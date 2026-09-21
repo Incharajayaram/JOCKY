@@ -7,6 +7,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 /* ============================================================================
  * Anti-Analysis: Debugger, VM, Sandbox Detection

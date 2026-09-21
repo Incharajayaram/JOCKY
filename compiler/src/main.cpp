@@ -9,7 +9,8 @@ static void printUsage(const char* prog) {
     std::cout << "Usage: " << prog << " [options] <input.jky>\n"
               << "Options:\n"
               << "  -o <file>      Output executable name (default: a.out)\n"
-              << "  -p <profile>   Obfuscation profile: none, light, standard, aggressive (default: standard)\n"
+              << "  -p <profile>   Obfuscation profile: none, light, standard, aggressive, paranoid (default: standard)\n"
+              << "  --pack         Pack final binary with UPX\n"
               << "  -k             Keep intermediate files\n"
               << "  -h             Show this help\n";
 }
@@ -28,6 +29,8 @@ int main(int argc, char** argv) {
             opts.outputFile = argv[++i];
         } else if (std::strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
             opts.profile = argv[++i];
+        } else if (std::strcmp(argv[i], "--pack") == 0) {
+            opts.pack = true;
         } else if (std::strcmp(argv[i], "-k") == 0) {
             opts.keepIntermediates = true;
         } else if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
