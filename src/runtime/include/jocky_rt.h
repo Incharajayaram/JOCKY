@@ -105,3 +105,45 @@ uint32_t jocky_runtime_init(void);
 #endif
 
 #endif /* JOCKY_RT_H */
+
+/* ============================================================================
+ * Direct Syscalls (Hell's Gate) - Windows x64
+ * ============================================================================ */
+
+#ifdef _WIN32
+
+/* Execute direct syscall with 4 arguments */
+intptr_t jocky_direct_syscall4(uint32_t syscall_number, 
+                                uintptr_t a1, uintptr_t a2, 
+                                uintptr_t a3, uintptr_t a4);
+
+/* Execute direct syscall with 6 arguments */
+intptr_t jocky_direct_syscall6(uint32_t syscall_number,
+                                uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
+                                uintptr_t a5, uintptr_t a6);
+
+/* Get syscall number by name (e.g., "NtAllocateVirtualMemory") */
+uint32_t jocky_get_syscall_num(const char* zw_name);
+
+/* Convenience wrappers */
+NTSTATUS jocky_nt_allocate_virtual_memory(HANDLE process, PVOID* base,
+                                           ULONG_PTR zero_bits, PSIZE_T size,
+                                           ULONG type, ULONG protect);
+
+NTSTATUS jocky_nt_protect_virtual_memory(HANDLE process, PVOID* base,
+                                          PSIZE_T size, ULONG new_protect,
+                                          PULONG old_protect);
+
+NTSTATUS jocky_nt_create_thread(HANDLE* thread_handle, ACCESS_MASK desired_access,
+                                 POBJECT_ATTRIBUTES object_attributes, HANDLE process_handle,
+                                 PVOID start_routine, PVOID argument,
+                                 ULONG create_flags, PULONG thread_id);
+
+NTSTATUS jocky_nt_write_virtual_memory(HANDLE process, PVOID base, PVOID buffer,
+                                        SIZE_T size, PSIZE_T written);
+
+NTSTATUS jocky_nt_protect_virtual_memory(HANDLE process, PVOID* base,
+                                          PSIZE_T size, ULONG new_protect,
+                                          PULONG old_protect);
+
+#endif /* _WIN32 */
