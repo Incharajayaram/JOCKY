@@ -18,6 +18,13 @@ static bool exec(const std::string& cmd) {
     return ret == 0;
 }
 
+static std::string getTargetFlag(const CompileOptions& opts) {
+    if (!opts.target.empty()) {
+        return "--target=" + opts.target + " ";
+    }
+    return "";
+}
+
 bool Pipeline::findToolchain(std::string& outClang, std::string& outOpt, std::string& outPlugin) {
     const char* env = std::getenv("JOCKY_LLVM_TOOLCHAIN");
     std::string prefix;
@@ -183,7 +190,8 @@ bool Pipeline::runObfuscation(const CompileOptions& opts, const std::string& inB
     std::string clang, opt, plugin;
     if (!findToolchain(clang, opt, plugin)) return false;
 
-    std::string cmd1 = clang + " -O1 -c -emit-llvm -x ir -Wno-override-module " + inBc + " -o " + inBc + ".tmp.bc";
+    std::string targetFlag = getTargetFlag(opts);
+    std::string cmd1 = clang + " " + targetFlag + "-O1 -c -emit-llvm -x ir -Wno-override-module " + inBc + " -o " + inBc + ".tmp.bc";
     if (!exec(cmd1)) {
         std::cerr << "[!] Failed to compile IR to bitcode\n";
         return false;
@@ -226,12 +234,13 @@ bool Pipeline::compileToObject(const CompileOptions& opts, const std::string& bc
     std::string clang, opt, plugin;
     if (!findToolchain(clang, opt, plugin)) return false;
 
-    std::string cmd = clang + " -c " + bc + " -o " + obj;
+    std::string targetFlag = getTargetFlag(opts);
+    std::string cmd = clang + " " + targetFlag + "-c " + bc + " -o " + obj;
     return exec(cmd);
 }
 
 bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDir,
-                              std::vector<std::string>& outObjs) {
+                              std::vector<std::string>& outObjs, const std::string& targetFlag) {
     namespace fs = std::filesystem;
 
     // Find runtime directory relative to compiler source
@@ -246,34 +255,36 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
 
     // System include paths for standard C headers
     std::vector<std::string> sysIncludes;
-#ifdef _WIN32
-    // Windows / MSVC paths
-    sysIncludes = {
-        "C:/Program Files/LLVM/lib/clang/17/include",
-        "C:/Program Files/LLVM/lib/clang/18/include",
-        "C:/Program Files/LLVM/lib/clang/19/include",
-    };
-    // Try to pick up MSVC paths from environment
-    const char* vcinst = std::getenv("VCINSTALLDIR");
-    if (vcinst) {
-        sysIncludes.push_back(std::string(vcinst) + "/VC/Tools/MSVC/Current/Include");
+    bool isWindowsTarget = targetFlag.find("windows") != std::string::npos || targetFlag.find("mingw") != std::string::npos || targetFlag.find("msvc") != std::string::npos;
+    
+    if (isWindowsTarget) {
+        // Windows / MSVC / mingw paths
+        sysIncludes = {
+            "C:/Program Files/LLVM/lib/clang/17/include",
+            "C:/Program Files/LLVM/lib/clang/18/include",
+            "C:/Program Files/LLVM/lib/clang/19/include",
+        };
+        // Try to pick up MSVC paths from environment
+        const char* vcinst = std::getenv("VCINSTALLDIR");
+        if (vcinst) {
+            sysIncludes.push_back(std::string(vcinst) + "/VC/Tools/MSVC/Current/Include");
+        }
+        const char* sdkDir = std::getenv("WindowsSdkDir");
+        if (sdkDir) {
+            sysIncludes.push_back(std::string(sdkDir) + "/Include/10.0.19041.0/ucrt");
+        }
+    } else {
+        // Linux / Unix paths
+        sysIncludes = {
+            "/usr/include",
+            "/usr/include/x86_64-linux-gnu",
+            "/usr/lib/gcc/x86_64-linux-gnu/15/include",
+            "/usr/lib/gcc/x86_64-linux-gnu/16/include",
+            "/usr/lib/llvm-17/lib/clang/17/include",
+            "/usr/lib/llvm-18/lib/clang/18/include",
+            "/usr/lib/llvm-19/lib/clang/19/include",
+        };
     }
-    const char* sdkDir = std::getenv("WindowsSdkDir");
-    if (sdkDir) {
-        sysIncludes.push_back(std::string(sdkDir) + "/Include/10.0.19041.0/ucrt");
-    }
-#else
-    // Linux / Unix paths
-    sysIncludes = {
-        "/usr/include",
-        "/usr/include/x86_64-linux-gnu",
-        "/usr/lib/gcc/x86_64-linux-gnu/15/include",
-        "/usr/lib/gcc/x86_64-linux-gnu/16/include",
-        "/usr/lib/llvm-17/lib/clang/17/include",
-        "/usr/lib/llvm-18/lib/clang/18/include",
-        "/usr/lib/llvm-19/lib/clang/19/include",
-    };
-#endif
     std::string incFlags = "-I" + includeDir.string();
     for (const auto& inc : sysIncludes) {
         if (fs::exists(inc)) {
@@ -288,22 +299,18 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
         runtimeDir / "cleanup" / "logs.c",
     };
 
-    // Windows-only sources
-#ifdef _WIN32
-    sources.push_back(runtimeDir / "evasion" / "unhook.c");
-    sources.push_back(runtimeDir / "evasion" / "syscalls.c");
-    sources.push_back(runtimeDir / "execution" / "hollow.c");
-#endif
+    // Windows-only sources - include when targeting Windows
+    if (isWindowsTarget) {
+        sources.push_back(runtimeDir / "evasion" / "unhook.c");
+        sources.push_back(runtimeDir / "evasion" / "syscalls.c");
+        sources.push_back(runtimeDir / "execution" / "hollow.c");
+    }
 
     for (const auto& src : sources) {
         if (!fs::exists(src)) continue;
 
-#ifdef _WIN32
-        fs::path obj = fs::path(outDir) / (src.stem().string() + ".obj");
-#else
         fs::path obj = fs::path(outDir) / (src.stem().string() + ".o");
-#endif
-        std::string cmd = clang + " -O2 -c " + incFlags + " " + src.string() + " -o " + obj.string();
+        std::string cmd = clang + " " + targetFlag + "-O2 -c " + incFlags + " " + src.string() + " -o " + obj.string();
         if (!exec(cmd)) {
             std::cerr << "[!] Failed to compile runtime: " << src << "\n";
             return false;
@@ -317,16 +324,18 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
 bool Pipeline::linkExecutable(const CompileOptions& opts, const std::string& clang,
                               const std::string& obj, const std::vector<std::string>& runtimeObjs,
                               const std::string& exe) {
-    std::string cmd = clang + " " + obj;
+    std::string targetFlag = getTargetFlag(opts);
+    std::string cmd = clang + " " + targetFlag + obj;
     for (const auto& ro : runtimeObjs) {
         cmd += " " + ro;
     }
     cmd += " -o " + exe;
-#ifdef _WIN32
-    cmd += " -lntdll";
-#else
-    cmd += " -ldl -lpthread";
-#endif
+    bool isWindowsTarget = targetFlag.find("windows") != std::string::npos || targetFlag.find("mingw") != std::string::npos || targetFlag.find("msvc") != std::string::npos;
+    if (isWindowsTarget) {
+        cmd += " -lntdll";
+    } else {
+        cmd += " -ldl -lpthread";
+    }
     return exec(cmd);
 }
 
@@ -335,13 +344,14 @@ bool Pipeline::run(const CompileOptions& opts) {
     size_t dot = base.find_last_of('.');
     if (dot != std::string::npos) base = base.substr(0, dot);
 
+    bool isWindowsTarget = !opts.target.empty() && 
+        (opts.target.find("windows") != std::string::npos || 
+         opts.target.find("mingw") != std::string::npos || 
+         opts.target.find("msvc") != std::string::npos);
+
     std::string llPath = base + ".ll";
     std::string bcPath = base + ".obf.bc";
-#ifdef _WIN32
-    std::string objPath = base + ".obj";
-#else
-    std::string objPath = base + ".o";
-#endif
+    std::string objPath = base + (isWindowsTarget ? ".obj" : ".o");
     std::string exePath = opts.outputFile;
 
     std::cout << "[*] Parsing and generating LLVM IR...\n";
@@ -374,10 +384,11 @@ bool Pipeline::run(const CompileOptions& opts) {
 
     std::vector<std::string> runtimeObjs;
     std::string outDir = base + ".build";
+    std::string targetFlag = getTargetFlag(opts);
     if (!opts.noRuntime) {
         std::cout << "[*] Compiling runtime library...\n";
         std::filesystem::create_directories(outDir);
-        if (!compileRuntime(clang, outDir, runtimeObjs)) {
+        if (!compileRuntime(clang, outDir, runtimeObjs, targetFlag)) {
             std::cerr << "[!] Runtime compilation failed\n";
             return false;
         }
