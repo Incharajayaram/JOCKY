@@ -7,7 +7,7 @@ namespace jocky {
 
 struct CompileOptions {
     std::string inputFile;
-    std::string outputFile = "a.out";
+    std::string outputFile;
     std::string profile = "standard";
     bool keepIntermediates = false;
     bool windows = false;

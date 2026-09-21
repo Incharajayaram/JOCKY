@@ -8,7 +8,7 @@ using namespace jocky;
 static void printUsage(const char* prog) {
     std::cout << "Usage: " << prog << " [options] <input.jky>\n"
               << "Options:\n"
-              << "  -o <file>      Output executable name (default: a.out)\n"
+              << "  -o <file>      Output executable name (default: input stem)\n"
               << "  -p <profile>   Obfuscation profile: none, light, standard, aggressive, paranoid (default: standard)\n"
               << "  --pack         Pack final binary with UPX\n"
               << "  -k             Keep intermediate files\n"
@@ -51,7 +51,16 @@ int main(int argc, char** argv) {
 
     opts.inputFile = input;
     if (opts.outputFile.empty()) {
-        opts.outputFile = "a.out";
+        // Default output name = input file stem (like Python pipeline)
+        size_t slash = input.find_last_of("/\\");
+        std::string name = (slash != std::string::npos) ? input.substr(slash + 1) : input;
+        size_t dot = name.find_last_of('.');
+        if (dot != std::string::npos) name = name.substr(0, dot);
+#ifdef _WIN32
+        opts.outputFile = name + ".exe";
+#else
+        opts.outputFile = name;
+#endif
     }
 
     Pipeline pipeline;
