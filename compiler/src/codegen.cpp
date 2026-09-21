@@ -8,7 +8,7 @@
 
 namespace jocky {
 
-CodeGen::CodeGen() {}
+CodeGen::CodeGen(bool noRuntime_) : noRuntime(noRuntime_) {}
 
 llvm::Type* CodeGen::llvmType(const JType& t) {
     llvm::Type* base = nullptr;
@@ -82,8 +82,8 @@ std::unique_ptr<llvm::Module> CodeGen::generate(Program& prog, const std::string
         }
     }
 
-    // Declare runtime init function
-    {
+    // Declare runtime init function (unless skipped)
+    if (!noRuntime) {
         llvm::FunctionType* rtFT = llvm::FunctionType::get(
             llvm::Type::getInt32Ty(ctx), false);
         llvm::Function::Create(rtFT, llvm::Function::ExternalLinkage,
