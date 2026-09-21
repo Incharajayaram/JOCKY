@@ -31,3 +31,7 @@ a.out
 
 # Toolchain (if bundled locally)
 toolchain/
+
+# C++ compiler build directory
+compiler/build/
+
