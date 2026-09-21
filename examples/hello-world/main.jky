@@ -1,0 +1,6 @@
+ffi puts(s: string) -> i32;
+
+fn main() -> i32 {
+    puts("Hello, JOCKY!");
+    return 0;
+}

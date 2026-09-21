@@ -1,0 +1,10 @@
+name: none
+description: No obfuscation, plain compilation
+passes: []
+polymorphic: false
+seed: 0
+optimization_level: 0
+packing:
+  enabled: false
+  tool: upx
+  args: []

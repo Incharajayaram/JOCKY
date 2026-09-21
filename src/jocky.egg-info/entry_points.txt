@@ -1,2 +1,0 @@
-[console_scripts]
-jocky = jocky.cli:main

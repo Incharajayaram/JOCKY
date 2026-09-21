@@ -1,12 +1,33 @@
-toolchain/
+# Build artifacts
 *.exe
 *.obj
 *.bc
-a.out
-.vscode/
-.jocky/
-temp*
-__pycache__/
 *.so
 *.o
 *.a
+*.ll
+
+# Python
+__pycache__/
+*.egg-info/
+*.egg
+*.pyc
+*.pyo
+venv/
+env/
+
+# Editor
+.vscode/
+.idea/
+
+# JOCKY build directories
+.jocky/
+.jocky-build/
+
+# Temp files
+temp*
+*.tmp
+a.out
+
+# Toolchain (if bundled locally)
+toolchain/
