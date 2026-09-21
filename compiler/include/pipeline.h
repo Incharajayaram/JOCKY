@@ -13,6 +13,7 @@ struct CompileOptions {
     bool windows = false;
     bool pack = false;
     bool noRuntime = false;
+    bool encryptStrings = false;
 };
 
 class Pipeline {
@@ -28,6 +29,10 @@ private:
                         const std::string& obj, const std::vector<std::string>& runtimeObjs,
                         const std::string& exe);
     bool findToolchain(std::string& outClang, std::string& outOpt, std::string& outPlugin);
+    bool findMLIRTools(std::string& outTranslate, std::string& outMlirOpt, std::string& outMlirPlugin);
+    bool runMLIRObfuscation(const std::string& inLl, const std::string& outLl,
+                            const std::string& translate, const std::string& mlirOpt,
+                            const std::string& mlirPlugin);
 };
 
 } // namespace jocky

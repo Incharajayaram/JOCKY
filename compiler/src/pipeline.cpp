@@ -85,6 +85,67 @@ bool Pipeline::findToolchain(std::string& outClang, std::string& outOpt, std::st
     return true;
 }
 
+bool Pipeline::findMLIRTools(std::string& outTranslate, std::string& outMlirOpt, std::string& outMlirPlugin) {
+    std::string clang, opt, llvmPlugin;
+    if (!findToolchain(clang, opt, llvmPlugin)) return false;
+
+    std::string prefix = clang.substr(0, clang.find_last_of("/\\"));
+    prefix = prefix.substr(0, prefix.find_last_of("/\\"));
+
+#ifdef _WIN32
+    outTranslate = prefix + "/bin/mlir-translate.exe";
+    outMlirOpt = prefix + "/bin/mlir-opt.exe";
+    outMlirPlugin = prefix + "/lib/MLIRObfuscationPlugin.dll";
+#else
+    outTranslate = prefix + "/bin/mlir-translate";
+    outMlirOpt = prefix + "/bin/mlir-opt";
+    outMlirPlugin = prefix + "/lib/MLIRObfuscationPlugin.so";
+#endif
+
+    if (!std::filesystem::exists(outTranslate)) {
+        std::cerr << "[!] mlir-translate not found: " << outTranslate << "\n";
+        return false;
+    }
+    if (!std::filesystem::exists(outMlirOpt)) {
+        std::cerr << "[!] mlir-opt not found: " << outMlirOpt << "\n";
+        return false;
+    }
+    return true;
+}
+
+bool Pipeline::runMLIRObfuscation(const std::string& inLl, const std::string& outLl,
+                                  const std::string& translate, const std::string& mlirOpt,
+                                  const std::string& mlirPlugin) {
+    std::string mlirPath = inLl + ".tmp.mlir";
+    std::string encMlirPath = inLl + ".tmp.enc.mlir";
+
+    // LLVM IR -> MLIR
+    std::string cmd1 = translate + " --import-llvm " + inLl + " -o " + mlirPath;
+    if (!exec(cmd1)) {
+        std::cerr << "[!] Failed to convert LLVM IR to MLIR\n";
+        return false;
+    }
+
+    // Run MLIR string encryption
+    std::string cmd2 = mlirOpt + " --load-pass-plugin=" + mlirPlugin +
+                       " --string-encrypt " + mlirPath + " -o " + encMlirPath;
+    if (!exec(cmd2)) {
+        std::cerr << "[!] MLIR string encryption failed\n";
+        return false;
+    }
+
+    // MLIR -> LLVM IR
+    std::string cmd3 = translate + " --mlir-to-llvmir " + encMlirPath + " -o " + outLl;
+    if (!exec(cmd3)) {
+        std::cerr << "[!] Failed to convert MLIR back to LLVM IR\n";
+        return false;
+    }
+
+    std::filesystem::remove(mlirPath);
+    std::filesystem::remove(encMlirPath);
+    return true;
+}
+
 bool Pipeline::emitLLVMIR(const CompileOptions& opts, const std::string& llPath) {
     std::ifstream in(opts.inputFile);
     if (!in) {
@@ -285,6 +346,22 @@ bool Pipeline::run(const CompileOptions& opts) {
 
     std::cout << "[*] Parsing and generating LLVM IR...\n";
     if (!emitLLVMIR(opts, llPath)) return false;
+
+    if (opts.encryptStrings) {
+        std::cout << "[*] Encrypting strings via MLIR...\n";
+        std::string translate, mlirOpt, mlirPlugin;
+        if (!findMLIRTools(translate, mlirOpt, mlirPlugin)) {
+            std::cerr << "[!] MLIR tools not found, skipping string encryption\n";
+        } else {
+            std::string encLlPath = llPath + ".enc.ll";
+            if (runMLIRObfuscation(llPath, encLlPath, translate, mlirOpt, mlirPlugin)) {
+                std::filesystem::remove(llPath);
+                std::filesystem::rename(encLlPath, llPath);
+            } else {
+                std::cerr << "[!] String encryption failed, continuing with plaintext strings\n";
+            }
+        }
+    }
 
     std::cout << "[*] Running obfuscation passes (profile: " << opts.profile << ")...\n";
     if (!runObfuscation(opts, llPath, bcPath)) return false;
