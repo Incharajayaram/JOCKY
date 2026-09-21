@@ -303,6 +303,7 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
         runtimeDir / "init" / "anti_analysis.c",
         runtimeDir / "cleanup" / "self_delete.c",
         runtimeDir / "cleanup" / "logs.c",
+        runtimeDir / "vm" / "vm_interpreter.c",
     };
 
     // Windows-only sources - only include when targeting Windows AND runtime is enabled
@@ -406,25 +407,56 @@ bool Pipeline::run(const CompileOptions& opts) {
     std::cout << "[+] Build succeeded: " << exePath << "\n";
 
     if (opts.pack) {
-        std::cout << "[*] Packing binary with UPX...\n";
-        std::string upx;
+        bool is_windows_target = !opts.target.empty() && 
+            (opts.target.find("windows") != std::string::npos || 
+             opts.target.find("mingw") != std::string::npos || 
+             opts.target.find("msvc") != std::string::npos);
+        
+        if (is_windows_target) {
+            std::cout << "[*] Packing binary with custom RC4 packer...\n";
+            std::string packer;
 #ifdef _WIN32
-        upx = "upx.exe";
+            packer = "pe_packer.exe";
 #else
-        upx = "/tmp/upx";
-        if (!std::filesystem::exists(upx)) {
-            upx = "upx";
-        }
+            packer = "/home/kamini/projects/sih148/JOCKY/compiler/build/pe_packer";
 #endif
-        std::string cmd = upx + " --best " + exePath;
+            if (!std::filesystem::exists(packer)) {
+                std::cerr << "[!] Custom packer not found: " << packer << "\n";
+                std::cerr << "    Building packer...\n";
+                std::string build_cmd = "g++ -O2 -std=c++17 /home/kamini/projects/sih148/JOCKY/compiler/src/pe_packer.cpp -o " + packer;
+                if (!exec(build_cmd)) {
+                    std::cerr << "[!] Failed to build packer\n";
+                }
+            }
+            std::string packed_path = exePath + ".packed";
+            std::string cmd = packer + " " + exePath + " " + packed_path;
+            if (!exec(cmd)) {
+                std::cerr << "[!] Custom packing failed\n";
+            } else {
+                std::filesystem::rename(packed_path, exePath);
+                std::cout << "[+] Packed with custom RC4 packer\n";
+            }
+        } else {
+            std::cout << "[*] Packing binary with UPX...\n";
+            std::string upx;
 #ifdef _WIN32
-        cmd += " >nul 2>&1";
+            upx = "upx.exe";
 #else
-        cmd += " 2>/dev/null";
+            upx = "/tmp/upx";
+            if (!std::filesystem::exists(upx)) {
+                upx = "upx";
+            }
 #endif
-        if (!exec(cmd)) {
-            std::cerr << "[!] Warning: UPX not found. Binary was NOT packed.\n";
-            std::cerr << "    Install UPX or place the binary on PATH to enable packing.\n";
+            std::string cmd = upx + " --best " + exePath;
+#ifdef _WIN32
+            cmd += " >nul 2>&1";
+#else
+            cmd += " 2>/dev/null";
+#endif
+            if (!exec(cmd)) {
+                std::cerr << "[!] Warning: UPX not found. Binary was NOT packed.\n";
+                std::cerr << "    Install UPX or place the binary on PATH to enable packing.\n";
+            }
         }
     }
 
