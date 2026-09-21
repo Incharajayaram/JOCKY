@@ -28,9 +28,15 @@ bool Pipeline::findToolchain(std::string& outClang, std::string& outOpt, std::st
         if (path) {
             std::stringstream ss(path);
             std::string dir;
+#ifdef _WIN32
+            while (std::getline(ss, dir, ';')) {
+                std::string clang = dir + "/clang.exe";
+                std::string opt = dir + "/opt.exe";
+#else
             while (std::getline(ss, dir, ':')) {
                 std::string clang = dir + "/clang";
                 std::string opt = dir + "/opt";
+#endif
                 if (std::filesystem::exists(clang) && std::filesystem::exists(opt)) {
                     prefix = dir + "/..";
                     break;
@@ -38,13 +44,35 @@ bool Pipeline::findToolchain(std::string& outClang, std::string& outOpt, std::st
             }
         }
         if (prefix.empty()) {
+#ifdef _WIN32
+            std::vector<std::string> candidates = {
+                "C:/Program Files/LLVM",
+                "C:/LLVM",
+            };
+            namespace fs = std::filesystem;
+            fs::path compilerSrc = fs::path(__FILE__).parent_path().parent_path();
+            candidates.push_back((compilerSrc / ".." / "llvm").string());
+            for (const auto& cand : candidates) {
+                if (std::filesystem::exists(cand + "/bin/clang.exe")) {
+                    prefix = cand;
+                    break;
+                }
+            }
+#else
             prefix = "/home/kamini/projects/llvm-obfuscation-tools-linux-x86_64";
+#endif
         }
     }
 
+#ifdef _WIN32
+    outClang = prefix + "/bin/clang.exe";
+    outOpt = prefix + "/bin/opt.exe";
+    outPlugin = prefix + "/lib/LLVMObfuscationPlugin.dll";
+#else
     outClang = prefix + "/bin/clang";
     outOpt = prefix + "/bin/opt";
     outPlugin = prefix + "/lib/LLVMObfuscationPlugin.so";
+#endif
 
     if (!std::filesystem::exists(outClang)) {
         std::cerr << "[!] clang not found: " << outClang << "\n";
@@ -125,12 +153,11 @@ bool Pipeline::runObfuscation(const CompileOptions& opts, const std::string& inB
             return false;
         }
     } else {
-        std::string cmd2 = "cp " + inBc + ".tmp.bc " + outBc;
-        exec(cmd2);
+        std::filesystem::copy(inBc + ".tmp.bc", outBc,
+                              std::filesystem::copy_options::overwrite_existing);
     }
 
-    std::string rm = "rm -f " + inBc + ".tmp.bc";
-    exec(rm);
+    std::filesystem::remove(inBc + ".tmp.bc");
     return true;
 }
 
@@ -157,12 +184,35 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
     }
 
     // System include paths for standard C headers
-    std::vector<std::string> sysIncludes = {
+    std::vector<std::string> sysIncludes;
+#ifdef _WIN32
+    // Windows / MSVC paths
+    sysIncludes = {
+        "C:/Program Files/LLVM/lib/clang/17/include",
+        "C:/Program Files/LLVM/lib/clang/18/include",
+        "C:/Program Files/LLVM/lib/clang/19/include",
+    };
+    // Try to pick up MSVC paths from environment
+    const char* vcinst = std::getenv("VCINSTALLDIR");
+    if (vcinst) {
+        sysIncludes.push_back(std::string(vcinst) + "/VC/Tools/MSVC/Current/Include");
+    }
+    const char* sdkDir = std::getenv("WindowsSdkDir");
+    if (sdkDir) {
+        sysIncludes.push_back(std::string(sdkDir) + "/Include/10.0.19041.0/ucrt");
+    }
+#else
+    // Linux / Unix paths
+    sysIncludes = {
         "/usr/include",
         "/usr/include/x86_64-linux-gnu",
         "/usr/lib/gcc/x86_64-linux-gnu/15/include",
+        "/usr/lib/gcc/x86_64-linux-gnu/16/include",
         "/usr/lib/llvm-17/lib/clang/17/include",
+        "/usr/lib/llvm-18/lib/clang/18/include",
+        "/usr/lib/llvm-19/lib/clang/19/include",
     };
+#endif
     std::string incFlags = "-I" + includeDir.string();
     for (const auto& inc : sysIncludes) {
         if (fs::exists(inc)) {
@@ -187,7 +237,11 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
     for (const auto& src : sources) {
         if (!fs::exists(src)) continue;
 
+#ifdef _WIN32
+        fs::path obj = fs::path(outDir) / (src.stem().string() + ".obj");
+#else
         fs::path obj = fs::path(outDir) / (src.stem().string() + ".o");
+#endif
         std::string cmd = clang + " -O2 -c " + incFlags + " " + src.string() + " -o " + obj.string();
         if (!exec(cmd)) {
             std::cerr << "[!] Failed to compile runtime: " << src << "\n";
@@ -222,7 +276,11 @@ bool Pipeline::run(const CompileOptions& opts) {
 
     std::string llPath = base + ".ll";
     std::string bcPath = base + ".obf.bc";
+#ifdef _WIN32
+    std::string objPath = base + ".obj";
+#else
     std::string objPath = base + ".o";
+#endif
     std::string exePath = opts.outputFile;
 
     std::cout << "[*] Parsing and generating LLVM IR...\n";
@@ -254,20 +312,32 @@ bool Pipeline::run(const CompileOptions& opts) {
 
     if (opts.pack) {
         std::cout << "[*] Packing binary with UPX...\n";
-        std::string upx = "/tmp/upx";
+        std::string upx;
+#ifdef _WIN32
+        upx = "upx.exe";
+#else
+        upx = "/tmp/upx";
         if (!std::filesystem::exists(upx)) {
             upx = "upx";
         }
-        std::string cmd = upx + " --best " + exePath + " 2>/dev/null";
+#endif
+        std::string cmd = upx + " --best " + exePath;
+#ifdef _WIN32
+        cmd += " >nul 2>&1";
+#else
+        cmd += " 2>/dev/null";
+#endif
         if (!exec(cmd)) {
             std::cerr << "[!] Warning: UPX not found. Binary was NOT packed.\n";
-            std::cerr << "    Install UPX or place the binary at /tmp/upx to enable packing.\n";
+            std::cerr << "    Install UPX or place the binary on PATH to enable packing.\n";
         }
     }
 
     if (!opts.keepIntermediates) {
-        std::string rm = "rm -rf " + llPath + " " + bcPath + " " + objPath + " " + outDir;
-        exec(rm);
+        std::filesystem::remove_all(llPath);
+        std::filesystem::remove_all(bcPath);
+        std::filesystem::remove_all(objPath);
+        std::filesystem::remove_all(outDir);
     }
 
     return true;
