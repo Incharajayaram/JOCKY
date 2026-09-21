@@ -25,7 +25,7 @@ private:
     bool emitLLVMIR(const CompileOptions& opts, const std::string& llPath);
     bool runObfuscation(const CompileOptions& opts, const std::string& inBc, const std::string& outBc);
     bool compileToObject(const CompileOptions& opts, const std::string& bc, const std::string& obj);
-    bool compileRuntime(const std::string& clang, const std::string& outDir, std::vector<std::string>& outObjs, const std::string& targetFlag);
+    bool compileRuntime(const std::string& clang, const std::string& outDir, std::vector<std::string>& outObjs, const std::string& targetFlag, bool noRuntime);
     bool linkExecutable(const CompileOptions& opts, const std::string& clang,
                         const std::string& obj, const std::vector<std::string>& runtimeObjs,
                         const std::string& exe);
