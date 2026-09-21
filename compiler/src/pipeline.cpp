@@ -101,7 +101,7 @@ bool Pipeline::emitLLVMIR(const CompileOptions& opts, const std::string& llPath)
         Parser parser(std::move(tokens));
         auto ast = parser.parse();
 
-        CodeGen codegen;
+        CodeGen codegen(opts.noRuntime);
         auto mod = codegen.generate(*ast, opts.inputFile);
 
         std::error_code ec;
@@ -292,17 +292,18 @@ bool Pipeline::run(const CompileOptions& opts) {
     std::cout << "[*] Compiling to object...\n";
     if (!compileToObject(opts, bcPath, objPath)) return false;
 
-    std::cout << "[*] Compiling runtime library...\n";
     std::string clang, opt, plugin;
     if (!findToolchain(clang, opt, plugin)) return false;
 
-    std::string outDir = base + ".build";
-    std::filesystem::create_directories(outDir);
-
     std::vector<std::string> runtimeObjs;
-    if (!compileRuntime(clang, outDir, runtimeObjs)) {
-        std::cerr << "[!] Runtime compilation failed\n";
-        return false;
+    std::string outDir = base + ".build";
+    if (!opts.noRuntime) {
+        std::cout << "[*] Compiling runtime library...\n";
+        std::filesystem::create_directories(outDir);
+        if (!compileRuntime(clang, outDir, runtimeObjs)) {
+            std::cerr << "[!] Runtime compilation failed\n";
+            return false;
+        }
     }
 
     std::cout << "[*] Linking executable...\n";
@@ -337,7 +338,9 @@ bool Pipeline::run(const CompileOptions& opts) {
         std::filesystem::remove_all(llPath);
         std::filesystem::remove_all(bcPath);
         std::filesystem::remove_all(objPath);
-        std::filesystem::remove_all(outDir);
+        if (!opts.noRuntime) {
+            std::filesystem::remove_all(outDir);
+        }
     }
 
     return true;

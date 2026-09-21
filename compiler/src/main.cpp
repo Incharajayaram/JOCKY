@@ -11,6 +11,7 @@ static void printUsage(const char* prog) {
               << "  -o <file>      Output executable name (default: input stem)\n"
               << "  -p <profile>   Obfuscation profile: none, light, standard, aggressive, paranoid (default: standard)\n"
               << "  --pack         Pack final binary with UPX\n"
+              << "  --no-runtime   Skip anti-analysis runtime (cleaner binary)\n"
               << "  -k             Keep intermediate files\n"
               << "  -h             Show this help\n";
 }
@@ -31,6 +32,8 @@ int main(int argc, char** argv) {
             opts.profile = argv[++i];
         } else if (std::strcmp(argv[i], "--pack") == 0) {
             opts.pack = true;
+        } else if (std::strcmp(argv[i], "--no-runtime") == 0) {
+            opts.noRuntime = true;
         } else if (std::strcmp(argv[i], "-k") == 0) {
             opts.keepIntermediates = true;
         } else if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {

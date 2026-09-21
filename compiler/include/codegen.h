@@ -19,7 +19,7 @@ public:
 
 class CodeGen {
 public:
-    CodeGen();
+    CodeGen(bool noRuntime = false);
     std::unique_ptr<llvm::Module> generate(Program& prog, const std::string& moduleName);
 
 private:
@@ -40,6 +40,7 @@ private:
     std::unordered_map<std::string, Local> locals;
 
     llvm::Function* currentFunc = nullptr;
+    bool noRuntime = false;
 
     void declareFunc(FuncDecl& decl);
     void declareFFI(FFIDecl& decl);

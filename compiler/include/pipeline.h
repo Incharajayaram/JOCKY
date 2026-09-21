@@ -12,6 +12,7 @@ struct CompileOptions {
     bool keepIntermediates = false;
     bool windows = false;
     bool pack = false;
+    bool noRuntime = false;
 };
 
 class Pipeline {
