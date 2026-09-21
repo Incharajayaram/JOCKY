@@ -1,0 +1,9 @@
+name: light
+description: Mild string obfuscation only
+passes:
+  - string_encrypt
+polymorphic: false
+seed: 0
+optimization_level: 1
+packing:
+  enabled: false

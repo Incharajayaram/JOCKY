@@ -1,0 +1,2 @@
+#!/bin/bash
+docker run --rm -v "$(pwd)":/workspace jocky-env /bin/bash -c "/opt/llvm-mingw/bin/x86_64-w64-mingw32-clang -O2 -emit-llvm -c malware_windows_v3_full.c -o temp2.bc && /workspace/toolchain/bin/run-opt.sh -load-pass-plugin=/workspace/toolchain/lib/LLVMObfuscationPlugin.so -passes=boguscf,flattening,substitution,split,linear-mba,opaque-pred temp2.bc -o temp2_obf.bc && /opt/llvm-mingw/bin/x86_64-w64-mingw32-clang -O2 temp2_obf.bc -o temp2.exe"

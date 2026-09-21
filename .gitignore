@@ -1,0 +1,12 @@
+toolchain/
+*.exe
+*.obj
+*.bc
+a.out
+.vscode/
+.jocky/
+temp*
+__pycache__/
+*.so
+*.o
+*.a

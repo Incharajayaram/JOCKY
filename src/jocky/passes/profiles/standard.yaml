@@ -1,0 +1,15 @@
+name: standard
+description: Balanced obfuscation for release builds
+passes:
+  - string_encrypt
+  - constant_obfuscate
+  - bogus_control_flow
+  - flatten_cfg
+  - instruction_substitution
+polymorphic: false
+seed: 0
+optimization_level: 2
+packing:
+  enabled: true
+  tool: upx
+  args: ["--best", "--lzma"]

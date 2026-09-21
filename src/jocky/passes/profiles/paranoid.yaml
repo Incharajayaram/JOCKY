@@ -1,0 +1,19 @@
+name: paranoid
+description: Everything + polymorphic
+passes:
+  - string_encrypt
+  - constant_obfuscate
+  - bogus_control_flow
+  - flatten_cfg
+  - instruction_substitution
+  - mlir_arith_obfuscate
+  - mlir_scf_obfuscate
+  - anti_debug
+  - anti_tamper
+polymorphic: true
+seed: random
+optimization_level: 3
+packing:
+  enabled: true
+  tool: upx
+  args: ["--best", "--lzma", "--ultra-brute"]
