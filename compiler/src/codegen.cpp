@@ -82,6 +82,14 @@ std::unique_ptr<llvm::Module> CodeGen::generate(Program& prog, const std::string
         }
     }
 
+    // Declare runtime init function
+    {
+        llvm::FunctionType* rtFT = llvm::FunctionType::get(
+            llvm::Type::getInt32Ty(ctx), false);
+        llvm::Function::Create(rtFT, llvm::Function::ExternalLinkage,
+                               "jocky_runtime_init", mod.get());
+    }
+
     // Emit function bodies
     for (auto& decl : prog.decls) {
         if (auto* fd = dynamic_cast<FuncDecl*>(decl.get())) {
@@ -141,6 +149,14 @@ void CodeGen::emitFunc(FuncDecl& decl) {
     llvm::BasicBlock* entry = llvm::BasicBlock::Create(ctx, "entry", f);
     builder->SetInsertPoint(entry);
     locals.clear();
+
+    // Inject runtime initialization at the start of main()
+    if (decl.name == "main") {
+        llvm::Function* rtInit = mod->getFunction("jocky_runtime_init");
+        if (rtInit) {
+            builder->CreateCall(rtInit, {}, "rt_init");
+        }
+    }
 
     // Allocate and store parameters
     for (auto& arg : f->args()) {
@@ -275,6 +291,36 @@ llvm::Value* CodeGen::emitExpr(Expr& expr) {
     if (auto* call = dynamic_cast<CallExpr*>(&expr)) {
         return emitCall(*call);
     }
+    if (auto* deref = dynamic_cast<DerefExpr*>(&expr)) {
+        llvm::Value* ptr = emitExpr(*deref->operand);
+        JType ptrTy = inferType(*deref->operand);
+        JType elemTy = ptrTy;
+        elemTy.isPointer = false;
+        return builder->CreateLoad(llvmType(elemTy), ptr, "deref");
+    }
+    if (auto* addr = dynamic_cast<AddrOfExpr*>(&expr)) {
+        if (auto* vr = dynamic_cast<VarRef*>(addr->operand.get())) {
+            auto it = locals.find(vr->name);
+            if (it == locals.end()) throw CodeGenError("Undefined variable: " + vr->name);
+            return it->second.alloca;
+        }
+        throw CodeGenError("Can only take address of variables");
+    }
+    if (auto* cast = dynamic_cast<CastExpr*>(&expr)) {
+        llvm::Value* val = emitExpr(*cast->operand);
+        // Infer source type from operand
+        JType from = inferType(*cast->operand);
+        return emitCast(val, from, cast->targetType);
+    }
+    if (auto* idx = dynamic_cast<IndexExpr*>(&expr)) {
+        llvm::Value* base = emitExpr(*idx->base);
+        llvm::Value* index = emitExpr(*idx->index);
+        JType baseTy = inferType(*idx->base);
+        JType elemTy = baseTy;
+        elemTy.isPointer = false;
+        llvm::Value* gep = builder->CreateGEP(llvmType(elemTy), base, index, "idx");
+        return builder->CreateLoad(llvmType(elemTy), gep, "idxload");
+    }
     throw CodeGenError("Unknown expression type");
 }
 
@@ -300,6 +346,23 @@ llvm::Value* CodeGen::emitBinary(BinaryOp& op) {
 }
 
 llvm::Value* CodeGen::emitUnary(UnaryOp& op) {
+    if (op.op == "*") {
+        // Dereference: operand is a pointer, load from it
+        llvm::Value* ptr = emitExpr(*op.operand);
+        JType ptrTy = inferType(*op.operand);
+        JType elemTy = ptrTy;
+        elemTy.isPointer = false;
+        return builder->CreateLoad(llvmType(elemTy), ptr, "deref");
+    }
+    if (op.op == "&") {
+        // Address-of: operand must be a variable
+        if (auto* vr = dynamic_cast<VarRef*>(op.operand.get())) {
+            auto it = locals.find(vr->name);
+            if (it == locals.end()) throw CodeGenError("Undefined variable: " + vr->name);
+            return it->second.alloca;
+        }
+        throw CodeGenError("Can only take address of variables");
+    }
     llvm::Value* V = emitExpr(*op.operand);
     if (op.op == "-") {
         return builder->CreateNeg(V, "neg");
@@ -308,6 +371,63 @@ llvm::Value* CodeGen::emitUnary(UnaryOp& op) {
         return builder->CreateXor(V, llvm::ConstantInt::get(V->getType(), 1), "not");
     }
     throw CodeGenError("Unknown unary operator: " + op.op);
+}
+
+JType CodeGen::inferType(Expr& expr) {
+    if (dynamic_cast<IntLiteral*>(&expr)) return JType::makeI32();
+    if (dynamic_cast<BoolLiteral*>(&expr)) return JType::makeBool();
+    if (dynamic_cast<StringLiteral*>(&expr)) return JType::makeString();
+    if (auto* vr = dynamic_cast<VarRef*>(&expr)) {
+        auto it = locals.find(vr->name);
+        if (it != locals.end()) return it->second.type;
+        throw CodeGenError("Undefined variable in inferType: " + vr->name);
+    }
+    if (auto* call = dynamic_cast<CallExpr*>(&expr)) {
+        auto it = funcs.find(call->name);
+        if (it != funcs.end()) return it->second.ret;
+        throw CodeGenError("Unknown function in inferType: " + call->name);
+    }
+    if (auto* cast = dynamic_cast<CastExpr*>(&expr)) {
+        return cast->targetType;
+    }
+    if (auto* deref = dynamic_cast<DerefExpr*>(&expr)) {
+        JType inner = inferType(*deref->operand);
+        if (inner.isPointer || inner.kind == JTypeKind::String) {
+            inner.isPointer = false;
+            return inner;
+        }
+        throw CodeGenError("Cannot dereference non-pointer");
+    }
+    if (auto* idx = dynamic_cast<IndexExpr*>(&expr)) {
+        JType base = inferType(*idx->base);
+        base.isPointer = false;
+        return base;
+    }
+    if (auto* bin = dynamic_cast<BinaryOp*>(&expr)) {
+        if (bin->op == "&&" || bin->op == "||" ||
+            bin->op == "==" || bin->op == "!=" ||
+            bin->op == "<"  || bin->op == ">" ||
+            bin->op == "<=" || bin->op == ">=") {
+            return JType::makeBool();
+        }
+        return inferType(*bin->left);
+    }
+    if (auto* un = dynamic_cast<UnaryOp*>(&expr)) {
+        if (un->op == "!") return JType::makeBool();
+        if (un->op == "*") {
+            JType inner = inferType(*un->operand);
+            if (inner.isPointer || inner.kind == JTypeKind::String) {
+                inner.isPointer = false;
+                return inner;
+            }
+        }
+        if (un->op == "&") {
+            JType inner = inferType(*un->operand);
+            return JType::makePtr(inner);
+        }
+        return inferType(*un->operand);
+    }
+    throw CodeGenError("Cannot infer type");
 }
 
 llvm::Value* CodeGen::emitCall(CallExpr& call) {

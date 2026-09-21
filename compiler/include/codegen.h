@@ -54,6 +54,7 @@ private:
 
     llvm::Type* llvmType(const JType& t);
     llvm::Value* emitCast(llvm::Value* val, const JType& from, const JType& to);
+    JType inferType(Expr& expr);
     bool isNumeric(const JType& t) const;
 };
 
