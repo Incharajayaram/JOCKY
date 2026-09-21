@@ -13,6 +13,7 @@ static void printUsage(const char* prog) {
               << "  --pack         Pack final binary with UPX\n"
               << "  --encrypt-strings  Encrypt string literals via MLIR\n"
               << "  --no-runtime   Skip anti-analysis runtime (cleaner binary)\n"
+              << "  --target <triple>  Cross-compile target (e.g., x86_64-w64-mingw32)\n"
               << "  -k             Keep intermediate files\n"
               << "  -h             Show this help\n";
 }
@@ -37,6 +38,8 @@ int main(int argc, char** argv) {
             opts.encryptStrings = true;
         } else if (std::strcmp(argv[i], "--no-runtime") == 0) {
             opts.noRuntime = true;
+        } else if (std::strcmp(argv[i], "--target") == 0 && i + 1 < argc) {
+            opts.target = argv[++i];
         } else if (std::strcmp(argv[i], "-k") == 0) {
             opts.keepIntermediates = true;
         } else if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
