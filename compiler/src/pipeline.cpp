@@ -133,8 +133,10 @@ bool Pipeline::runMLIRObfuscation(const std::string& inLl, const std::string& ou
         return false;
     }
 
-    // Run MLIR obfuscation passes (avoid symbol-obfuscate/crypto-hash which break global_ctors)
+    // Run MLIR obfuscation passes (symbol/crypto first, then string encrypt to preserve global_ctors)
     std::string cmd2 = mlirOpt + " --load-pass-plugin=" + mlirPlugin +
+                       " --symbol-obfuscate " +
+                       " --crypto-hash " +
                        " --string-encrypt " +
                        " --constant-obfuscate " +
                        " --import-obfuscate " +
@@ -244,7 +246,7 @@ bool Pipeline::compileToObject(const CompileOptions& opts, const std::string& bc
 }
 
 bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDir,
-                              std::vector<std::string>& outObjs, const std::string& targetFlag) {
+                              std::vector<std::string>& outObjs, const std::string& targetFlag, bool noRuntime) {
     namespace fs = std::filesystem;
 
     // Find runtime directory relative to compiler source
@@ -303,8 +305,8 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
         runtimeDir / "cleanup" / "logs.c",
     };
 
-    // Windows-only sources - include when targeting Windows
-    if (isWindowsTarget) {
+    // Windows-only sources - only include when targeting Windows AND runtime is enabled
+    if (isWindowsTarget && !noRuntime) {
         sources.push_back(runtimeDir / "evasion" / "unhook.c");
         sources.push_back(runtimeDir / "evasion" / "syscalls.c");
         sources.push_back(runtimeDir / "execution" / "hollow.c");
@@ -392,7 +394,7 @@ bool Pipeline::run(const CompileOptions& opts) {
     if (!opts.noRuntime) {
         std::cout << "[*] Compiling runtime library...\n";
         std::filesystem::create_directories(outDir);
-        if (!compileRuntime(clang, outDir, runtimeObjs, targetFlag)) {
+        if (!compileRuntime(clang, outDir, runtimeObjs, targetFlag, opts.noRuntime)) {
             std::cerr << "[!] Runtime compilation failed\n";
             return false;
         }
