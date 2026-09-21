@@ -1,11 +1,11 @@
 name: standard
 description: Balanced obfuscation for release builds
 passes:
-  - string_encrypt
-  - constant_obfuscate
   - bogus_control_flow
   - flatten_cfg
   - instruction_substitution
+  - linear_mba
+  - opaque_predicates
 polymorphic: false
 seed: 0
 optimization_level: 2

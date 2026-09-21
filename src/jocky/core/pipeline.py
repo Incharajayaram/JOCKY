@@ -1,34 +1,29 @@
-from typing import List
+from typing import List, Optional
+from rich.console import Console
+from rich.status import Status
 from .stage import Stage
 from .context import BuildContext
 
 class Pipeline:
-    """Orchestrator: runs stages in order."""
-    def __init__(self, stages: List[Stage]):
+    """Orchestrator: runs stages in order with rich console output."""
+    def __init__(self, stages: List[Stage], console: Optional[Console] = None):
         self.stages = stages
+        self.console = console or Console()
 
     def run(self, ctx: BuildContext) -> BuildContext:
-        """Run all stages in the pipeline."""
-        print("Starting JOCKY Pipeline...")
-        
-        # Preflight all stages
-        for stage in self.stages:
-            print(f"[{stage.name}] Running preflight...")
-            stage.preflight(ctx)
-            
-        # Run all stages
-        for stage in self.stages:
-            print(f"[{stage.name}] Running...")
-            ctx = stage.run(ctx)
-            
-        # Postflight all stages
-        for stage in self.stages:
-            print(f"[{stage.name}] Running postflight...")
-            stage.postflight(ctx)
-            
-        print("Pipeline finished successfully.")
+        total = len(self.stages)
+        for i, stage in enumerate(self.stages, 1):
+            with self.console.status(
+                f"[bold cyan][{i}/{total}][/bold cyan] {stage.name} ...",
+                spinner="dots"
+            ) as status:
+                stage.preflight(ctx)
+                ctx = stage.run(ctx)
+                stage.postflight(ctx)
+                status.update(
+                    f"[bold green]✓[/bold green] [bold cyan][{i}/{total}][/bold cyan] {stage.name}"
+                )
         return ctx
 
-# Helper function to get the default pipeline (for now empty or dummy)
 def get_default_pipeline() -> Pipeline:
     return Pipeline([])

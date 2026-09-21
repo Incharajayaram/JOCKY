@@ -1,0 +1,10 @@
+ffi printf(fmt: string, ...) -> i32;
+
+fn greet(name: string) {
+    printf("Hello, %s!\n", name);
+}
+
+fn main() -> i32 {
+    greet("JOCKY");
+    return 0;
+}
