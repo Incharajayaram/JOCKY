@@ -4,7 +4,22 @@ JOCKY is a language and compiler pipeline for the SIH 26148 problem statement. I
 
 ## Quick start
 
-No pip install needed. Just run the tools directly from the repo root:
+### C++ compiler (recommended)
+
+Build the C++ compiler once, then use it directly:
+
+```bash
+cd compiler
+mkdir -p build && cd build
+cmake ..
+make -j$(nproc)
+cd ../..
+
+./compiler/build/jockyc examples/hello-world/main.jky -o hello
+./compiler/build/jockyc examples/fib/main.jky -p standard -o fib
+```
+
+### Python frontend (prototyping / dev)
 
 ```bash
 ./jocky build examples/hello-world/main.jky --profile standard
@@ -14,16 +29,83 @@ No pip install needed. Just run the tools directly from the repo root:
 
 ## Tools
 
-| Tool | Purpose | Input |
-|------|---------|-------|
-| `./jocky` | JOCKY language compiler | `.jky` files |
-| `./jockyc` | C/C++ obfuscation wrapper | `.c` / `.cpp` files |
+| Tool | Language | Purpose | Input |
+|------|----------|---------|-------|
+| `compiler/build/jockyc` | C++ | Native compiler (LLVM C++ API) | `.jky` files |
+| `./jocky` | Python | Frontend + pipeline (click + rich) | `.jky` files |
+| `./jockyc` | Python | C/C++ obfuscation wrapper | `.c` / `.cpp` files |
 
 ---
 
-## `./jocky` — JOCKY language compiler
+## `compiler/build/jockyc` — Native C++ Compiler
 
-A beautiful CLI built with `click` and `rich`. It shows colored status messages, progress spinners, tables for listings, and panels for results.
+Links against LLVM's C++ API directly. No Python runtime needed.
+
+### Build
+
+```bash
+cd compiler
+mkdir -p build && cd build
+cmake ..
+make -j$(nproc)
+```
+
+CMake finds the LLVM obfuscation build automatically via the path in `compiler/CMakeLists.txt`. You can override it:
+
+```bash
+cmake .. -DLLVM_ROOT=/path/to/llvm-build
+```
+
+### Usage
+
+```bash
+./compiler/build/jockyc <input.jky> [options]
+
+Options:
+  -o <file>      Output executable name (default: a.out)
+  -p <profile>   Obfuscation profile: none, light, standard, aggressive (default: standard)
+  -k             Keep intermediate files
+  -h             Show help
+```
+
+### Examples
+
+```bash
+# Build without obfuscation
+./compiler/build/jockyc examples/hello-world/main.jky -o hello -p none
+
+# Build with standard obfuscation
+./compiler/build/jockyc examples/fib/main.jky -o fib -p standard
+
+# Build with aggressive obfuscation
+./compiler/build/jockyc examples/c-interop/main.jky -o greet -p aggressive
+```
+
+### Architecture
+
+```
+compiler/
+  include/
+    token.h      # Token definitions
+    lexer.h      # Lexer interface
+    ast.h        # AST node types
+    parser.h     # Parser interface
+    codegen.h    # LLVM IR generation (IRBuilder)
+    pipeline.h   # Compilation pipeline
+  src/
+    main.cpp     # CLI entry point
+    lexer.cpp    # Lexer implementation
+    parser.cpp   # Recursive descent parser
+    ast.cpp      # Type utilities
+    codegen.cpp  # LLVM C++ API codegen
+    pipeline.cpp # Build orchestration (opt/clang subprocesses)
+```
+
+---
+
+## `./jocky` — Python Frontend
+
+A beautiful CLI built with `click` and `rich`. Useful for rapid prototyping and verification.
 
 ### Usage
 
@@ -37,29 +119,6 @@ A beautiful CLI built with `click` and `rich`. It shows colored status messages,
 ./jocky clean [--all]
 ```
 
-### Examples
-
-```bash
-# Build with default (standard) obfuscation profile
-./jocky build examples/hello-world/main.jky
-
-# Build without obfuscation
-./jocky build examples/fib/main.jky --profile none
-
-# Build and run
-./jocky run examples/fib/main.jky --profile standard
-
-# Verify syntax and types only
-./jocky verify examples/hello-world/main.jky
-
-# List available profiles and passes (as formatted tables)
-./jocky list-profiles
-./jocky list-passes
-
-# Clean all build artifacts
-./jocky clean
-```
-
 ### Build profiles
 
 | Profile | Description |
@@ -70,43 +129,17 @@ A beautiful CLI built with `click` and `rich`. It shows colored status messages,
 | `aggressive` | Full LLVM + MLIR passes |
 | `paranoid` | Everything + anti-debug |
 
-### Pipeline stages
-
-1. **parse** — Lex, parse, and type-check JOCKY source
-2. **lower_ir** — Generate LLVM IR text
-3. **mlir_obfuscate** — Run MLIR passes (string-encrypt, constant-obfuscate, etc.)
-4. **ir_obfuscate** — Run LLVM IR obfuscation passes via `opt`
-5. **link** — Compile to object and link executable
-6. **pack** — Optional UPX packing
-
 ---
 
-## `./jockyc` — C/C++ obfuscation wrapper
+## `./jockyc` — C/C++ Obfuscation Wrapper
 
-Compiles C/C++ files through the LLVM obfuscation passes directly, without the JOCKY language frontend.
+Compiles C/C++ files through the LLVM obfuscation passes directly.
 
 ```bash
 ./jockyc input.c -o output
 ./jockyc input.c --bcf --fla --sub -o output
 ./jockyc input.c --windows -o output.exe
 ```
-
-### Pass flags
-
-| Flag | Pass |
-|------|------|
-| `--bcf` | Bogus control flow |
-| `--fla` | Control-flow flattening |
-| `--sub` | Instruction substitution |
-| `--split` | Basic-block splitting |
-| `--mba` | Linear MBA |
-| `--opaque` | Opaque predicates |
-| `--indcall` | Indirect calls |
-| `--pdata` | PData stripping (Windows) |
-| `--antidebug` | Anti-debug |
-| `--signature` | Signature stripping |
-| `--virtualize` | Code virtualization |
-| `--passes` | Comma-separated custom pass list |
 
 ---
 
@@ -147,57 +180,75 @@ fn main() -> i32 {
 
 ---
 
+## Runtime Framework
+
+Portable C runtime for anti-analysis, evasion, and execution:
+
+```
+src/runtime/
+  include/jocky_rt.h    # Public API
+  init/
+    anti_analysis.c     # Debugger, VM, sandbox detection
+  evasion/
+    unhook.c            # Ntdll unhooking (Windows)
+    syscalls.c          # Direct syscall framework (Windows)
+  execution/
+    hollow.c            # Process hollowing (Windows)
+  cleanup/
+    self_delete.c       # Self-deletion
+    logs.c              # Log clearing
+```
+
+Build with CMake:
+
+```bash
+cd src/runtime
+mkdir build && cd build
+cmake ..
+make
+```
+
+---
+
 ## Toolchain configuration
 
-JOCKY needs an LLVM/MLIR toolchain with the obfuscation plugins. It discovers the toolchain automatically via (in order of priority):
+All tools discover the LLVM obfuscation toolchain automatically:
 
 1. **`JOCKY_LLVM_TOOLCHAIN`** environment variable
-2. **`jocky.yaml`** config file with a `toolchain.llvm_dir` key
-3. **PATH search** — if `clang`, `opt`, and `mlir-opt` are all in the same `bin/` directory
-4. **Common install locations** — searches `~/projects/llvm-obfuscation-tools-linux-x86_64`, `/usr/local/llvm-obfuscation`, `/opt/llvm-obfuscation`, etc.
-
-### Quick setup with env var
+2. **`jocky.yaml`** config file (`toolchain.llvm_dir`)
+3. **PATH search** (clang + opt + mlir-opt)
+4. **Common install locations**
 
 ```bash
 export JOCKY_LLVM_TOOLCHAIN=/path/to/llvm-obfuscation-tools
-./jocky build hello.jky
 ```
 
-### Setup with config file
-
-Create `jocky.yaml` in your project root or `~/.config/jocky/config.yaml`:
-
-```yaml
-toolchain:
-  llvm_dir: /path/to/llvm-obfuscation-tools
-```
-
-### Windows cross-compilation (jockyc)
-
-For Windows builds, `jockyc` also looks for:
-
-- **`JOCKY_LLVM_MINGW`** — path to llvm-mingw prefix (e.g. `/opt/llvm-mingw`)
-- **`JOCKY_WINSDK_VCTOOLS`** — path to MSVC VCTools
-- **`JOCKY_WINSDK_UM`** — path to Windows SDK
-
-Or pass them as CLI flags:
-
-```bash
-./jockyc input.c --windows --vctoolsdir /path/to/vctools --winsdkdir /path/to/sdk -o out.exe
-```
+For Windows cross-compilation with `jockyc`:
+- `JOCKY_LLVM_MINGW` — llvm-mingw prefix
+- `JOCKY_WINSDK_VCTOOLS` — MSVC VCTools
+- `JOCKY_WINSDK_UM` — Windows SDK
 
 ---
 
 ## Structure
 
 ```
-src/jocky/
-  language/         # Lexer, parser, AST, type checker, LLVM IR codegen
-  core/             # Pipeline, stages, context, profiles, toolchain discovery
-  stages/           # Parse, lower, obfuscate, link, pack
-  passes/           # Pass registry and profile YAMLs
-  backends/         # LLVM IR, object, executable backends
-  cli.py            # Main CLI entry point (click + rich)
-jocky               # JOCKY language CLI launcher (sets PYTHONPATH)
-jockyc              # C/C++ obfuscation CLI
+compiler/               # C++ compiler (LLVM C++ API)
+  CMakeLists.txt
+  include/              # Headers
+  src/                  # Implementation
+src/jocky/              # Python frontend
+  language/             # Lexer, parser, AST, checker, codegen
+  core/                 # Pipeline, stages, context, profiles
+  stages/               # Parse, lower, obfuscate, link, pack
+  passes/               # Pass registry and profile YAMLs
+  cli.py                # Main CLI (click + rich)
+src/runtime/            # C runtime framework
+  include/
+  init/
+  evasion/
+  execution/
+  cleanup/
+jocky                   # Python CLI launcher
+jockyc                  # C/C++ obfuscation CLI (Python)
 ```
