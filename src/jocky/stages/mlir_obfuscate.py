@@ -1,12 +1,8 @@
 from jocky.core.stage import Stage
 from jocky.core.context import BuildContext
+from jocky.core.toolchain import discover_toolchain
 from jocky.utils.subprocess import run_cmd
 from pathlib import Path
-
-LLVM_BUILD = Path("/home/kamini/projects/llvm-obfuscation-tools-linux-x86_64")
-MLIR_OPT = LLVM_BUILD / "bin" / "mlir-opt"
-MLIR_TRANSLATE = LLVM_BUILD / "bin" / "mlir-translate"
-MLIR_PLUGIN = LLVM_BUILD / "lib" / "MLIRObfuscationPlugin.so"
 
 class MLIRObfuscateStage(Stage):
     @property
@@ -22,6 +18,7 @@ class MLIRObfuscateStage(Stage):
         if not passes:
             return ctx
 
+        tc = discover_toolchain()
         ir_path = ctx.state.get("llvm_ir")
         if not ir_path:
             return ctx
@@ -31,7 +28,7 @@ class MLIRObfuscateStage(Stage):
         # Import LLVM IR to MLIR
         mlir_path = out_dir / "input.mlir"
         run_cmd([
-            str(MLIR_TRANSLATE), "--import-llvm",
+            str(tc.mlir_translate()), "--import-llvm",
             str(ir_path), "-o", str(mlir_path)
         ], "Import LLVM IR to MLIR")
 
@@ -41,8 +38,8 @@ class MLIRObfuscateStage(Stage):
         for p in passes:
             pass_args.append(f"--{p}")
         run_cmd([
-            str(MLIR_OPT),
-            f"--load-pass-plugin={MLIR_PLUGIN}",
+            str(tc.mlir_opt()),
+            f"--load-pass-plugin={tc.mlir_plugin()}",
             *pass_args,
             str(mlir_path),
             "-o", str(obf_mlir)
@@ -50,7 +47,7 @@ class MLIRObfuscateStage(Stage):
 
         # Export back to LLVM IR
         run_cmd([
-            str(MLIR_TRANSLATE), "--mlir-to-llvmir",
+            str(tc.mlir_translate()), "--mlir-to-llvmir",
             str(obf_mlir), "-o", str(ir_path)
         ], "Export MLIR back to LLVM IR")
 

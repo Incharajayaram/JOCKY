@@ -147,12 +147,44 @@ fn main() -> i32 {
 
 ---
 
-## Toolchain
+## Toolchain configuration
 
-The compiler uses the LLVM obfuscation fork's self-contained distribution at:
-`/home/kamini/projects/llvm-obfuscation-tools-linux-x86_64/`
+JOCKY needs an LLVM/MLIR toolchain with the obfuscation plugins. It discovers the toolchain automatically via (in order of priority):
 
-This includes `clang`, `opt`, `mlir-opt`, `mlir-translate`, and both obfuscation plugins.
+1. **`JOCKY_LLVM_TOOLCHAIN`** environment variable
+2. **`jocky.yaml`** config file with a `toolchain.llvm_dir` key
+3. **PATH search** — if `clang`, `opt`, and `mlir-opt` are all in the same `bin/` directory
+4. **Common install locations** — searches `~/projects/llvm-obfuscation-tools-linux-x86_64`, `/usr/local/llvm-obfuscation`, `/opt/llvm-obfuscation`, etc.
+
+### Quick setup with env var
+
+```bash
+export JOCKY_LLVM_TOOLCHAIN=/path/to/llvm-obfuscation-tools
+./jocky build hello.jky
+```
+
+### Setup with config file
+
+Create `jocky.yaml` in your project root or `~/.config/jocky/config.yaml`:
+
+```yaml
+toolchain:
+  llvm_dir: /path/to/llvm-obfuscation-tools
+```
+
+### Windows cross-compilation (jockyc)
+
+For Windows builds, `jockyc` also looks for:
+
+- **`JOCKY_LLVM_MINGW`** — path to llvm-mingw prefix (e.g. `/opt/llvm-mingw`)
+- **`JOCKY_WINSDK_VCTOOLS`** — path to MSVC VCTools
+- **`JOCKY_WINSDK_UM`** — path to Windows SDK
+
+Or pass them as CLI flags:
+
+```bash
+./jockyc input.c --windows --vctoolsdir /path/to/vctools --winsdkdir /path/to/sdk -o out.exe
+```
 
 ---
 
@@ -161,7 +193,7 @@ This includes `clang`, `opt`, `mlir-opt`, `mlir-translate`, and both obfuscation
 ```
 src/jocky/
   language/         # Lexer, parser, AST, type checker, LLVM IR codegen
-  core/             # Pipeline, stages, context, profiles
+  core/             # Pipeline, stages, context, profiles, toolchain discovery
   stages/           # Parse, lower, obfuscate, link, pack
   passes/           # Pass registry and profile YAMLs
   backends/         # LLVM IR, object, executable backends

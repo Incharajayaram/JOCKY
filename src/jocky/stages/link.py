@@ -1,10 +1,8 @@
 from jocky.core.stage import Stage
 from jocky.core.context import BuildContext
+from jocky.core.toolchain import discover_toolchain
 from jocky.utils.subprocess import run_cmd
 from pathlib import Path
-
-LLVM_BUILD = Path("/home/kamini/projects/llvm-obfuscation-tools-linux-x86_64")
-CLANG = LLVM_BUILD / "bin" / "clang"
 
 class LinkStage(Stage):
     @property
@@ -12,6 +10,7 @@ class LinkStage(Stage):
         return "link"
 
     def run(self, ctx: BuildContext) -> BuildContext:
+        tc = discover_toolchain()
         obf_bc = ctx.state["llvm_obf_bc"]
         out_dir = ctx.get_stage_output_dir(self.name)
         output = ctx.output_dir / ctx.input_file.stem
@@ -21,12 +20,12 @@ class LinkStage(Stage):
         # Compile obfuscated bitcode to object
         obj_path = out_dir / "output.o"
         run_cmd([
-            str(CLANG), "-c", str(obf_bc), "-o", str(obj_path)
+            str(tc.clang()), "-c", str(obf_bc), "-o", str(obj_path)
         ], "Bitcode to object")
 
         # Link to executable
         run_cmd([
-            str(CLANG), str(obj_path), "-o", str(output)
+            str(tc.clang()), str(obj_path), "-o", str(output)
         ], "Linking executable")
 
         ctx.state["executable"] = output
