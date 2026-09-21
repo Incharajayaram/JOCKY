@@ -133,9 +133,13 @@ bool Pipeline::runMLIRObfuscation(const std::string& inLl, const std::string& ou
         return false;
     }
 
-    // Run MLIR string encryption
+    // Run MLIR obfuscation passes (avoid symbol-obfuscate/crypto-hash which break global_ctors)
     std::string cmd2 = mlirOpt + " --load-pass-plugin=" + mlirPlugin +
-                       " --string-encrypt " + mlirPath + " -o " + encMlirPath;
+                       " --string-encrypt " +
+                       " --constant-obfuscate " +
+                       " --import-obfuscate " +
+                       " --scf-obfuscate " +
+                       mlirPath + " -o " + encMlirPath;
     if (!exec(cmd2)) {
         std::cerr << "[!] MLIR string encryption failed\n";
         return false;
