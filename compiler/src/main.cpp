@@ -6,13 +6,14 @@
 using namespace jocky;
 
 static void printUsage(const char* prog) {
-    std::cout << "Usage: " << prog << " [options] <input.jky>\n"
+    std::cout << "Usage: " << prog << " [options] <input.jky|input.c>\n"
               << "Options:\n"
               << "  -o <file>      Output executable name (default: input stem)\n"
               << "  -p <profile>   Obfuscation profile: none, light, standard, aggressive, paranoid (default: standard)\n"
-              << "  --pack         Pack final binary with UPX\n"
+              << "  --pack         Pack final binary with custom packer (Windows) or UPX (Linux)\n"
               << "  --encrypt-strings  Encrypt string literals via MLIR\n"
               << "  --no-runtime   Skip anti-analysis runtime (cleaner binary)\n"
+              << "  --cc           Compile C source through JOCKY pipeline\n"
               << "  --target <triple>  Cross-compile target (e.g., x86_64-w64-mingw32)\n"
               << "  -k             Keep intermediate files\n"
               << "  -h             Show this help\n";
@@ -45,6 +46,8 @@ int main(int argc, char** argv) {
         } else if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
             printUsage(argv[0]);
             return 0;
+        } else if (std::strcmp(argv[i], "--cc") == 0) {
+            opts.isCInput = true;
         } else if (argv[i][0] != '-') {
             input = argv[i];
         } else {
@@ -59,6 +62,18 @@ int main(int argc, char** argv) {
     }
 
     opts.inputFile = input;
+
+    // Auto-detect C input from file extension
+    if (!opts.isCInput) {
+        size_t dot = input.find_last_of('.');
+        if (dot != std::string::npos) {
+            std::string ext = input.substr(dot);
+            if (ext == ".c" || ext == ".C") {
+                opts.isCInput = true;
+            }
+        }
+    }
+    
     if (opts.outputFile.empty()) {
         // Default output name = input file stem (like Python pipeline)
         size_t slash = input.find_last_of("/\\");
