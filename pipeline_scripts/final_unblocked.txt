@@ -1,0 +1,491 @@
+00561455-9da1-4f0c-8564-e4c99b716a74 | driver_090d409f.sys | malicious
+00755879-eeb3-4a70-9df6-c4e8ff561cdc | iobios64.sys | vulnerable driver
+0144dbef-1da8-406c-8e35-7afee57dc471 | isodrivep64.sys | vulnerable driver
+0215d6d6-e0c4-4a11-bd3a-40511f89d736 | driver_5d61e4ea.sys | malicious
+028aecb5-70d0-4423-87d7-f037a11ef1c9 | signeddrv.sys | vulnerable driver
+02bbc006-a4a4-438f-9b6c-4382303f6b45 | evga_kernel_driver-x64.sys | vulnerable driver
+02e4a30f-8aa8-4ff0-8e02-1bff1d0f088f | AsrAutoChkUpdDrv_1_0_32.sys | vulnerable driver
+03d1a3a2-e76c-4fd5-a134-55ec983fdc4c | PlugPlayService.sys | malicious
+043773c5-120a-4c6b-8485-8f1f5c47fd3e | aswArPot.sys | vulnerable driver
+04d377f9-36e0-42a4-8d47-62232163dc68 | iomem64.sys | vulnerable driver
+04eefdf4-448d-45bb-87fc-93f263fc77f4 | driver_668c5bea.sys | malicious
+0567c6c4-282f-406f-9369-7f876b899c25 | procexp.Sys | vulnerable driver
+0590655c-baa2-481a-b909-463534bd7a5e | daxin_blank5.sys | malicious
+0712c54c-69fd-41f2-950a-da678ac51246 | STProcessMonitor.sys | vulnerable driver
+07c57c69-c8d7-40cf-8bcc-612671427044 | tboflhelper.sys | vulnerable driver
+080a834f-3e19-4cae-b940-a4ecf901db28 | HWiNFO64I.SYS | vulnerable driver
+080ff223-f8e0-49c0-a7b5-e97349cf81a0 | HpPortIox64.sys | vulnerable driver
+08adabb3-7336-43de-a980-e23a55081f19 | WDTKernel.sys | vulnerable driver
+08fbd284-7ad2-466d-b55f-6d5a7d07aca5 | ArgusMonitor.sys | vulnerable driver
+09c46890-5aa1-4122-962e-7ed94754e710 | SmSerl64.sys | vulnerable driver
+09d2e61d-e041-4ec8-ab7b-385848456a36 | driver_ab811ca5.sys | malicious
+0baa833c-e4e1-449e-86ee-cafeb11f5fd5 | vboxguest.sys | vulnerable driver
+0d039ee9-aaa5-49c2-a980-405d4290ee0a | telephonuAfY.sys | malicious
+0d6f1b0f-b94d-4254-b3bb-49de61246260 | GPU-Z.sys | vulnerable driver
+0e114b5b-7ec1-4fa3-ac93-e505f986547f | NetworkLocker_x64.sys | vulnerable driver
+0e272ccf-81e5-4612-95d2-365e7ded6eac | shield.sys | vulnerable driver
+0e3b0052-18c7-4c8b-a064-a1332df07af2 | ProxyDrv.sys | vulnerable driver
+0e8da43d-92e0-43f9-bc34-50a7d15b34bd | etdsupp.sys | vulnerable driver
+0e94f1a2-beab-4adb-9687-eb2719a201c9 | mst.sys | vulnerable driver
+0eb5f4ce-12a7-4b45-b021-42b995de07c5 | Air_SYSTEM10.sys | malicious
+0f21a584-6ace-4242-82cb-9766cea6973a | CITMDRV_IA64.sys | vulnerable driver
+0f59ce3b-20ac-41ba-8010-2abc74827eb8 | cpuz.sys | vulnerable driver
+0f8e317e-ad2b-4b02-9f96-603bb8d28604 | NICM.sys | vulnerable driver
+0fc0563c-de9f-41d8-806a-748e04d57365 | gftkyj64.sys | malicious
+1106fe7a-b78b-4edf-85c0-6208979f380b | driver_981d03e1.sys | malicious
+11a73c42-26aa-446b-8560-43eecb265091 | driver_e1123b59.sys | malicious
+127cde1d-905e-4c67-a2c3-04ea4deaea7d | wantd_6.sys | malicious
+12998ebb-8c74-4e44-89a2-2a71c0f6e92b | TcIo.sys | vulnerable driver
+12ccd18a-11da-495a-b4b4-98a2f2bff180 | yyprotect64.sys | vulnerable driver
+13637210-2e1c-45a4-9f76-fe38c3c34264 | HpPortIox64.sys | vulnerable driver
+137daca4-0d7b-48aa-8574-f7eb6ad02526 | speedfan.sys | vulnerable driver
+13973a71-412f-4a18-a2a6-476d3853f8de | AMDRyzenMasterDriver.sys | vulnerable driver
+13d67487-8c65-47bb-a3d3-d799b5f7533b | GGProtect64.sys | vulnerable driver
+14556074-b235-4378-b356-f58721629d72 | mimikatz.sys | malicious
+14e51012-5429-483e-9423-49778c3bd1c2 | driver_ef9d653a.sys | malicious
+16d8962b-cf96-432f-8a43-d41f06828f56 | cpuz.sys | vulnerable driver
+18a842be-681a-4f32-97fd-57cb72ff5f3a | NlsLexicons0024UvN.sys | malicious
+19d16518-4aee-4983-ba89-dbbe0fa8a3e7 | AsrRapidStartDrv.sys | vulnerable driver
+19f13965-7078-4c19-a2e3-71ab8b77a9b7 | HP_SWTOOLS_DRIVER.sys | vulnerable driver
+1a0fab94-f4a7-48c2-a2f4-72d19c382642 | PGPwded.sys | vulnerable driver
+1adc79ba-d923-4e25-9175-77fa18e10cad | 1109.sys | vulnerable driver
+1aeb1205-8b02-42b6-a563-b953ea337c19 | Tmel.sys | vulnerable driver
+1b916d35-f62b-41ef-8454-3aed20299cb0 | KExplore.sys | vulnerable driver
+1bab0fae-7908-4fae-9db7-73562c7d92cd | AmdTools64.sys | vulnerable driver
+1bf3b155-752a-4cc7-beb0-f202e525eb1a | daxin_blank1.sys | malicious
+1c6e1d3b-f825-4065-9e0c-83386883e40f | rzpnk.sys | vulnerable driver
+1c7631f0-f92f-4be5-8ba7-3eefb0601d45 | LHA.sys | vulnerable driver
+1c92e1bf-103b-4545-b242-e5a9858ec9c8 | CSC.sys | vulnerable driver
+1ce0aa79-8719-447c-908b-75547f2ccc98 | SysFile_X64.sys | vulnerable driver
+1d2cdef1-de44-4849-80e5-e2fa288df681 | iqvw64e.sys | vulnerable driver
+1db2dd90-5b8e-43c3-a39b-61e0614fb2ab | pstrip64.sys | vulnerable driver
+1e69f91e-4ec5-4c6a-b4a4-2279808b6545 | gibepext.sys | vulnerable driver
+205721b7-b83b-414a-b4b5-8bacb4a37777 | elrawdsk.sys | vulnerable driver
+2225128d-a23f-434a-aaee-69a88ea64fbd | HWiNFO32.SYS | vulnerable driver
+22aa985b-5fdb-4e38-9382-a496220c27ec | TmComm.sys | vulnerable driver
+23f11e19-0776-4dd4-9c9c-7f6b60f8553f | ATSZIO.sys | vulnerable driver
+24cc4f8d-a88d-4b2d-a912-bc773d12a524 | Mnemosyne.sys | vulnerable driver
+24d8bef2-379c-4a27-bd2d-4f13136f3476 | HardwareMon-x86.sys | vulnerable driver
+24fb7bab-b8c3-46ea-a370-c84d2f0ff614 | ADV64DRV.sys | vulnerable driver
+257d425f-f660-466c-8bee-c24cccf06daa | AsmIo64.sys | vulnerable driver
+25d5ebe3-e827-44a4-86fc-898844595c23 | POORTRY.sys | malicious
+2703d3dd-05f0-4ae2-83a2-2ad0939467d0 | Cndom6.sys | malicious
+271ace20-2f68-4695-9579-0d4de8cb4fe6 | GameDriverX64.sys | vulnerable driver
+2740a074-1e06-4f75-9c6a-dc57a3f85189 | POORTRY1.sys | malicious
+2866bd72-a4b1-4764-a838-9ed0790c2631 | a236e7d654cd932b7d11cb604629a2d0.sys | malicious
+29cb263b-b0b0-40d5-a97d-5ddf4ba79c1e | goad.sys | vulnerable driver
+29d2c408-c1c6-451a-acf6-eddd59969183 | AppShopDrv103.sys | vulnerable driver
+2a9193cc-4e7e-4c8d-9cb4-040723e81841 | SparkIO.sys | vulnerable driver
+2ad22816-46de-45b5-999b-864944635e0a | IoManager.sys | vulnerable driver
+2ada18ae-2c52-49b6-b1a0-cf3b267f6dc7 | sfdrvx32.sys | vulnerable driver
+2b949a0d-939f-456a-a34f-4589d7712227 | libnicm.sys | vulnerable driver
+2ba1bccf-d8d7-464a-9ae1-41371c55e5e8 | driver_099ef491.sys | malicious
+2c7d54ff-7b49-4da8-ae77-00ac6fa2944f | HWAuidoOs2Ec.sys | vulnerable driver
+2d301a46-ceb6-477c-8a51-463a6ded3524 | BiosToolCommonDriver.sys | vulnerable driver
+2d6c1da6-17e2-4385-ad93-1430f83bde83 | 4748696211bd56c2d93c21cab91e82a5.sys | malicious
+2da3a276-9e38-4ee6-903d-d15f7c355e7c | vboxdrv.sys | vulnerable driver
+2e1531b2-d370-4543-9e2e-5319a1c13c22 | daxin_blank2.sys | malicious
+2e47cd6a-30a2-4790-9f9c-9de7b0d7bf60 | fjfwupgd.sys | vulnerable driver
+2e4fedb0-30ed-400d-b4e1-b2b2004c1607 | OpenLibSys.sys | vulnerable driver
+2ea12acc-95b6-4f91-afb7-8ded7a2fe9d9 | vmdrv.sys | vulnerable driver
+300cdb55-6e01-4365-83e5-5783be2f9262 | snxpsamd.sys | vulnerable driver
+31439f28-4616-4ee1-a6b7-1cf742127909 | SIVX64.sys | vulnerable driver
+31686f0e-3748-48c2-be09-fc8f3252e780 | FairplayKD.sys | vulnerable driver
+31797996-6973-402d-a4a0-d01ce51e02c0 | AsrIbDrv.sys | vulnerable driver
+3207f14b-a66c-4d5e-a5d5-2467ffd58265 | d39DuiY9sxtDSiu4LSvS.sys | malicious
+32155681-33e8-4d0d-b9f6-c822851e7321 | RtsPer.sys | vulnerable driver
+3277cecc-f4b4-4a00-be01-9da83e013bcd | wantd_5.sys | malicious
+33a9c9ae-5ca3-442d-9f0f-2615637c1c57 | ntbios_2.sys | malicious
+347d5d79-35e6-4438-885f-57a7c95eeb89 | atidsmxx.sys | vulnerable driver
+351ff5ca-f07b-4eb6-9300-d5d31514defb | nscm.sys | vulnerable driver
+3599f0ef-67fc-4130-910f-0c482612d16f | qu829.sys | malicious
+36227ce7-2bf6-4963-bfae-c399000a1079 | rtif.sys | vulnerable driver
+375e8de3-aae4-488d-8273-66744978b45f | szkg64.sys | vulnerable driver
+394f49b2-2d78-4d0d-b374-1399695455f3 | Afd.sys | vulnerable driver
+39742f99-2180-46d7-8538-56667c935cc3 | viragt.sys | vulnerable driver
+399fb787-5b06-46f0-86cb-dff7374bb015 | DsArk64.sys | vulnerable driver
+3a56286a-d6e2-4782-bd43-1e04869da8cc | OAToolx64.sys | vulnerable driver
+3a9ea9a6-e5e3-439a-b892-1f78dd990099 | SeasunProtect.sys | vulnerable driver
+3ab0d182-6365-47a7-89f4-34121e889503 | HwOs2Ec10x64.sys | vulnerable driver
+3ac0eda2-a844-4a9d-9cfa-c25a9e05d678 | Bs_Def.sys | vulnerable driver
+3bc629e8-7bf8-40c2-965b-87eb155e0065 | mtcBSv64.sys | vulnerable driver
+3bec7340-bd8b-43ae-8569-d81a66f01dda | ene.sys | vulnerable driver
+3d1439e9-9a7d-497a-8c6c-74513f825d6a | daxin_blank6.sys | malicious
+3dc0b91e-6afe-4938-ad9a-2cdf10c2c1e6 | energydriver.sys | vulnerable driver
+3e0bf6dc-791b-4170-8c40-427e7299d93d | KfeCo10X64.sys | vulnerable driver
+3e3067b0-3d74-46fe-9f57-1ae3a0293958 | CcProtect.sys | vulnerable driver
+3e5c0fc4-bfe8-4af2-9613-4f56b0e3c2c8 | malicious.sys | malicious
+3ea63674-2599-43b5-9390-4a929ec99f48 | ktgn.sys | malicious
+408964b3-1799-425b-92bf-465c72a272d1 | TBT_Force_Power_Control_Access64.sys | vulnerable driver
+40bfb01b-d251-4c2c-952e-052a89a76f5b | PanMonFltX64.sys | vulnerable driver
+412f4aaf-5525-458c-b87e-311e504b856d | mJj0ge.sys | malicious
+424a387e-735e-49d1-99de-f067dcf1c3e9 | TSDRVX64.sys | vulnerable driver
+430f94b4-69e8-4541-bea7-329be7d283b7 | lsigetwin_SliffDriver.sys | vulnerable driver
+43d0af25-c066-471f-bb73-6ce25dc7e0eb | Dh_Kernel.sys | vulnerable driver
+459c39a0-d6bd-4d3e-91ae-a701bb0b3198 | KKYUM.sys | vulnerable driver
+45a31a17-f78d-48ec-beba-74f6bfc5f96e | windivert.sys | malicious
+45b0de20-b3cc-4604-a428-175ea092cd39 | inetcache.sys | vulnerable driver
+47724cc1-bf75-4ab7-a47a-355a9aa30de1 | BSMIx64.sys | vulnerable driver
+47a351ee-8abe-40d8-bc2b-557390fa0945 | Lv561av.sys | vulnerable driver
+47d4b71f-eebd-4775-9e7c-b031135e8f1b | LECOMAx64.sys | vulnerable driver
+47e08b2f-7925-40c5-9bcf-0af348c07d33 | SIOCTL.sys | vulnerable driver
+48aeea9b-7812-4b25-9835-baaebe7dc551 | ADRMDRVSYS.sys | vulnerable driver
+48bc2815-85ec-4436-a51a-69810c8cb171 | driver7-x64.sys | vulnerable driver
+495f0f36-c5e0-467d-8115-b5bdbe7ff686 | driver_312c83a9.sys | malicious
+4a80da66-f8f1-4af9-ba56-696cfe6c1e10 | BS_Def64.sys | vulnerable driver
+4c009d0a-8dfa-49f7-b043-b9cef3b01101 | thelper.sys | vulnerable driver
+4c4e7664-af86-4483-858a-f59346f3d304 | driver_930da474.sys | malicious
+4c815256-2534-4476-b15d-7cbf24c80098 | jokercontroller.sys | vulnerable driver
+4c9a91ff-9284-49a7-899d-dfe85a112465 | RootLaser.sys | vulnerable driver
+4cb95b41-43b4-4806-b536-ae5fd8c76b0e | ViveRRAudio.sys | vulnerable driver
+4d365dd0-34c3-492e-a2bd-c16266796ae5 | ALSysIO64.sys | vulnerable driver
+4db827b1-325b-444d-9f23-171285a4d12f | VProEventMonitor.sys | vulnerable driver
+4dd3289c-522c-4fce-b48e-5370efc90fa1 | iQVW64.SYS | vulnerable driver
+4e7563f0-0d77-43e9-b765-a509ba121818 | DNDrv.sys | vulnerable driver
+4f0a65a7-9a01-40cb-8d95-0844515103e6 | avalueio.sys | vulnerable driver
+4f2edf45-b135-404f-bedc-9583f0bae574 | e939448b28a4edc81f1f974cebf6e7d2.sys | malicious
+500e07cb-77c6-4e83-ae3f-73f70f1c10b5 | tfbfs3ped.sys | vulnerable driver
+509edc55-1881-4fac-8640-b9c516396505 | ipctype.sys | vulnerable driver
+50bbae3f-f6d8-4881-8fd7-a70002d52841 | giveio.sys | vulnerable driver
+50de2fce-d9b5-4007-abef-22560e4e93b2 | Lallamon.sys | vulnerable driver
+50eec1d1-87ea-405d-a7c0-d789c29630a7 | pwdrvio.sys | vulnerable driver
+51808fa6-89a4-4f4d-aabc-0a7b0e99e34d | kdriver.sys | vulnerable driver
+51a44484-8bcc-4150-8b94-4a755cff0af8 | driver_b4f33ffe.sys | malicious
+5261cacf-380c-4573-85ff-a643cbdf009a | KApcHelper_x64.sys | malicious
+5281b4b4-1b96-4261-8a1f-5fa22ba44d53 | BS_RVSIO64.sys | vulnerable driver
+52955eb1-8cf4-41f3-b998-5e2e6d3aa258 | Windows_CPU_Temperature_Component.sys | vulnerable driver
+549d3563-74ce-4d84-844c-8d985886373c | watabe.sys | vulnerable driver
+54af50e5-c964-485a-9b15-d5411971a425 | 6c8a.sys | vulnerable driver
+54d67d79-0268-4c5f-be7e-0f74cd20828a | NTIOLib_X64.sys | vulnerable driver
+56610446-9914-41f6-a028-33640a683c9d | Kinkajou.sys | vulnerable driver
+56b320b3-5b12-4ec6-81e2-5a16c56c7478 | spf.sys | vulnerable driver
+576bb95a-f15e-4a0d-bcee-08791e1504e2 | driver_d9f15d91.sys | malicious
+57822c56-6531-4a2e-afbf-96f77dc5fcaf | KslD.sys | vulnerable driver
+57f63efb-dc43-4dba-9413-173e3e4be750 | AsrSmartConnectDrv.sys | vulnerable driver
+57fc510a-e649-4599-b83e-8f3605e3d1d9 | aswArPot.sys | vulnerable driver
+5901421f-7929-487d-87bd-632f29290352 | VdBSv64.sys | vulnerable driver
+5904f3a1-2e0c-4746-8078-8ada66a5cb08 | Astra64.sys | vulnerable driver
+5938df1d-9513-449f-8252-c442ddca0c2a | VBoxUSB.Sys | vulnerable driver
+5961e133-ccc3-4530-8f4f-5d975c41028d | LgDataCatcher.sys | vulnerable driver
+5a03dc5a-115d-4d6f-b5b5-685f4c014a69 | sfdrvx64.sys | vulnerable driver
+5ad8a3b6-6d20-4c95-8fa7-9a507167ba3c | netfilter2.sys | vulnerable driver
+5b9a202c-0695-532e-9d92-662cedefee07 | NGStar.sys | vulnerable driver
+5c4142a6-b287-4817-864f-152be08f7c48 | srswdrv.sys | vulnerable driver
+5c45ae9e-cb6f-4eab-a070-b0187202e080 | amigendrv64.sys | vulnerable driver
+5cbb1918-f7ac-4de8-b334-0bb4824a516b | rksafe.sys | malicious
+5d658b45-81f0-442e-ac43-7c249ce1d54f | ProcessCtr.sys | vulnerable driver
+5f70bde4-9f81-44a8-9d3e-c6c7cf65bfae | PanIO.sys | vulnerable driver
+5fb86651-c152-404a-9a2f-0f54b0d2bb55 | driver_77225a99.sys | malicious
+5ff0ca63-fff8-4c2d-ac04-bb09fc84259f | nipalk.sys | vulnerable driver
+610617d5-2566-4f55-b636-29a4ea576654 | RtsTpx.sys | vulnerable driver
+618fbf89-f4e3-4b2a-a4b4-cc4bf7c180e0 | POORTRY2.sys | malicious
+619953be-2115-4da2-bb59-603fcf93a3d2 | fastdumpx64.sys | vulnerable driver
+61abe019-08cb-48a3-89b2-62810696f277 | NQrmq.sys | malicious
+63535f5c-9535-4bb0-ae8c-4366d40055f9 | _xyzxbqvb.rdu_GFAC_Sys_x64.sys | vulnerable driver
+6356d7d9-3b82-4731-9d5f-cc9bc37558fc | test2.sys | vulnerable driver
+636d30fd-2b95-4dc2-a413-be0e43d1482c | changsha | malicious
+64601d77-61ea-43b7-8178-9d45dfba6022 | CmUpx.sys | vulnerable driver
+647f72e7-f378-4908-946c-5e45fab448e8 | driver_5c308aed.sys | malicious
+651d1cdc-3e13-405f-b8b3-65cc70cef5a8 | tm_filter.sys | vulnerable driver
+65458077-861e-4423-b446-2a9c7afe44b5 | tdevflt.sys | malicious
+658a906e-82d3-4c78-a63b-ddddeeb3f452 | AdvCare.sys | vulnerable driver
+66813e1f-13c8-4884-931a-62b46350c345 | 834761775.sys | malicious
+66be9e0a-9246-4404-b5b5-7fbde351668f | BS_I2cIo.sys | vulnerable driver
+670dc258-78b5-4552-a16b-b41917c86f8d | driver7-x86.sys | vulnerable driver
+6736cbe7-33ea-4488-b464-231c0b8d1049 | gpcidrv64.sys | vulnerable driver
+685c38ea-6939-4b02-a250-b47dcfecf817 | BSMEM64_W10.sys | vulnerable driver
+68810b7a-06c5-498a-bbdf-28fb4d5d9201 | bin_intigua_driver64.sys | vulnerable driver
+6882f954-e69b-464a-b7cf-0cda802d3257 | Realtime Driver.sys | vulnerable driver
+6c0c60f0-895d-428a-a8ae-e10390bceb12 | sfdrvx32.sys | vulnerable driver
+6c84d133-c619-4deb-a91a-5cf05e4cb7c2 | CSAgent.sys | malicious
+6ca608ec-df2e-4a8d-8a0b-350f9e0271ab | IMFForceDelete | vulnerable driver
+6e0786f5-2168-40a8-a068-e261c4eb10e7 | throttlestop.sys | vulnerable driver
+6ec5ddda-f302-4008-a73e-12814c1d571f | ATSZIO.sys | vulnerable driver
+6eca187c-8fb2-4eae-9c80-fd9ef9d8c91e | QIOMem.sys | vulnerable driver
+6f1d7635-0778-4f17-9c97-b80deca32510 | nxeng.sys | vulnerable driver
+6f6aedb9-aeaf-4c13-9d6d-37f062728c38 | DDDriver.sys | vulnerable driver
+6fc3034f-8b40-44ef-807a-f61d3ea2dece | NBIOLib_X64.sys | vulnerable driver
+6fe10a55-7fb8-4a9d-9ebc-1b27b6e5b833 | prokiller64.sys | malicious
+705330b3-5e2c-4c87-ab92-0f01b68b1b2d | dddriver64Dcsa.sys | vulnerable driver
+705facba-b595-41dd-86a6-93aefe6a6234 | titidrv.sys | vulnerable driver
+708650ed-c497-48be-97bc-9edd48cf2a1a | BdApiUtil.sys | vulnerable driver
+70a7693f-2880-47a0-90f2-9703f2b4cab3 | fortimon3.sys | vulnerable driver
+70acea34-7ed2-42d5-885c-eca3c2de640c | Sense5Ext.sys | malicious
+70fa8606-c147-4c40-8b7a-980290075327 | VBoxUSB.Sys | vulnerable driver
+71d930a7-3465-4d27-90d4-2a1a08bebb92 | RtsUer.sys | vulnerable driver
+724d7989-dfce-4bb2-9beb-dee15df5b790 | skill.sys | vulnerable driver
+72637cb1-5ca2-4ad0-a5df-20da17b231b5 | wantd_4.sys | malicious
+73196456-40ae-4b6d-8562-07cf99458a7d | kEvP64.sys | vulnerable driver
+741677e9-20d5-40e5-9cd2-3bf2beb76322 | dpmemio.sys | vulnerable driver
+750a8aa9-a87c-4142-b96b-18ea139ada14 | driver_89036534.sys | malicious
+75b9b0c5-dd3e-4cf3-a693-c80f2feabb6a | 5a4fe297c7d42539303137b6d75b150d.sys | malicious
+767ed0a0-606b-4297-a858-e2af5b4a0400 | xkpsm.sys | vulnerable driver
+76b5dfae-b384-45ce-8646-b2eec6b76a1e | KfeCo11X64.sys | vulnerable driver
+77157886-00f9-4f6e-b217-d896813b630f | kavservice.bin | malicious
+7789e9ca-8508-486b-9d77-7497c5c61474 | PSKD64.SYS | vulnerable driver
+79542852-3a0c-43bc-bfa3-3eeb0e1d7fd2 | VBoxDrv.sys | vulnerable driver
+79e1e3d4-36d0-4325-8d9c-c6e69b6084da | ImmunetUtilDriver.sys | vulnerable driver
+7a5fe570-3b35-4fad-b7d6-7518bd5436a0 | NodeDriver.sys | malicious
+7a722cd5-69ec-4680-9f20-9387f249a891 | ElbyCDIO.sys | vulnerable driver
+7a9d34e4-c660-4388-ab61-4fd6f6bf1ad4 | avkiller.sys | malicious
+7bb4d807-9a66-48ff-9fb7-82780f3b015e | RadHwMgr.sys | vulnerable driver
+7c766ce5-fa74-4080-907d-95f2f68d49e7 | mtxmem.sys | vulnerable driver
+7cc0a40d-7902-4400-9fc4-0070053991cb | bootrepair.sys | vulnerable driver
+7cee2ce8-7881-4a9a-bb18-61587c95f4a2 | DcProtect.sys | vulnerable driver
+7d9e8ee4-6725-4216-bc6b-ac3042018d5c | SakDriver.sys | malicious
+7d9fee48-82d8-4582-be9a-a46682054e3e | MyPortIO_x64.sys | vulnerable driver
+7e80423f-8b30-4ee2-b904-9f5421826a8c | daxin_blank.sys | malicious
+7edb5602-239f-460a-89d6-363ff1059765 | viragt64.sys | vulnerable driver
+7f52f435-d217-4c13-98a4-4fdc6c8516c8 | FoxKeDriver64.sys | vulnerable driver
+7f645b95-4374-47ae-be1a-e4415308b550 | WCPU.sys | vulnerable driver
+7f80bb6e-bbf6-46dd-b77d-ecef24f1c2cd | ksapi.sys | vulnerable driver
+7f9842a0-8118-462e-8860-227265ff4379 | NTIOLib.sys | vulnerable driver
+8081b0d0-e18e-474a-bdfa-8ff1956d90cb | driver_0ffb4081.sys | malicious
+809e7c77-f0fa-46fb-862c-71969ae0c032 | ktmutil7ODM.sys | malicious
+8198f5af-4b40-4800-a22a-4a7cf957ef37 | MSqPq.sys | malicious
+81a73e57-2e92-4d21-97d3-1c21eb4c3aea | LenovoDiagnosticsDriver.sys | vulnerable driver
+82087b26-b649-4ad1-a353-3a225c757ff7 | driver_0a636606.sys | malicious
+82eee73e-156e-4344-b975-babbf0bc131f | PGRHostControl.sys | vulnerable driver
+833fc08f-217d-4d3f-8c8e-782c61120407 | kt2.sys | malicious
+8347c4af-8946-4135-b890-cde3ed35fc28 | KObjExp.sys | vulnerable driver
+837ad058-65f4-4b75-8f21-b842e48db8a5 | nvaudio.sys | vulnerable driver
+83b78b88-3b43-41cc-a60f-cab1a7b96978 | BdApiUtil.sys | vulnerable driver
+843a028a-e998-42cb-874c-4478680af397 | ditpio64.sys | vulnerable driver
+847e6aa7-ce2d-4f4a-aa6c-a00c5f0ad728 | dXIw8eZ9aYxQYzgm.sys | vulnerable driver
+84a3007a-de5e-4622-bfc5-f05d927c3618 | Alinubx.sys | vulnerable driver
+84f92ac1-1e72-420d-9cc0-65c838b90a4d | portwell.sys | vulnerable driver
+85335187-dae0-4f06-acea-209efaf74973 | driver_4fc254af.sys | malicious
+855ade1f-8a9e-4c9d-ab8e-d7e409609852 | elbycdio.sys | vulnerable driver
+85f8ad5b-c5aa-468b-99f3-4b0aacfaa724 | cyvrlpc.sys | vulnerable driver
+8697785a-d088-42a7-ac25-b5c8a3b22664 | driver_d1ea9e16.sys | malicious
+86cff0de-2536-4b8d-a846-a7312c569597 | nicm.sys | vulnerable driver
+87593c63-9e3e-4d09-aa47-94bca0783396 | reddriver.sys | malicious
+87680018-393b-47b6-8130-6b41bed2bc7c | LnvMSRIO.sys | vulnerable driver
+87752fb8-e9f6-4235-91e2-c4343677d817 | mimidrv.sys | malicious
+87d5ec39-482e-4e78-a003-be4b662f85fc | vsdatant.sys | vulnerable driver
+8858c9c8-e570-41ed-a5cc-054d9eb51d40 | fekern.sys | vulnerable driver
+886af494-4087-48c9-b48f-53e638d6f62e | UDDB2B6.sys | vulnerable driver
+892292f9-b87c-40a5-80e5-8c9b02914e8b | wantd.sys | malicious
+894bd2db-1d93-4b3d-8e4d-7dac29382cb9 | wdisvhost.sys | vulnerable driver
+89643454-e38b-41cb-853d-abf649a104a5 | DCRCVDrv.sys | vulnerable driver
+8a162702-b043-4108-bb6c-1488751a4a32 | dkrTK.sys | malicious
+8a1a4a5d-3e41-4539-80cd-0cb751f7fab3 | ProcObsrvesx.sys | vulnerable driver
+8a6aebaa-34aa-46e8-a864-4189a55fd17b | ktapi.sys | vulnerable driver
+8c2df58f-1e02-4911-ad40-3fa4ed1f4333 | ef0e1725aaf0c6c972593f860531a2ea.sys | malicious
+8d23f7e6-341a-431e-9dc1-bc797773d411 | shimano32.sys | vulnerable driver
+8d2f15a5-e71a-47ba-a391-55d1a1962368 | SvIoCtrlx64.sys | vulnerable driver
+8d3f27bd-c3fd-48d0-913a-e2caa6fbd025 | rtkio.sys | vulnerable driver
+8dbd8d1c-aa4a-418c-9bbe-0730d37d9bb5 | Amd_RPMC_BiosToolCommonDriver.sys | vulnerable driver
+8e673a36-4f16-4f4c-acf7-ca95bc586384 | CSAgent.sys | vulnerable driver
+8f2d3be4-3e25-490f-82bc-0aca16aee101 | PCTcore64.sys | vulnerable driver
+8fcec30c-f5ca-4aae-b2d8-77af60b78d42 | zntport.sys | vulnerable driver
+8ff4ab50-05b7-4bfa-b994-1920c4ed4978 | ncpl.sys | vulnerable driver
+90239ca5-500d-422a-a3e6-6b771b55b3eb | p2KGhmzsARY1.sys | vulnerable driver
+90afa27c-0f67-46a6-b4a9-809f55157c71 | nscm.sys | vulnerable driver
+90df671c-a903-49bd-ac62-c124d4f6901d | GlobalVistaVentures_v3.sys | vulnerable driver
+93740202-930c-4ab4-8603-8ec9532c5415 | WinTapix.sys | malicious
+93c84c08-4683-493d-abf7-22dc2d1cb567 | PanIOx64.sys | vulnerable driver
+9543c507-9b10-4de8-89b9-42a4f24c99ec | FPCIE2COM.sys | vulnerable driver
+95fc9bf0-ec86-44b3-abad-a4c922aa7742 | pmxdrv64.sys | vulnerable driver
+96ba5e53-6a40-4813-b6f1-ccce31a883cf | xhunter1.sys | vulnerable driver
+9713603a-53bf-4907-a304-b422db741fc6 | typelibdE.sys | malicious
+9720d49d-c20f-479e-9284-2b3ad120fdf8 | SONiXDDRx64.sys | vulnerable driver
+9748d5c8-62dd-474b-a336-0aadb49e5ff9 | daxin_blank3.sys | malicious
+9771266b-72e2-4ed3-ac14-1ac25dc5fb25 | hax.sys | vulnerable driver
+97e3077a-ca57-4f45-ba7c-f63dc9c4ea32 | CardIo64.sys | vulnerable driver
+97ed6c7b-be4c-4f60-9157-c788a555ca9f | iscflashx64.sys | vulnerable driver
+97fa88f6-3819-4d56-a82c-52a492a9e2b5 | inpout32.sys | vulnerable driver
+981210cb-8b84-4d37-b46e-b71059b8c438 | amsdk.sys | vulnerable driver
+98b064c4-c9ff-4cac-a6b6-a24964b70923 | chinese_cheat_driver.sys | vulnerable driver
+9974b134-7fee-4c7a-9b0d-38b3b2d7e957 | CSAgent.sys | vulnerable driver
+998ed67c-9c20-46ef-a6ba-abc606b540b9 | rtkiow8x64.sys | vulnerable driver
+9a4fb66e-9084-4b21-9d76-a7afbe330606 | AMDPowerProfiler.sys | vulnerable driver
+9bf033e4-7295-4b63-8772-638b76851741 | ComputerZ.Sys | vulnerable driver
+9bf541fb-a68e-41a5-aab2-b939acc22bb1 | iOCdrv.sys | vulnerable driver
+9c3c6e89-3916-498f-81e5-da057ab3ed42 | windbg.sys | malicious
+9c4e45c8-8f99-40b4-bb73-2e1cfa813034 | 927e3aef03a8355d236230cace376b3023480a40c5ac08453c07dab343dd1f11 | vulnerable driver
+9ca73d04-3349-4c16-9384-94c43335a031 | Driver7.sys | vulnerable driver
+9cb4b2fa-67fb-4415-a064-7da7bc47e105 | wamsdk.sys | vulnerable driver
+9d4358c3-5d6e-48a0-971e-e2ad7724c106 | filwfp.sys | vulnerable driver
+9e0a1bae-6509-41fd-a5bf-dfe6cf388682 | driver_206006a1.sys | malicious
+9e87b6b0-00ed-4259-bcd7-05e2c924d58c | BSMEMx64.sys | vulnerable driver
+9eb0156e-4c43-487f-be8c-40a7b19a4279 | ardrv.sys | vulnerable driver
+9f88300d-e607-4e50-8626-fd799439e049 | K7RKScan.sys | vulnerable driver
+a0006589-a811-4341-9be0-4512eae9febb | kgameprotect.sys | vulnerable driver
+a02ee964-a21e-4b08-9c98-a730c90bfd53 | LMIinfo.sys | vulnerable driver
+a07e5897-3835-4188-9e3e-bd810c3e34a5 | WibuKey64.sys | vulnerable driver
+a08ee79f-801d-4b98-996f-55f6a72ac5f7 | CP2X72C.SYS | vulnerable driver
+a0f0d0db-15a2-48e4-af39-50967ee8b541 | driver_16773074.sys | malicious
+a0fbd397-64d5-4af2-844b-b096e08a1866 | libnicm.sys | vulnerable driver
+a2177b22-0401-4c31-8ae4-40a7e2a53653 | dtr_ec.sys | vulnerable driver
+a22104a8-126d-449f-ba3e-28678c60c587 | wantd_3.sys | malicious
+a285591e-ad3c-46a3-a648-c58589ff5efc | amsdk.sys | vulnerable driver
+a338a9fc-9fe3-400c-9fe4-69bb7892602d | UCOREW64.SYS | vulnerable driver
+a4795ab6-d908-44cf-9ebf-a47db367d385 | WiRwaDrv.sys | vulnerable driver
+a4aa80bc-4ecd-49ab-bc0f-0f49b07fdd7f | segwindrvx64.sys | vulnerable driver
+a5ebba11-5a31-48d2-9c6d-78bba397edf1 | PcieCubed.sys | malicious
+a6340f12-b0ee-41c5-acf0-92be886d1296 | KmWpsMs.sys | vulnerable driver
+a6dd3aef-d3a7-4c72-abcd-e633e0c0706c | kdhacker64_ev.sys | vulnerable driver
+a7628504-9e35-4e42-91f7-0c0a512549f4 | SANDRA.sys | vulnerable driver
+a7bba474-815f-49be-bddc-4d76a64c866c | NTIOLib.sys | vulnerable driver
+a7c3e2d1-8f4b-4e6a-b5d9-3c1f0e7a9b82 | CorMem.sys | vulnerable driver
+a845a05c-5357-4b78-9783-16b4d34b2cb0 | aswVmm.sys | vulnerable driver
+a8f2da2a-369c-4b4d-9a00-d7a892b9f7c3 | wsdkd.sys | vulnerable driver
+a9ab4412-d484-459b-be97-5975f5ab8094 | be6318413160e589080df02bb3ca6e6a.sys | malicious
+a9d9cbb7-b5f6-4e74-97a5-29993263280e | CorsairLLAccess64.sys | vulnerable driver
+aa687f89-4f3b-4b59-b64e-fee5e2ae2310 | wantd_2.sys | malicious
+aaf8ce1a-e11b-4929-96e0-5ec0666cef2c | 1fc7aeeff3ab19004d2e53eae8160ab1.sys | malicious
+abcd2c10-1078-4cf9-b320-04ca38d22f98 | Chaos-Rootkit.sys | vulnerable driver
+ac62e709-4aa5-41f4-87b1-b811283d70d1 | a9df5964635ef8bd567ae487c3d214c4.sys | malicious
+acb5da93-1dcc-4d16-8415-6b4b221cb4a1 | 360netmon_wfp.sys | vulnerable driver
+adf27819-c7a0-4476-8632-5ca759202542 | RzDev_00X10.sys | malicious
+ae2a6048-3896-4dd8-9eb1-a4a66104b0cf | MemCtl.sys | vulnerable driver
+af153e7c-13fa-4a40-a095-00726ad6d783 | driver_1a74c2bd.sys | malicious
+af8ef3c0-8686-4112-992b-86587a4a9060 | driver_82d928c5.sys | malicious
+af98f6e6-f19e-4705-a7b9-e7ee7377447b | fildds.sys | vulnerable driver
+b074dcb5-b278-4434-bdd9-14a055d724f3 | mlgbbiicaihflrnh.sys | malicious
+b0dedc3f-6e4b-497a-aade-390cbf4beebb | GtcKmdfBs.sys | vulnerable driver
+b1dd91b1-9ba3-4d68-a2d1-919039e18430 | dcr.sys | vulnerable driver
+b1f406cd-117a-45bb-97db-3f9ecb44f70d | sxav64-v1.5.1.sys | vulnerable driver
+b28cc2ee-d4a2-4fe4-9acb-a7a61cad20c6 | WiseUnlo.sys | vulnerable driver
+b32d8d7d-0dc2-4d09-a306-8efc4caf1839 | 4118b86e490aed091b1a219dba45f332.sys | malicious
+b3f7c8d2-4a19-4e5b-9d6c-2f8e1a3b7c04 | DriversCloud_amd64.sys | vulnerable driver
+b3fd8560-79d3-40b7-b05f-c78044176c8c | xjokercontroller.sys | vulnerable driver
+b4f3a1c2-e8d7-4f92-a301-5c6d9e0b1a2f | TVicPort64.sys | vulnerable driver
+b660d253-2b60-46c5-b95a-c354aa5eb154 | driver_4f9b5a2f.sys | malicious
+b6873d69-affe-431b-9ba8-459391386603 | ControlCenter.sys | vulnerable driver
+b72f7335-6f27-42c5-85f5-ed7eb9016eac | AsrAutoChkUpdDrv.sys | vulnerable driver
+b759adfa-b353-4ca3-9dfb-8fadf7a437eb | spwizimgVT.sys | malicious
+b7bfe661-591a-45be-823d-ac6dae2edeed | mtxC9CB.sys | vulnerable driver
+b8339454-0e84-4a5b-92d0-6a626ced6677 | ngiodriver.sys | vulnerable driver
+b898cc81-1736-45c7-ab41-c104ab17f05d | IUForceDelete.sys | vulnerable driver
+b9216fc9-860e-43ae-8db2-e970c7e76b46 | pskmad.sys | vulnerable driver
+b98bc8f5-5dde-417f-a25c-41d95b867d75 | Khwmon.sys | vulnerable driver
+ba91bce3-2cf9-4c44-bbd8-1170a44d23db | filnk.sys | vulnerable driver
+baa168cd-eba2-42e4-95e9-47cb4b2f9094 | wnbios.sys | vulnerable driver
+babe348d-f160-41ec-9db9-2413b989c1f0 | VBoxUSBMon.sys | vulnerable driver
+bb20edec-ecd4-4acd-9ad2-e4559748b336 | burntcigar.sys | malicious
+bc5e020a-ecff-43c8-b57b-ee17b5f65b21 | sandra.sys | vulnerable driver
+bd06e043-0f69-4212-be93-d069bf0de848 | AsrCDDrv.sys | vulnerable driver
+bd580aba-a804-4afc-adb3-b8ce342c78f6 | K7RKScan.sys | vulnerable driver
+bd5bc879-6602-4338-938e-0873f71bd3d0 | ampg.sys | malicious
+bd6490c2-20ea-441e-803c-bc3b957dae4c | isodrivep64.sys | vulnerable driver
+bd9f084e-b235-4978-bf2a-5f1dc02937df | TfSysMon.sys | vulnerable driver
+be1a3216-73db-46e4-b107-87d9b7751181 | pxscan.sys | vulnerable driver
+be3e49ea-095e-4fdb-9529-f4c2dbb9a9fc | PhlashNT.sys | vulnerable driver
+bf01915d-045f-442c-a74e-25c56182123f | BSMI.sys | vulnerable driver
+bffcac17-f20c-43cc-baf0-93fd20bc1ed5 | unknown.sys | vulnerable driver
+c00f818c-1c90-4b47-bc29-fb949f6efb65 | e29f6311ae87542b3d693c1f38e4e3ad.sys | malicious
+c0634ed7-840e-4a7e-8b34-33efe50405c2 | TPwSav.sys | vulnerable driver
+c1143cd9-a709-4323-9678-2117285d1b47 | NSecKrnl.sys | vulnerable driver
+c1265ee4-aed4-4e65-ac54-c64deb5e3b28 | fur.sys | malicious
+c22dd43e-cf1f-4338-a109-d662198ffbe9 | d591004.sys | vulnerable driver
+c2e98102-2055-48f0-9449-3e7a7f2c0ffe | idmtdi.sys | malicious
+c2ed6a76-95ad-45fd-97d4-b55deefb3e32 | GoFly64.sys | vulnerable driver
+c2feb6de-46fe-44ab-93c2-634ea6ab83a2 | mbamchameleon.sys | vulnerable driver
+c33648d7-6473-4e2b-92f6-93f195bc183f | nvflsh32.sys | vulnerable driver
+c366ee89-97ae-4523-b635-e05769384bd3 | whql.sys | vulnerable driver
+c3c083d2-e9bd-4891-8582-46086de2b2b4 | MonProcessEX.sys | vulnerable driver
+c3cca618-5a7f-4a51-8785-cb328fbfb0df | viraglt64.sys | vulnerable driver
+c44e6197-efab-49d2-8a5f-04ae4a0f0ea0 | jnprva.sys | vulnerable driver
+c67ad48b-223e-40f8-bfc7-0cb904d0a3d7 | pskmad_64.sys | vulnerable driver
+c734bcff-aaaa-4450-a9a9-25ee52aa7ff1 | ktes.sys | malicious
+c7789f3c-b638-4f66-a890-7605682306e7 | Novawave_Novabench_NovabenchDriverWin10.sys | vulnerable driver
+c7f76931-e24c-4d94-9e1f-5a083da581b4 | fd3b7234419fafc9bdd533f48896ed73_b816c5cd.sys | vulnerable driver
+c7f94129-f95f-4848-b1ab-68aae24275e7 | kernel_utility_driver64.sys | malicious
+c8619f49-8e23-489b-9878-53d27533da15 | pxitrig64.sys | vulnerable driver
+c95a796a-a8f6-4cfa-bc42-4936ecb59091 | 8492937_2_Driver.sys | vulnerable driver
+c98af16e-197f-4e66-bf94-14646bde32dd | CupFixerx64.sys | vulnerable driver
+ca1e8664-841f-4e4b-9e67-3f515cc249c6 | ndislan.sys | malicious
+ca415ed5-b611-4840-bfb2-6e1eacac33d1 | Monitor_win10_x64.sys | vulnerable driver
+ca6455d1-b06e-496c-be33-f89c41b27540 | CSAgent.sys | vulnerable driver
+cce291c8-4534-4362-af45-5f45cd32bd92 | smep_namco.sys | vulnerable driver
+cea8bd08-a3c5-4ae1-a568-387b909ada67 | driver_146b8f4f.sys | malicious
+cf805b21-4611-4983-a8b6-271373a45057 | SBIOSIO64.sys | vulnerable driver
+cf94939a-703f-46a4-917b-d6af7e0685ef | mapmom.sys | vulnerable driver
+cf9ed92d-d39b-4562-a256-b36f6560ccfa | NPR0.sys | vulnerable driver
+cfdc5cb4-be5c-4dcc-a883-825fa72115b4 | PanMonFlt.sys | vulnerable driver
+d0cc79b2-a789-4cf3-9a88-25bdabb79416 | devhost.sys | vulnerable driver
+d0de6c54-2dd8-4e32-a2a7-c6c26dcd2a0f | XLHA.sys | vulnerable driver
+d2806397-9ceb-47c8-b5f3-3aabec182ff5 | NCHGBIOS2x64.SYS | vulnerable driver
+d2a619bb-c8c6-4c79-8b6a-8368668bbfb2 | windrvr1251.sys | vulnerable driver
+d3111e83-52eb-4a8c-817d-761ea72d37e2 | fgme.sys | malicious
+d35cb48d-2aca-4d7d-a194-f4566183bcd9 | TmComm.sys | vulnerable driver
+d4664202-d1b9-44d4-97cc-fee2150082db | nvflsh64.sys | vulnerable driver
+d474d8ad-14d9-4664-addd-86b4a9b7a1a5 | NeacSafe64.sys | vulnerable driver
+d4d82af5-0ac6-4d5d-944f-cf108475aba9 | 360hvm64.sys | vulnerable driver
+d4eb6ed4-c23f-45a9-9891-5aa8f218b863 | pcdsrvc_x64.sys | vulnerable driver
+d64167b6-f281-41d8-9535-6cb925e77aec | EneTechIo64.sys | vulnerable driver
+d6dc9b52-9918-442d-b03a-f1f614aa4cce | ppa_x64.sys | vulnerable driver
+d7773616-9860-4768-b6a2-d74f32c23b4e | driver_1afc1d06.sys | malicious
+d819bee2-3bff-481f-a301-acc3d1f5fe58 | Se64a.sys | vulnerable driver
+d827f7a6-1832-4ddb-90dd-7a8cf1c7f25e | LcTkA.sys | malicious
+d9a9fd72-e789-4bba-9b96-549b123e5c40 | rspot.sys | vulnerable driver
+d9e00cc7-a8f4-4390-a6dc-0f5423e97da4 | mydrivers.sys | vulnerable driver
+d9e9fab2-6b64-4c14-b1ec-7af1923c0773 | AccelLid.sys | vulnerable driver
+d9f2c3d6-160c-4eb3-8547-894fcf810342 | driver7-x86-withoutdbg.sys | vulnerable driver
+da066835-f37c-40bf-86bb-d77ad45c7f30 | driver_fdd16a94.sys | malicious
+da6709ab-3b7a-445d-9a47-e8b4141d4133 | hp64vision.sys | vulnerable driver
+da7314dc-6cf1-4d74-a0d1-796fc08944f8 | windbg.sys | malicious
+dbb58de1-a1e5-4c7f-8fe0-4033502b1c63 | asas.sys | vulnerable driver
+dbd78de7-f5ab-4fb7-a246-39cbcca4678c | deresute64.sys | vulnerable driver
+dbfcce10-76a3-44a4-a9b8-d7126152a235 | driver_bfcbc010.sys | malicious
+dc3fdbd3-601a-4d2a-bf34-d2e84c6ff1d3 | stdcdrvws64.sys | vulnerable driver
+dc82ae79-d3e2-439a-a4c7-ec1f23e1261b | fbiosdrv.sys | vulnerable driver
+ddca6daf-4932-4e82-ad3c-d92d47632ea4 | 6771b13a53b9c7449d4891e427735ea2.sys | malicious
+ddefecdd-9410-46d9-8957-e23aac1aba0c | c94f405c5929cfcccc8ad00b42c95083.sys | malicious
+de003542-80e1-4aa0-9b99-ed8647a93a6e | cpuz_x64.sys | vulnerable driver
+de365e80-45cb-48fb-af6e-0a96a5ad7777 | CtiIo64.sys | vulnerable driver
+de4dd27a-1f7e-4271-98a4-55395ab6aabf | BS_I2c64.sys | vulnerable driver
+de62baae-872d-4e9a-b6d9-b0ac99854c66 | Chaos-Rootkit.sys | vulnerable driver
+deffeb8d-c7d9-46b9-a921-7d8d096460ef | AIDA64Driver.sys | vulnerable driver
+dfce8b0f-d857-4808-80ef-61273c7a4183 | Dh_Kernel_10.sys | vulnerable driver
+e0e93453-1007-4799-ad02-9b461b7e0398 | truesight.sys | vulnerable driver
+e1c29414-5b5b-44f4-84cc-e6f55d9a23c6 | driver_85ca0dcd.sys | malicious
+e354b869-e817-4f9f-8027-a3d5bfb3689b | Windows-Memory-Informer.sys | vulnerable driver
+e4098d7e-78b3-4da1-96cb-68b27f245e02 | HwOs2Ec7x64.sys | vulnerable driver
+e41d5471-c4b8-48da-bdb7-e462008c2e78 | cpqsysio64.sys | vulnerable driver
+e42cd285-4dda-4086-a696-93ab1d6f17ca | HOSTNT.sys | vulnerable driver
+e5f12b82-8d07-474e-9587-8c7b3714d60c | zam64.sys | vulnerable driver
+e6378671-986d-42a1-8e7a-717117c83751 | BioNTdrv.sys | vulnerable driver
+e69e3427-97cd-43bb-aeda-f1fbbeaa75f6 | MemLoaderCustomize.sys | malicious
+e7fd8ffc-ab37-4a7b-8dc9-fc7432fbacae | driver_4d8bc539.sys | malicious
+ea0e7351-b65c-4c5a-9863-83b9d5efcec3 | ampa.sys | vulnerable driver
+eada0015-c868-463c-91a6-d159ee1110d7 | KRegExp.sys | vulnerable driver
+eb07ef7e-0402-48eb-8e06-8fb76eda5b84 | LHA.sys | vulnerable driver
+ec5012bb-789a-436d-be22-b343c331f7c7 | PMAD.sys | vulnerable driver
+ec521bd5-8a3f-46ec-b6d3-414b79977a7e | l1malwarebits.sys | vulnerable driver
+ecabc507-2cc7-4011-89ab-7d9d659e6f88 | VBoxMouseNT.sys | vulnerable driver
+ed3abb66-c577-44b8-89fa-80d300c82373 | xhunter2.sys | vulnerable driver
+eef1fcf4-8c54-420b-8d38-9c5f95129dcc | ntbios.sys | malicious
+ef6b5fe8-6c4b-4b32-8adc-c1d8a83e8558 | a26363e7b02b13f2b8d697abb90cd5c3.sys | malicious
+ef848b1c-e197-4f98-aa19-4580f41a98b8 | termdd.sys | vulnerable driver
+f0a02666-44f6-4174-a7c6-d006481a340f | TRIXX.sys | vulnerable driver
+f1dd9c41-2608-48e5-bb3e-191d56b34591 | sdrv_win_sliff.sys | vulnerable driver
+f2032ff3-9c67-4d48-981b-2479babb153d | ZYArKit.sys | vulnerable driver
+f22e7230-5f32-4c4e-bc9d-9076ebf10baa | VBoxTAP.sys | vulnerable driver
+f3215c19-8053-458c-81a5-90a74c5d2e6d | CITMDRV_AMD64.sys | vulnerable driver
+f33c2e80-7b01-416b-821a-ed06db4b6511 | stdcdrv64.sys | vulnerable driver
+f375e53d-db7c-4149-beff-c8b9329f6f9b | devMemDrv.sys | vulnerable driver
+f4126206-564f-49f5-a942-2138a3131e0e | NICM.SYS | vulnerable driver
+f4990bdd-8821-4a3c-a11a-4651e645810c | IOMap64.sys | vulnerable driver
+f4c22f4d-eff8-40c5-8b31-146abe5f17b7 | physmem.sys | vulnerable driver
+f4e00816-97a8-4c2d-b990-9812f16fe3d3 | athpexnt.sys | vulnerable driver
+f5c1a46f-21e6-4b06-b212-2dc55b699497 | driver_290bc782.sys | malicious
+f650dfc3-d3a1-4a9a-8b71-c599d1f9579c | FDMCJHJYXZITI.sys | vulnerable driver
+f694c0e1-b75d-4c41-acbd-a87b72d8abe4 | driver_a6deeea6.sys | malicious
+f6c08b8a-1d25-4bf1-9d4f-5368c1f6cfe7 | driver_c3d48ddd.sys | malicious
+f8bddc8b-49b9-41f7-a877-d15ec3f174f9 | daxin_blank4.sys | malicious
+f8ed41ef-18f0-441c-99b8-def062214d0e | BdApiUtil64.sys | vulnerable driver
+f92f4c60-b39c-4726-ba74-dcab7f653ae2 | hwdetectng.sys | vulnerable driver
+fab98aaa-e4e7-4c4a-af65-c00d35cf66e9 | cpuz141.sys | vulnerable driver
+fb36ebc6-fdc5-42eb-929b-a07e00c5b9db | ksapi.sys | vulnerable driver
+fb783760-cb3f-4cf4-b4ac-8edb756b9821 | atlAccess.sys | vulnerable driver
+fbd12dbb-434e-4950-887a-382b681e8a5a | AppVkgr.sys | vulnerable driver
+fc3467c3-6109-447d-b438-7a4276c3d8e5 | PoisonX.sys | vulnerable driver
+fd6c52b1-aeaa-4d89-8051-91acc68c3270 | ACPIx86.sys | vulnerable driver
+fda3ff67-12dc-488c-a4c2-603f5bf420bd | cg6kwin2k.sys | vulnerable driver
+fdf4f85b-47f4-4c98-a0d5-a6583463f565 | vmdrv.sys | vulnerable driver
+fe2f68e1-e459-4802-9a9a-23bb3c2fd331 | kEvP64.sys | vulnerable driver
+ff74f03e-e4ce-4242-bfe3-60601056bb34 | CorsairLLAccess64.sys | vulnerable driver
+ff77b58d-e143-4f61-92de-c0d9bc0af7d5 | ACE-BASE.sys | vulnerable driver
