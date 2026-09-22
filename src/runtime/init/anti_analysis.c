@@ -5,6 +5,7 @@
  * Works on Windows and Linux.
  */
 
+#define _GNU_SOURCE
 #include "jocky_rt.h"
 #include <stdio.h>
 #include <string.h>

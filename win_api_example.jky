@@ -1,0 +1,17 @@
+// Foreign Function Interface (FFI) declarations for Windows API functions (user32.dll / kernel32.dll)
+ffi MessageBoxA(hWnd: i64, lpText: string, lpCaption: string, uType: i32) -> i32;
+ffi GetCurrentProcessId() -> i32;
+ffi GetTickCount() -> i32;
+ffi printf(fmt: string, ...) -> i32;
+
+fn main() -> i32 {
+    let pid: i32 = GetCurrentProcessId();
+    let uptime: i32 = GetTickCount();
+
+    printf("JOCKY Windows API Integration Example\n");
+    printf("Current Process ID: %d\n", pid);
+    printf("System Uptime (ms): %d\n", uptime);
+
+    return 0;
+}
+

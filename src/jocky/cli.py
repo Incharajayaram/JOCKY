@@ -84,46 +84,51 @@ def cli():
 @click.argument("file", type=click.Path(exists=True, dir_okay=False))
 @click.option("--profile", "-p", default=None, help="Obfuscation profile (none, light, standard, aggressive, paranoid)")
 @click.option("--output", "-o", default=None, help="Output executable path")
+@click.option("--target", "-t", default="native", help="Target platform (linux, windows, or both)")
 @click.option("--keep-intermediates", is_flag=True, help="Keep intermediate build files")
-def build(file: str, profile: Optional[str], output: Optional[str], keep_intermediates: bool):
-    """Build a JOCKY source file into a native executable."""
+def build(file: str, profile: Optional[str], output: Optional[str], target: str, keep_intermediates: bool):
+    """Build a JOCKY source file into a native executable (Linux, Windows, or both)."""
     input_path = Path(file)
     build_dir = input_path.parent / ".jocky-build"
     build_dir.mkdir(exist_ok=True)
 
     prof = resolve_profile(profile)
-    config = {}
-    if output:
-        config["output"] = output
+    targets = ["linux", "windows"] if target.lower() == "both" else [target]
 
-    ctx = BuildContext(
-        input_file=input_path,
-        profile_name=profile or (prof.name if prof else "none"),
-        output_dir=build_dir,
-        config=config,
-    )
-    ctx.state["profile"] = prof
+    for tgt in targets:
+        config = {"target": tgt}
+        if output:
+            config["output"] = output if len(targets) == 1 else f"{output}_{tgt}"
 
-    header("JOCKY Build")
-    console.print(f"  [dim]Source[/dim]     {input_path}")
-    console.print(f"  [dim]Profile[/dim]    {ctx.profile_name}")
-    console.print(f"  [dim]Build dir[/dim]  {build_dir}")
-    console.print()
+        ctx = BuildContext(
+            input_file=input_path,
+            profile_name=profile or (prof.name if prof else "none"),
+            output_dir=build_dir,
+            config=config,
+        )
+        ctx.state["profile"] = prof
 
-    pipeline = get_pipeline()
-    try:
-        ctx = pipeline.run(ctx)
-    except Exception as e:
+        header(f"JOCKY Build ({tgt})")
+        console.print(f"  [dim]Source[/dim]     {input_path}")
+        console.print(f"  [dim]Profile[/dim]    {ctx.profile_name}")
+        console.print(f"  [dim]Target[/dim]     {tgt}")
+        console.print(f"  [dim]Build dir[/dim]  {build_dir}")
         console.print()
-        error(f"Build failed: {e}")
-        raise click.ClickException(str(e))
 
-    exe = ctx.state.get("executable")
-    console.print()
-    if exe:
-        success(f"Build succeeded → [bold white]{exe}[/bold white]")
-    else:
-        warn("Build finished but no executable was produced")
+        pipeline = get_pipeline()
+        try:
+            ctx = pipeline.run(ctx)
+        except Exception as e:
+            console.print()
+            error(f"Build failed for {tgt}: {e}")
+            raise click.ClickException(str(e))
+
+        exe = ctx.state.get("executable")
+        console.print()
+        if exe:
+            success(f"Build succeeded [{tgt}] → [bold white]{exe}[/bold white]")
+        else:
+            warn(f"Build finished for {tgt} but no executable was produced")
 
     if not keep_intermediates:
         for stage_dir in build_dir.iterdir():
