@@ -1,0 +1,26 @@
+// Demonstration of JOCKY module using Win32 C Wrapper Layer FFI
+
+ffi jocky_win_get_process_id() -> i32;
+ffi jocky_win_get_system_info(buf: string, max_len: i32) -> i32;
+ffi jocky_win_get_memory_status(buf: string, max_len: i32) -> i32;
+ffi jocky_win_get_tick_count() -> i64;
+ffi printf(fmt: string, ...) -> i32;
+
+fn main() -> i32 {
+    let pid: i32 = jocky_win_get_process_id();
+    let sys_buf: string = "                                                                ";
+    let mem_buf: string = "                                                                ";
+
+    jocky_win_get_system_info(sys_buf, 64);
+    jocky_win_get_memory_status(mem_buf, 64);
+
+    printf("===========================================\n");
+    printf("  JOCKY Win32 C Wrapper Integration Demo   \n");
+    printf("===========================================\n");
+    printf("Process ID   : %d\n", pid);
+    printf("System Info  : %s\n", sys_buf);
+    printf("Memory Status: %s\n", mem_buf);
+    printf("===========================================\n");
+
+    return 0;
+}

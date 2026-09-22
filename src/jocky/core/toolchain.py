@@ -124,6 +124,8 @@ def _find_in_path() -> Optional[Path]:
 def _find_in_common_locations() -> Optional[Path]:
     """Search common install prefixes."""
     candidates = [
+        Path.cwd() / "toolchain",
+        Path(__file__).parent.parent.parent.parent / "toolchain",
         Path.home() / "projects" / "llvm-obfuscation-tools-linux-x86_64",
         Path.home() / "llvm-obfuscation-tools-linux-x86_64",
         Path("/usr/local/llvm-obfuscation"),
