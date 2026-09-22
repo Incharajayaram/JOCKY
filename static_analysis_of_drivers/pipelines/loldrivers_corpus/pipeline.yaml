@@ -1,0 +1,75 @@
+name: loldrivers_corpus
+description: windows kernel driver vulnerability review over a local LOLDrivers corpus (keeps every sample)
+version: "2.0"
+
+model: claude-code/claude-opus-5
+
+report:
+  title: Windows kernel driver review (LOLDrivers corpus)
+  entity: driver
+  classification_key: classification
+  vulnerable_when: [vulnerable]
+  safe_when: [safe]
+  columns:
+    - semgrep_scanner.finding_count
+    - decompile.device_on_load_path
+    - discover.priority_score
+    - decompile.function_count
+    - discover.dangerous_imports
+
+settings:
+  work_dir: work
+  max_workers: 4
+
+stages:
+  - name: discover
+    processor: pe_ingest/pe_ingest.py
+    config:
+      extensions: [".sys"]
+      recursive: true
+      subsystem_filter: [1]
+      subdirs: []
+
+  - name: kernel_filter
+    processor: metadata_filter
+    config:
+      require:
+        is_kernel_driver: true
+        has_ioctl_surface: true
+      dedup_field: sha256
+
+  - name: decompile
+    processor: ghidra_decompile/ghidra_decompile.py
+    parallel: 0
+    timeout: 600
+    config:
+      strategy: extract_dispatch.py
+      max_functions: 60
+      max_depth: 4
+      ghidra_install_dir: ${GHIDRA_INSTALL_DIR}
+      java_home: ${JAVA_HOME:-}
+
+  - name: semgrep_scanner
+    processor: semgrep_scanner/semgrep_scanner.py
+    config:
+      min_findings: 1
+      rules_dir: pipelines/loldrivers/rules
+      batch_size: 200
+
+  - name: rank_by_findings
+    processor: top_k
+    config:
+      metric_path: "semgrep_scanner.finding_count"
+      keep_top: 0
+      sort_order: desc
+
+  - name: assess
+    processor: generic_llm
+    parallel: 4
+    on_failure: skip
+    config:
+      prompt: pipelines/loldrivers/assessment.j2
+      output_file: assessment.md
+      classify_by: "\\[VULNERABLE\\]|\\[SAFE\\]"
+      max_context_tokens: 900000
+      max_retries: 3
