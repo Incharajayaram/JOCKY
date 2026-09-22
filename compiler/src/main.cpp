@@ -15,6 +15,7 @@ static void printUsage(const char* prog) {
               << "  --no-runtime   Skip anti-analysis runtime (cleaner binary)\n"
               << "  --cc           Compile C source through JOCKY pipeline\n"
               << "  --target <triple>  Cross-compile target (e.g., x86_64-w64-mingw32)\n"
+              << "  --msvc         Use MSVC toolchain (clang-cl + lld-link) for Windows\n"
               << "  -k             Keep intermediate files\n"
               << "  -h             Show this help\n";
 }
@@ -48,6 +49,8 @@ int main(int argc, char** argv) {
             return 0;
         } else if (std::strcmp(argv[i], "--cc") == 0) {
             opts.isCInput = true;
+        } else if (std::strcmp(argv[i], "--msvc") == 0) {
+            opts.useMsvc = true;
         } else if (argv[i][0] != '-') {
             input = argv[i];
         } else {

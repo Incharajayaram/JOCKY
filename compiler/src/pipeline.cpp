@@ -7,6 +7,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#include <cstdio>
 #include <filesystem>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/FileSystem.h>
@@ -25,7 +26,110 @@ static std::string getTargetFlag(const CompileOptions& opts) {
     return "";
 }
 
-bool Pipeline::findToolchain(std::string& outClang, std::string& outOpt, std::string& outPlugin) {
+bool Pipeline::findMsvcToolchain(std::string& outClangCl, std::string& outLldLink,
+                                 std::string& outWindowsSdk, std::string& outVcTools) {
+#ifdef _WIN32
+    std::string vswhere_path = "C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe";
+    std::string vc_install_dir;
+    std::string windows_sdk_dir;
+    
+    if (std::filesystem::exists(vswhere_path)) {
+        std::string cmd = vswhere_path + " -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath";
+        FILE* pipe = _popen(cmd.c_str(), "r");
+        if (pipe) {
+            char buffer[512];
+            if (fgets(buffer, sizeof(buffer), pipe)) {
+                vc_install_dir = buffer;
+                vc_install_dir.erase(vc_install_dir.find_last_not_of(" \n\r\t") + 1);
+            }
+            _pclose(pipe);
+        }
+    }
+    
+    if (vc_install_dir.empty()) {
+        const char* vcinst = std::getenv("VSINSTALLDIR");
+        if (vcinst) vc_install_dir = vcinst;
+    }
+    
+    if (vc_install_dir.empty()) {
+        std::vector<std::string> candidates = {
+            "C:/Program Files/Microsoft Visual Studio/2022/Community",
+            "C:/Program Files/Microsoft Visual Studio/2022/Professional",
+            "C:/Program Files/Microsoft Visual Studio/2022/Enterprise",
+            "C:/Program Files/Microsoft Visual Studio/2019/Community",
+            "C:/Program Files/Microsoft Visual Studio/2019/Professional",
+            "C:/Program Files/Microsoft Visual Studio/2019/Enterprise",
+        };
+        for (const auto& cand : candidates) {
+            if (std::filesystem::exists(cand + "/VC/Tools/MSVC")) {
+                vc_install_dir = cand;
+                break;
+            }
+        }
+    }
+    
+    if (vc_install_dir.empty()) return false;
+    
+    std::string vc_tools_path = vc_install_dir + "/VC/Tools/MSVC";
+    if (!std::filesystem::exists(vc_tools_path)) return false;
+    
+    std::string latest_version;
+    for (const auto& entry : std::filesystem::directory_iterator(vc_tools_path)) {
+        if (entry.is_directory()) {
+            std::string name = entry.path().filename().string();
+            if (name > latest_version) latest_version = name;
+        }
+    }
+    if (latest_version.empty()) return false;
+    
+    std::string vc_tools = vc_tools_path + "/" + latest_version;
+    
+    const char* sdkDir = std::getenv("WindowsSdkDir");
+    std::string windows_sdk_dir;
+    if (sdkDir) {
+        windows_sdk_dir = sdkDir;
+    } else {
+        std::vector<std::string> sdk_candidates = {
+            "C:/Program Files (x86)/Windows Kits/10",
+            "C:/Program Files/Windows Kits/10",
+        };
+        for (const auto& cand : sdk_candidates) {
+            if (std::filesystem::exists(cand)) {
+                windows_sdk_dir = cand;
+                break;
+            }
+        }
+    }
+    
+    if (windows_sdk_dir.empty()) {
+        std::cerr << "[!] Windows SDK not found\n";
+        return false;
+    }
+    
+    outClangCl = vc_tools + "/bin/Hostx64/x64/clang-cl.exe";
+    outLldLink = vc_tools + "/bin/Hostx64/x64/lld-link.exe";
+    outWindowsSdk = windows_sdk_dir;
+    outVcTools = vc_tools;
+    
+    return std::filesystem::exists(outClangCl) && std::filesystem::exists(outLldLink);
+#else
+    (void)outClangCl; (void)outLldLink; (void)outWindowsSdk; (void)outVcTools;
+    return false;
+#endif
+}
+
+bool Pipeline::findToolchain(const CompileOptions& opts, std::string& outClang, std::string& outOpt, std::string& outPlugin) {
+    if (opts.useMsvc) {
+#ifdef _WIN32
+        std::string clang_cl, lld_link, windows_sdk, vc_tools;
+        if (findMsvcToolchain(outClang, outOpt, outWindowsSdk, outVcTools)) {
+            return true;
+        }
+#endif
+        std::cerr << "[!] MSVC toolchain requested but not found\n";
+        return false;
+    }
+    
     const char* env = std::getenv("JOCKY_LLVM_TOOLCHAIN");
     std::string prefix;
     if (env) {
@@ -94,7 +198,7 @@ bool Pipeline::findToolchain(std::string& outClang, std::string& outOpt, std::st
 
 bool Pipeline::findMLIRTools(std::string& outTranslate, std::string& outMlirOpt, std::string& outMlirPlugin) {
     std::string clang, opt, llvmPlugin;
-    if (!findToolchain(clang, opt, llvmPlugin)) return false;
+    if (!findToolchain(CompileOptions{}, clang, opt, llvmPlugin)) return false;
 
     std::string prefix = clang.substr(0, clang.find_last_of("/\\"));
     prefix = prefix.substr(0, prefix.find_last_of("/\\"));
@@ -126,14 +230,12 @@ bool Pipeline::runMLIRObfuscation(const std::string& inLl, const std::string& ou
     std::string mlirPath = inLl + ".tmp.mlir";
     std::string encMlirPath = inLl + ".tmp.enc.mlir";
 
-    // LLVM IR -> MLIR
     std::string cmd1 = translate + " --import-llvm " + inLl + " -o " + mlirPath;
     if (!exec(cmd1)) {
         std::cerr << "[!] Failed to convert LLVM IR to MLIR\n";
         return false;
     }
 
-    // Run MLIR obfuscation passes (symbol/crypto first, then string encrypt to preserve global_ctors)
     std::string cmd2 = mlirOpt + " --load-pass-plugin=" + mlirPlugin +
                        " --symbol-obfuscate " +
                        " --crypto-hash " +
@@ -147,7 +249,6 @@ bool Pipeline::runMLIRObfuscation(const std::string& inLl, const std::string& ou
         return false;
     }
 
-    // MLIR -> LLVM IR
     std::string cmd3 = translate + " --mlir-to-llvmir " + encMlirPath + " -o " + outLl;
     if (!exec(cmd3)) {
         std::cerr << "[!] Failed to convert MLIR back to LLVM IR\n";
@@ -161,13 +262,11 @@ bool Pipeline::runMLIRObfuscation(const std::string& inLl, const std::string& ou
 
 bool Pipeline::emitLLVMIR(const CompileOptions& opts, const std::string& llPath) {
     std::string clang, opt, plugin;
-    if (!findToolchain(clang, opt, plugin)) return false;
+    if (!findToolchain(opts, clang, opt, plugin)) return false;
 
     if (opts.isCInput) {
-        // C input: use clang to generate LLVM IR
         std::string targetFlag = getTargetFlag(opts);
         
-        // System include paths for standard C headers
         std::vector<std::string> sysIncludes;
         bool isWindowsTarget = !opts.target.empty() && 
             (opts.target.find("windows") != std::string::npos || 
@@ -176,9 +275,10 @@ bool Pipeline::emitLLVMIR(const CompileOptions& opts, const std::string& llPath)
         
         if (isWindowsTarget) {
             sysIncludes = {
-                "C:/Program Files/LLVM/lib/clang/17/include",
-                "C:/Program Files/LLVM/lib/clang/18/include",
-                "C:/Program Files/LLVM/lib/clang/19/include",
+                "/usr/lib/llvm-17/lib/clang/17/include",
+                "/usr/lib/llvm-18/lib/clang/18/include",
+                "/usr/lib/llvm-19/lib/clang/19/include",
+                "/usr/x86_64-w64-mingw32/include",
             };
             const char* vcinst = std::getenv("VCINSTALLDIR");
             if (vcinst) {
@@ -214,7 +314,6 @@ bool Pipeline::emitLLVMIR(const CompileOptions& opts, const std::string& llPath)
             return false;
         }
     } else {
-        // Jocky input: use Jocky parser
         std::ifstream in(opts.inputFile);
         if (!in) {
             std::cerr << "[!] Cannot open: " << opts.inputFile << "\n";
@@ -250,7 +349,7 @@ bool Pipeline::emitLLVMIR(const CompileOptions& opts, const std::string& llPath)
 
 bool Pipeline::runObfuscation(const CompileOptions& opts, const std::string& inBc, const std::string& outBc) {
     std::string clang, opt, plugin;
-    if (!findToolchain(clang, opt, plugin)) return false;
+    if (!findToolchain(opts, clang, opt, plugin)) return false;
 
     std::string targetFlag = getTargetFlag(opts);
     std::string cmd1 = clang + " " + targetFlag + "-O1 -c -emit-llvm -x ir -Wno-override-module " + inBc + " -o " + inBc + ".tmp.bc";
@@ -294,7 +393,7 @@ bool Pipeline::runObfuscation(const CompileOptions& opts, const std::string& inB
 
 bool Pipeline::compileToObject(const CompileOptions& opts, const std::string& bc, const std::string& obj) {
     std::string clang, opt, plugin;
-    if (!findToolchain(clang, opt, plugin)) return false;
+    if (!findToolchain(opts, clang, opt, plugin)) return false;
 
     std::string targetFlag = getTargetFlag(opts);
     std::string cmd = clang + " " + targetFlag + "-c " + bc + " -o " + obj;
@@ -305,7 +404,6 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
                               std::vector<std::string>& outObjs, const std::string& targetFlag, bool noRuntime) {
     namespace fs = std::filesystem;
 
-    // Find runtime directory relative to compiler source
     fs::path compilerSrc = fs::path(__FILE__).parent_path().parent_path();
     fs::path runtimeDir = compilerSrc / ".." / "src" / "runtime";
     fs::path includeDir = runtimeDir / "include";
@@ -315,18 +413,15 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
         return false;
     }
 
-    // System include paths for standard C headers
     std::vector<std::string> sysIncludes;
     bool isWindowsTarget = targetFlag.find("windows") != std::string::npos || targetFlag.find("mingw") != std::string::npos || targetFlag.find("msvc") != std::string::npos;
     
     if (isWindowsTarget) {
-        // Windows / MSVC / mingw paths
         sysIncludes = {
             "C:/Program Files/LLVM/lib/clang/17/include",
             "C:/Program Files/LLVM/lib/clang/18/include",
             "C:/Program Files/LLVM/lib/clang/19/include",
         };
-        // Try to pick up MSVC paths from environment
         const char* vcinst = std::getenv("VCINSTALLDIR");
         if (vcinst) {
             sysIncludes.push_back(std::string(vcinst) + "/VC/Tools/MSVC/Current/Include");
@@ -336,7 +431,6 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
             sysIncludes.push_back(std::string(sdkDir) + "/Include/10.0.19041.0/ucrt");
         }
     } else {
-        // Linux / Unix paths
         sysIncludes = {
             "/usr/include",
             "/usr/include/x86_64-linux-gnu",
@@ -354,7 +448,6 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
         }
     }
 
-    // Portable sources (always compiled)
     std::vector<fs::path> sources = {
         runtimeDir / "init" / "anti_analysis.c",
         runtimeDir / "cleanup" / "self_delete.c",
@@ -362,7 +455,6 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
         runtimeDir / "vm" / "vm_interpreter.c",
     };
 
-    // Windows-only sources - only include when targeting Windows AND runtime is enabled
     if (isWindowsTarget && !noRuntime) {
         sources.push_back(runtimeDir / "evasion" / "unhook.c");
         sources.push_back(runtimeDir / "evasion" / "syscalls.c");
@@ -436,14 +528,14 @@ bool Pipeline::run(const CompileOptions& opts) {
         }
     }
 
-    std::cout << "[*] Running obfuscation passes (profile: " << opts.profile << ")...\n";
+    std::cout << "[*] Running obfuscation passes (profile: " << opts.profile << ")....\n";
     if (!runObfuscation(opts, llPath, bcPath)) return false;
 
     std::cout << "[*] Compiling to object...\n";
     if (!compileToObject(opts, bcPath, objPath)) return false;
 
     std::string clang, opt, plugin;
-    if (!findToolchain(clang, opt, plugin)) return false;
+    if (!findToolchain(opts, clang, opt, plugin)) return false;
 
     std::vector<std::string> runtimeObjs;
     std::string outDir = base + ".build";
