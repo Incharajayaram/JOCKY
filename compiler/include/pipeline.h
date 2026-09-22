@@ -16,6 +16,7 @@ struct CompileOptions {
     bool encryptStrings = false;
     std::string target;
     bool isCInput = false;
+    bool useMsvc = false;
 };
 
 class Pipeline {
@@ -30,7 +31,9 @@ private:
     bool linkExecutable(const CompileOptions& opts, const std::string& clang,
                         const std::string& obj, const std::vector<std::string>& runtimeObjs,
                         const std::string& exe);
-    bool findToolchain(std::string& outClang, std::string& outOpt, std::string& outPlugin);
+    bool findToolchain(const CompileOptions& opts, std::string& outClang, std::string& outOpt, std::string& outPlugin);
+    bool findMsvcToolchain(std::string& outClangCl, std::string& outLldLink,
+                           std::string& outWindowsSdk, std::string& outVcTools);
     bool findMLIRTools(std::string& outTranslate, std::string& outMlirOpt, std::string& outMlirPlugin);
     bool runMLIRObfuscation(const std::string& inLl, const std::string& outLl,
                             const std::string& translate, const std::string& mlirOpt,
