@@ -15,6 +15,7 @@ struct CompileOptions {
     bool noRuntime = false;
     bool encryptStrings = false;
     std::string target;
+    bool isCInput = false;
 };
 
 class Pipeline {

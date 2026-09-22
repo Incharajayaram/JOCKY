@@ -160,34 +160,90 @@ bool Pipeline::runMLIRObfuscation(const std::string& inLl, const std::string& ou
 }
 
 bool Pipeline::emitLLVMIR(const CompileOptions& opts, const std::string& llPath) {
-    std::ifstream in(opts.inputFile);
-    if (!in) {
-        std::cerr << "[!] Cannot open: " << opts.inputFile << "\n";
-        return false;
-    }
-    std::string source((std::istreambuf_iterator<char>(in)),
-                        std::istreambuf_iterator<char>());
+    std::string clang, opt, plugin;
+    if (!findToolchain(clang, opt, plugin)) return false;
 
-    try {
-        Lexer lexer(source);
-        auto tokens = lexer.tokenize();
-
-        Parser parser(std::move(tokens));
-        auto ast = parser.parse();
-
-        CodeGen codegen(opts.noRuntime);
-        auto mod = codegen.generate(*ast, opts.inputFile);
-
-        std::error_code ec;
-        llvm::raw_fd_ostream out(llPath, ec);
-        if (ec) {
-            std::cerr << "[!] Cannot write " << llPath << ": " << ec.message() << "\n";
+    if (opts.isCInput) {
+        // C input: use clang to generate LLVM IR
+        std::string targetFlag = getTargetFlag(opts);
+        
+        // System include paths for standard C headers
+        std::vector<std::string> sysIncludes;
+        bool isWindowsTarget = !opts.target.empty() && 
+            (opts.target.find("windows") != std::string::npos || 
+             opts.target.find("mingw") != std::string::npos || 
+             opts.target.find("msvc") != std::string::npos);
+        
+        if (isWindowsTarget) {
+            sysIncludes = {
+                "C:/Program Files/LLVM/lib/clang/17/include",
+                "C:/Program Files/LLVM/lib/clang/18/include",
+                "C:/Program Files/LLVM/lib/clang/19/include",
+            };
+            const char* vcinst = std::getenv("VCINSTALLDIR");
+            if (vcinst) {
+                sysIncludes.push_back(std::string(vcinst) + "/VC/Tools/MSVC/Current/Include");
+            }
+            const char* sdkDir = std::getenv("WindowsSdkDir");
+            if (sdkDir) {
+                sysIncludes.push_back(std::string(sdkDir) + "/Include/10.0.19041.0/ucrt");
+            }
+        } else {
+            sysIncludes = {
+                "/usr/include",
+                "/usr/include/x86_64-linux-gnu",
+                "/usr/lib/gcc/x86_64-linux-gnu/15/include",
+                "/usr/lib/gcc/x86_64-linux-gnu/16/include",
+                "/usr/lib/llvm-17/lib/clang/17/include",
+                "/usr/lib/llvm-18/lib/clang/18/include",
+                "/usr/lib/llvm-19/lib/clang/19/include",
+            };
+        }
+        
+        std::string incFlags;
+        for (const auto& inc : sysIncludes) {
+            if (std::filesystem::exists(inc)) {
+                incFlags += " -isystem " + inc;
+            }
+        }
+        
+        std::string cmd = clang + " " + targetFlag + "-O1 -S -emit-llvm -Wno-override-module " + 
+                          incFlags + " " + opts.inputFile + " -o " + llPath;
+        if (!exec(cmd)) {
+            std::cerr << "[!] Failed to generate LLVM IR from C source\n";
             return false;
         }
-        mod->print(out, nullptr);
-    } catch (const std::exception& e) {
-        std::cerr << "[!] Compilation error: " << e.what() << "\n";
-        return false;
+    } else {
+        // Jocky input: use Jocky parser
+        std::ifstream in(opts.inputFile);
+        if (!in) {
+            std::cerr << "[!] Cannot open: " << opts.inputFile << "\n";
+            return false;
+        }
+        std::string source((std::istreambuf_iterator<char>(in)),
+                            std::istreambuf_iterator<char>());
+
+        try {
+            Lexer lexer(source);
+            auto tokens = lexer.tokenize();
+
+            Parser parser(std::move(tokens));
+            auto ast = parser.parse();
+
+            CodeGen codegen(opts.noRuntime);
+            auto mod = codegen.generate(*ast, opts.inputFile);
+
+            std::error_code ec;
+            llvm::raw_fd_ostream out(llPath, ec);
+            if (ec) {
+                std::cerr << "[!] Cannot write " << llPath << ": " << ec.message() << "\n";
+                return false;
+            }
+            mod->print(out, nullptr);
+        } catch (const std::exception& e) {
+            std::cerr << "[!] Compilation error: " << e.what() << "\n";
+            return false;
+        }
     }
     return true;
 }
