@@ -76,13 +76,22 @@ def main():
             
             # Unzip mechanism with password placeholder
             ZIP_PASSWORD = 'infected' # Password for MalwareBazaar zips
-            try:
-                # Using system unzip as it natively supports all encryption types
-                os.system(f"unzip -P {ZIP_PASSWORD} -q {out_path} -d drivers_out/")
+            
+            # Check exit code of unzip
+            ret_code = os.system(f"unzip -P {ZIP_PASSWORD} -q {out_path} -d drivers_out/")
+            if ret_code == 0:
                 print(f" [+] Saved and extracted to drivers_out/ (Password used: {ZIP_PASSWORD})")
                 os.remove(out_path) # Clean up zip after extraction
-            except Exception as unzip_err:
-                print(f" [!] Error extracting {out_path}: {unzip_err}")
+            else:
+                print(f" [!] Error extracting {out_path} (Exit code {ret_code})")
+                # Let's peek into the file to see if it's an API error message
+                try:
+                    with open(out_path, 'r', errors='ignore') as err_f:
+                        content = err_f.read(150)
+                        if "{" in content or "<html" in content:
+                            print(f"     => API Response: {content.strip()}")
+                except:
+                    pass
                 
         except Exception as e:
             print(f" [!] Error downloading {sha256}: {e}")
