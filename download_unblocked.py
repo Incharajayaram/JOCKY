@@ -73,8 +73,17 @@ def main():
             out_path = os.path.join('drivers_out', f"{sha256}.zip")
             with open(out_path, 'wb') as f:
                 f.write(response.content)
-            print(f" [+] Saved to {out_path} (Password: infected)")
             
+            # Unzip mechanism with password placeholder
+            ZIP_PASSWORD = 'infected' # Password for MalwareBazaar zips
+            try:
+                # Using system unzip as it natively supports all encryption types
+                os.system(f"unzip -P {ZIP_PASSWORD} -q {out_path} -d drivers_out/")
+                print(f" [+] Saved and extracted to drivers_out/ (Password used: {ZIP_PASSWORD})")
+                os.remove(out_path) # Clean up zip after extraction
+            except Exception as unzip_err:
+                print(f" [!] Error extracting {out_path}: {unzip_err}")
+                
         except Exception as e:
             print(f" [!] Error downloading {sha256}: {e}")
 
