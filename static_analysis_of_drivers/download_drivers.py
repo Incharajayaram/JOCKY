@@ -85,7 +85,7 @@ def api_key_from(env_var):
 
 def mb_download(sha256, api_key, session):
     r = session.post(MB_URL, data={"query": "get_file", "sha256_hash": sha256},
-                     headers={"API-KEY": api_key}, timeout=60)
+                     headers={"Auth-Key": api_key}, timeout=60)
     ctype = r.headers.get("Content-Type", "")
     if r.status_code == 401:
         raise RuntimeError("MalwareBazaar authentication failed (bad/expired API key)")
