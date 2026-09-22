@@ -5,7 +5,7 @@ import sys
 
 # MalwareBazaar API Key - Get yours from https://bazaar.abuse.ch/
 API_KEY = 'YOUR_API_KEY_HERE'
-HEADERS = {'API-KEY': API_KEY}
+HEADERS = {'Auth-Key': API_KEY}
 MB_URL = 'https://mb-api.abuse.ch/api/v1/'
 
 def main():
