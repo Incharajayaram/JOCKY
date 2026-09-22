@@ -1,16 +1,9 @@
 import json
-import requests
 import os
 import sys
 import subprocess
 import shutil
 import hashlib
-import time
-
-# MalwareBazaar API Key - Get yours from https://bazaar.abuse.ch/
-API_KEY = 'YOUR_API_KEY_HERE'
-HEADERS = {'Auth-Key': API_KEY}
-MB_URL = 'https://mb-api.abuse.ch/api/v1/'
 
 REPOS = [
     "https://github.com/CaledoniaProject/drivers-binaries.git",
@@ -64,10 +57,6 @@ def main():
 
     print(f"Found {len(target_hashes)} unique samples (SHA256 hashes) to download.")
 
-    if API_KEY == 'YOUR_API_KEY_HERE' or not API_KEY:
-        print("\n[!] IMPORTANT: You need to insert your MalwareBazaar API Key in this script for the fallback downloads.")
-        sys.exit(1)
-
     os.makedirs('drivers_out', exist_ok=True)
     os.makedirs('repo_cache', exist_ok=True)
 
@@ -110,57 +99,22 @@ def main():
 
     print(f"\n[*] Successfully extracted {found_in_repos} drivers from GitHub repositories.")
 
-    # 3. Fallback to MalwareBazaar
+    # 3. Fallback to Winbindex for missing drivers
     if target_hashes:
-        print(f"[*] {len(target_hashes)} drivers not found in GitHub repos. Falling back to MalwareBazaar...")
+        print(f"\n[*] {len(target_hashes)} drivers not found in GitHub repos. Generating Winbindex links...")
         
-        for sha256, filename in list(target_hashes.items()):
-            print(f"Downloading {filename} ({sha256})...")
-            data = {
-                'query': 'get_file',
-                'sha256_hash': sha256
-            }
-            try:
-                response = requests.post(MB_URL, data=data, headers=HEADERS, timeout=15)
-                if 'file_not_found' in response.text:
-                    print(f" [-] File not found on MalwareBazaar")
-                    # Delay to avoid 502 errors
-                    time.sleep(1)
-                    continue
-                    
-                zip_path = os.path.join('drivers_out', f"{sha256}.zip")
-                with open(zip_path, 'wb') as f:
-                    f.write(response.content)
+        with open('winbindex_missing_links.txt', 'w') as f:
+            f.write("=== Missing Drivers (Winbindex Lookup) ===\n")
+            f.write("Click these links to manually search Winbindex and download the files from Microsoft Symbol Servers.\n\n")
+            for sha256, filename in target_hashes.items():
+                # Generate a Winbindex search URL
+                link = f"https://winbindex.m417z.com/?file={filename}&sha256={sha256}"
+                f.write(f"Driver: {filename}\n")
+                f.write(f"SHA256: {sha256}\n")
+                f.write(f"Link:   {link}\n")
+                f.write("-" * 50 + "\n")
                 
-                ZIP_PASSWORD = 'infected'
-                ret_code = os.system(f"unzip -P {ZIP_PASSWORD} -q {zip_path} -d drivers_out/")
-                
-                if ret_code == 0:
-                    print(f" [+] Saved and extracted from MalwareBazaar")
-                    os.remove(zip_path)
-                    
-                    # Rename the extracted .sys file to the correct filename if needed
-                    # Unzip usually extracts it as sha256.sys, but we'll rename it just in case
-                    extracted_file = os.path.join('drivers_out', f"{sha256}.sys")
-                    target_file = os.path.join('drivers_out', filename)
-                    if os.path.exists(extracted_file) and extracted_file != target_file:
-                        os.rename(extracted_file, target_file)
-                        
-                else:
-                    print(f" [!] Error extracting zip (Exit code {ret_code})")
-                    try:
-                        with open(zip_path, 'r', errors='ignore') as err_f:
-                            content = err_f.read(150)
-                            if "{" in content or "<html" in content:
-                                print(f"     => API Response: {content.strip()}")
-                    except:
-                        pass
-                        
-            except Exception as e:
-                print(f" [!] Error downloading: {e}")
-                
-            # Sleep to prevent 502 Bad Gateway / rate limiting from MalwareBazaar
-            time.sleep(1)
+        print("[*] Missing drivers written to 'winbindex_missing_links.txt'.")
 
 if __name__ == "__main__":
     main()
