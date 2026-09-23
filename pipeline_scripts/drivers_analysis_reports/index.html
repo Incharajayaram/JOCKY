@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Windows kernel driver review</title><style>
+/* Cold paper, hairline rules, and wide-tracked monospace micro-labels set
+   against a tight heavy headline. Colour is spent only on outcomes, so
+   anything on this page carrying colour is saying something. */
+:root{
+  /* one spacing scale, each step ~1.6x the last, so a wide gap and a tight gap
+     never look accidentally alike. The margin goes on the larger element. */
+  --s1:4px; --s2:7px; --s3:11px; --s4:18px; --s5:29px; --s6:47px; --s7:76px;
+  --bar:52px;  /* height of the sticky filter; the table head parks under it */
+  /* Deep and muted in both modes. The dark set is a counterpart to the light
+     one - same hues walked down in saturation - not a second palette. */
+  --paper:#F5F7F8; --plate:#FFFFFF; --ink:#0D1114; --body:#39424B;
+  --faint:#5C6570; --rule:#DDE2E6; --rule-hard:#A8B1B9;
+  --positive:#9B1C31; --positive-wash:#9B1C310F;
+  --review:#4B3A9E;  --review-wash:#4B3A9E0F;
+  --warn:#8A5209; --ok:#1D6E54; --inert:#C3CAD2;
+  --lift:0 10px 24px -18px rgba(13,17,20,.55);
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#0F1215; --plate:#171C21; --ink:#E7EBEE; --body:#A3ACB6;
+    --faint:#7E8892; --rule:#222930; --rule-hard:#3B4550;
+    --positive:#E8555F; --positive-wash:#E8555F16;
+    --review:#8C7BE0;  --review-wash:#8C7BE016;
+    --warn:#DFA05C; --ok:#45C98A; --inert:#39424E;
+    --lift:0 10px 24px -18px rgba(0,0,0,.8);
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--paper);color:var(--body);
+  font:400 13px/1.6 var(--sans);padding:0 var(--s5) var(--s7);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+.shell{max-width:1180px;margin:0 auto}
+a{color:inherit;text-decoration:none;border-bottom:1px solid var(--rule-hard)}
+a:hover{border-bottom-color:currentColor}
+:focus-visible{outline:2px solid var(--review);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* micro-label: the connective tissue of a form */
+.lbl{font:500 9.5px/1 var(--mono);letter-spacing:.19em;text-transform:uppercase;color:var(--faint)}
+
+/* requisition plate ------------------------------------------------------- */
+.mast{padding:var(--s5) 0 0}
+.kicker{display:flex;gap:var(--s3);align-items:baseline;flex-wrap:wrap}
+.kicker .mark{font:700 10.5px/1 var(--mono);letter-spacing:.24em;color:var(--ink)}
+.kicker .id{margin-left:auto;font:400 10.5px/1 var(--mono);color:var(--faint)}
+h1{
+  margin:var(--s4) 0 0;color:var(--ink);
+  font:700 clamp(30px,4.6vw,52px)/0.98 var(--sans);letter-spacing:-.035em;
+}
+h1 .qty{color:var(--faint);font-weight:400;letter-spacing:-.02em}
+.plate{
+  margin:var(--s5) 0 0;border-top:1px solid var(--rule-hard);border-bottom:1px solid var(--rule);
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+}
+.plate > div{padding:var(--s3) var(--s4) var(--s3) 0;border-right:1px solid var(--rule)}
+.plate > div:last-child{border-right:0}
+.plate dd{margin:var(--s2) 0 0;font:400 12.5px/1.45 var(--mono);color:var(--ink);word-break:break-word}
+.plate .why{margin:var(--s1) 0 0;font:400 11.5px/1.5 var(--sans);color:var(--faint)}
+
+/* the run state carries a dot because it is the one value on the plate that
+   can change while somebody is looking at the page. */
+.run{display:flex;align-items:center;gap:var(--s2)}
+.run i{width:7px;height:7px;border-radius:50%;background:var(--inert);flex:none}
+.run.running i{background:var(--ok);animation:beat 2s ease-in-out infinite}
+.run.stopped i{background:var(--positive)}
+.run.finished i{background:var(--rule-hard)}
+.run .age{color:var(--faint);font-size:11.5px}
+@keyframes beat{50%{opacity:.2}}
+
+/* readout: the two outcomes worth acting on at full size, then the shape of
+   the whole corpus, then the ones that only need acknowledging. */
+.readout{margin:var(--s5) 0 0;padding-top:var(--s5);border-top:1px solid var(--rule)}
+.ticks{display:flex;flex-wrap:wrap;gap:var(--s4) var(--s7)}
+.tick{cursor:help}
+.tick b{display:block;color:var(--ink);letter-spacing:-.04em;
+  font:600 clamp(30px,3.6vw,38px)/1 var(--mono)}
+.tick .lbl{display:block;margin-top:var(--s2)}
+.tick.pos b{color:var(--positive)}
+.tick.rev b{color:var(--review)}
+.tick.zero b{color:var(--inert)}
+
+/* the shape of the whole corpus in one line. It dims to whatever the outcome
+   filter is showing, so it always reads as the view currently on screen. */
+.spread{display:flex;gap:1px;height:7px;margin:var(--s5) 0 0;background:var(--rule)}
+.spread i{display:block;background:var(--inert);min-width:3px;
+  transition:opacity .15s,transform .15s}
+.spread i.pos{background:var(--positive)}
+.spread i.rev{background:var(--review)}
+.spread i.err{background:var(--warn)}
+.spread i.una{background:var(--rule-hard)}
+.spread i.time{background:var(--warn)}
+.spread i.ok{background:var(--ok)}
+.spread i:hover{transform:scaleY(1.7)}
+.spread.narrowed i{opacity:.22}
+.spread.narrowed i.on{opacity:1}
+.rest{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);margin:var(--s3) 0 0;
+  font:400 11.5px/1.4 var(--mono);color:var(--faint)}
+.rest span{display:flex;align-items:center;cursor:help}
+.rest i{width:6px;height:6px;border-radius:50%;background:var(--inert);flex:none;
+  margin-right:var(--s2)}
+.rest .err i{background:var(--warn)}
+.rest .una i{background:var(--rule-hard)}
+.rest .time i{background:var(--warn)}
+.rest .ok i{background:var(--ok)}
+.rest .confirmed i{background:var(--ok)}
+.rest .refuted i{background:var(--positive)}
+.rest .outstanding i{background:var(--warn)}
+.rest .unmarked i{background:var(--inert)}
+.rest:empty{display:none}
+.rest b{color:var(--body);font-weight:600;margin-right:.38em}
+
+/* statements -------------------------------------------------------------- */
+.finding-note{
+  margin:var(--s5) 0 0;padding:var(--s3) var(--s4);background:var(--positive-wash);
+  border-left:2px solid var(--positive);color:var(--ink);font-size:13px
+}
+.finding-note.rev{background:var(--review-wash);border-left-color:var(--review)}
+.finding-note b{font-weight:600}
+.aside{
+  margin:var(--s4) 0 0;padding:var(--s3) 0 0;border-top:1px solid var(--rule);
+  color:var(--faint);font-size:12px
+}
+.files{margin:var(--s5) 0 0;display:flex;gap:var(--s3);flex-wrap:wrap}
+.files a{
+  border:1px solid var(--rule-hard);padding:var(--s2) var(--s3);color:var(--body);
+  font:400 11px/1 var(--mono);letter-spacing:.04em;transition:border-color .12s,color .12s
+}
+.files a:hover{border-color:var(--ink);color:var(--ink)}
+
+/* filter ------------------------------------------------------------------ */
+/* a corpus list is longer than a screen, so the way to narrow it travels. its
+   measured height becomes --bar, which is where the table head parks. */
+.filter{
+  position:sticky;top:0;z-index:6;margin:var(--s5) 0 0;padding:var(--s3) 0;
+  display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;background:var(--paper);
+  border-bottom:1px solid var(--rule);transition:box-shadow .15s
+}
+/* once it is actually pinned it should read as floating over the list */
+.filter.stuck{box-shadow:var(--lift)}
+.field{
+  display:flex;align-items:center;gap:var(--s2);background:var(--plate);
+  border:1px solid var(--rule-hard);padding:0 var(--s3);min-width:210px;
+  transition:border-color .12s,box-shadow .12s
+}
+.field:focus-within{border-color:var(--review);box-shadow:0 0 0 3px var(--review-wash)}
+.field .glyph{color:var(--faint);font:400 14px/1 var(--mono)}
+input[type=search]{
+  flex:1;background:transparent;color:var(--ink);border:0;outline:0;
+  padding:var(--s3) 0;font:400 13px/1 var(--mono)
+}
+input[type=search]::placeholder{color:var(--faint)}
+.hint{color:var(--faint);font-size:11.5px;margin-left:var(--s2)}
+
+/* outcome toggles: narrowing to a single outcome is the move a triage pass
+   makes over and over, so it travels with the search rather than sitting in
+   the header where the list would scroll away from it */
+.chipf{
+  display:inline-flex;align-items:center;gap:var(--s2);background:transparent;
+  border:1px solid var(--rule);color:var(--faint);padding:var(--s2) var(--s3);
+  font:500 9.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;
+  cursor:pointer;transition:border-color .12s,color .12s,background .12s
+}
+.chipf b{font:600 11px/1 var(--mono);letter-spacing:0}
+.chipf:hover{border-color:var(--rule-hard);color:var(--body)}
+.chipf[aria-pressed="true"]{border-color:currentColor;color:var(--ink)}
+.chipf.pos[aria-pressed="true"]{color:var(--positive);background:var(--positive-wash)}
+.chipf.rev[aria-pressed="true"]{color:var(--review);background:var(--review-wash)}
+
+/* Two axes share this bar: what the run concluded, and what a person recorded
+   about it. They narrow the list together rather than being alternatives, so
+   they are separated and named instead of running on as one set of seven.
+   The second axis is shaped differently rather than coloured differently -
+   colour already means outcome here, and a review is not an outcome. */
+.filter .axis{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap}
+.filter .axis + .axis{
+  margin-left:var(--s3);padding-left:var(--s4);border-left:1px solid var(--rule)
+}
+.filter .axis .lbl{margin-right:var(--s1)}
+.chipf.mk{border-radius:999px;padding-left:var(--s2)}
+.chipf.mk i{width:6px;height:6px;border-radius:50%;background:var(--inert);flex:none}
+.chipf.mk.confirmed i{background:var(--ok)}
+.chipf.mk.refuted i{background:var(--positive)}
+.chipf.mk.outstanding i{background:var(--warn)}
+.chipf.mk[aria-pressed="true"]{
+  background:var(--plate);border-color:var(--rule-hard);color:var(--ink)
+}
+
+/* sections ---------------------------------------------------------------- */
+section{margin-top:var(--s6)}
+.shead{display:flex;align-items:baseline;gap:var(--s4);
+  padding-bottom:var(--s3);border-bottom:1px solid var(--rule-hard)}
+.shead h2{margin:0;color:var(--ink);font:600 13px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase}
+.shead .n{font:600 13px/1 var(--mono);color:var(--positive)}
+.shead.q h2{color:var(--body)}
+.shead.q .n{color:var(--faint)}
+.shead .of{margin-left:auto;color:var(--faint);font-size:11.5px;text-align:right;max-width:44ch}
+.shead[title]{cursor:help}
+
+/* result table ------------------------------------------------------------ */
+/* no scroll container at desktop width: an overflow ancestor becomes the
+   scrollport, which is what stops a sticky table head from ever sticking. */
+.scroll{overflow:visible}
+table{width:100%;border-collapse:collapse}
+thead th{
+  position:sticky;top:var(--bar);z-index:2;background:var(--paper);
+  font:500 9.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--faint);
+  text-align:left;padding:var(--s4) var(--s3) var(--s3) 0;white-space:nowrap;
+  border-bottom:1px solid var(--rule);cursor:pointer;user-select:none
+}
+thead th::after{content:"\2195";margin-left:var(--s2);opacity:.35;font-size:10px;letter-spacing:0}
+thead th:hover{color:var(--ink)}
+thead th:hover::after{opacity:1}
+thead th[data-dir]{color:var(--ink)}
+thead th[data-dir="asc"]::after{content:"\2191";opacity:1}
+thead th[data-dir="desc"]::after{content:"\2193";opacity:1}
+thead th.r{text-align:right}
+tbody tr{cursor:pointer}
+tbody td{padding:var(--s3) var(--s3) var(--s3) 0;border-bottom:1px solid var(--rule);
+  vertical-align:baseline}
+/* hovering tints the row in its own outcome colour, so the palette is teaching
+   what the colours mean every time somebody runs down the list */
+tbody tr:hover td,tbody tr:focus-within td{background:var(--plate)}
+tbody tr.pos:hover td,tbody tr.pos:focus-within td{background:var(--positive-wash)}
+tbody tr.rev:hover td,tbody tr.rev:focus-within td{background:var(--review-wash)}
+tbody tr:hover td.spec a{border-bottom-color:var(--ink)}
+td.r{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+td.spec{word-break:break-word}
+td.spec a{font:500 13.5px/1.35 var(--sans);color:var(--ink);letter-spacing:-.01em;
+  border-bottom:1px solid var(--rule-hard)}
+td.spec a:hover{border-bottom-color:var(--ink)}
+td.muted{color:var(--faint)}
+.res{font:600 9.5px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase}
+.res.pos{color:var(--positive)}
+.res.rev{color:var(--review)}
+.res.non{color:var(--faint)}
+td.out{width:1%;white-space:nowrap}
+td.out .res{cursor:help}
+
+/* severity: the counts themselves, coloured by tier. Counts rather than a
+   proportional bar, because a bar shows the mix within a row and says nothing
+   about how much there is - one high and nine high would fill it alike. */
+td.sev{text-align:right;white-space:nowrap;color:var(--faint);
+  font:400 11.5px/1.5 var(--mono);font-variant-numeric:tabular-nums}
+td.sev span{margin-left:var(--s2)}
+td.sev .c{color:var(--positive);font-weight:700}
+td.sev .h{color:var(--positive)}
+td.sev .m{color:var(--warn)}
+
+/* review marks ------------------------------------------------------------ */
+/* what a stage concluded and what a person has checked are different claims,
+   so a mark never reuses an outcome colour: green is checked by a human. */
+td.rev{width:1%;white-space:nowrap;text-align:right}
+.mark{font:600 9.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;
+  color:var(--faint);white-space:nowrap}
+.mark.confirmed{color:var(--ok)}
+.mark.refuted{color:var(--positive)}
+.mark.outstanding{color:var(--warn)}
+.mark .note{display:block;margin-top:var(--s1);font:400 11px/1.4 var(--mono);
+  letter-spacing:0;text-transform:none;color:var(--faint);max-width:34ch;
+  white-space:normal;text-align:right}
+
+/* the control on a result's own page, where the reader decides */
+.review{margin:var(--s5) 0 0;padding:var(--s4) 0 0;border-top:1px solid var(--rule)}
+.review .lbl{display:block;margin-bottom:var(--s3)}
+.review .opts{display:flex;gap:var(--s2);flex-wrap:wrap}
+.review button{
+  background:transparent;border:1px solid var(--rule);color:var(--faint);
+  padding:var(--s2) var(--s3);font:500 9.5px/1 var(--mono);letter-spacing:.13em;
+  text-transform:uppercase;cursor:pointer;transition:border-color .12s,color .12s
+}
+.review button:hover{border-color:var(--rule-hard);color:var(--body)}
+.review button[aria-pressed="true"]{border-color:currentColor;color:var(--ink)}
+.review button.confirmed[aria-pressed="true"]{color:var(--ok)}
+.review button.refuted[aria-pressed="true"]{color:var(--positive)}
+.review button.outstanding[aria-pressed="true"]{color:var(--warn)}
+.review textarea{
+  display:none;width:100%;margin-top:var(--s3);background:var(--plate);
+  border:1px solid var(--rule-hard);color:var(--ink);padding:var(--s3);
+  font:400 12.5px/1.5 var(--mono);resize:vertical;min-height:62px
+}
+.review textarea:focus{outline:0;border-color:var(--review);box-shadow:0 0 0 3px var(--review-wash)}
+.review.outstanding textarea,.review.refuted textarea{display:block}
+.review .saved{margin:var(--s3) 0 0;font:400 11.5px/1 var(--mono);color:var(--faint)}
+
+/* specimen fingerprint ---------------------------------------------------- */
+.strip{display:flex;gap:var(--s3);flex-wrap:wrap;margin-top:var(--s2)}
+.chip{font:400 11px/1.4 var(--mono);color:var(--body);white-space:nowrap}
+.chip em{color:var(--faint);font-style:normal;margin-right:var(--s1);letter-spacing:.06em}
+.chip.on{color:var(--positive)}
+
+/* specimen page ----------------------------------------------------------- */
+.back{display:inline-block;margin:var(--s6) 0 0;font:400 11px/1 var(--mono);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--faint);border:0}
+.back:hover{color:var(--ink)}
+.verdict{display:block;margin-top:var(--s4)}
+.verdict .res{font-size:11px;letter-spacing:.2em}
+.verdict .tally{margin-left:var(--s3);font:400 11.5px/1 var(--mono);color:var(--faint)}
+.verdict hr{margin:var(--s2) 0 0;border:0;border-top:2px solid var(--positive);width:44px}
+.verdict.rev hr{border-top-color:var(--review)}
+.verdict.non hr{border-top-color:var(--rule-hard)}
+.evidence{list-style:none;padding:0;margin:0}
+.evidence li{padding:var(--s5) 0;border-bottom:1px solid var(--rule)}
+.ehead{display:flex;gap:var(--s3);align-items:baseline;flex-wrap:wrap}
+.ehead .sev{font:600 9.5px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--faint)}
+.ehead .sev.c,.ehead .sev.h{color:var(--positive)}
+.ehead .sev.m{color:var(--warn)}
+.ehead .rule{font:500 12.5px/1 var(--mono);color:var(--ink)}
+.ehead .at{margin-left:auto;font:400 11px/1 var(--mono);color:var(--faint)}
+.emsg{margin:var(--s2) 0 0;color:var(--body);font-size:13px;max-width:76ch}
+pre{
+  margin:var(--s3) 0 0;padding:var(--s4);background:var(--plate);
+  border:1px solid var(--rule);border-left:2px solid var(--rule-hard);
+  overflow-x:auto;font:400 12px/1.7 var(--mono);color:var(--ink);
+  white-space:pre-wrap;word-break:break-word
+}
+.evidence li.c pre,.evidence li.h pre{border-left-color:var(--positive)}
+.evidence li.m pre{border-left-color:var(--warn)}
+.prose pre{border-left-color:var(--review)}
+.kv{width:100%;border-collapse:collapse;margin-top:var(--s1)}
+.kv td{padding:var(--s3) var(--s4) var(--s3) 0;border-bottom:1px solid var(--rule);
+  font:400 12px/1.5 var(--mono);vertical-align:baseline;color:var(--ink)}
+.kv td:first-child{color:var(--faint);white-space:nowrap;width:1%;letter-spacing:.04em}
+.empty{color:var(--faint);font-size:12.5px;padding:var(--s5) 0}
+@media (max-width:640px){
+  body{padding:0 var(--s4) var(--s6)}
+  .mast{padding-top:var(--s5)}
+  .kicker .id{margin-left:0}
+  .plate > div{border-right:0;border-bottom:1px solid var(--rule)}
+  .ticks{gap:var(--s4) var(--s6)}
+  /* the help text is what makes a label readable, so it stacks under the
+     heading rather than disappearing where hover does not exist */
+  .shead{flex-wrap:wrap}
+  .shead .of{margin-left:0;text-align:left;flex-basis:100%;max-width:none}
+  .filter{position:static}
+  /* the axes stack here, so the rule between them turns with them */
+  .filter .axis + .axis{
+    flex-basis:100%;margin-left:0;padding-left:0;border-left:0;
+    padding-top:var(--s3);border-top:1px solid var(--rule)
+  }
+  thead th{top:0}
+}
+@media (max-width:900px){
+  /* narrow enough that the table cannot fit: it scrolls in its own box, and
+     the head stops sticking because that box is now the scrollport */
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  thead th{position:static}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body data-corpus="loldrivers:/home/incharanew/Downloads/drivers_out"><div class="shell"><header class="mast">
+  <div class="kicker"><span class="mark">DEEPZERO</span>
+    <span class="lbl">vulnerability research</span>
+    <span class="id">run_20260923_002504</span></div>
+  <h1>Windows kernel driver review <span class="qty">46 drivers</span></h1>
+  <dl class="plate"><div><div class='lbl'>corpus</div><dd>/home/incharanew/Downloads/drivers_out</dd></div><div><div class='lbl'>assessed by</div><dd>gemini/gemini-pro-latest</dd></div><div><div class='lbl'>status</div><dd><span class='run finished' data-beat='2026-09-23T17:48:34.570536+00:00'><i></i><span>finished</span><span class='age'></span></span></dd></div></dl>
+  <div class='readout'><div class='ticks'><div class='tick pos zero' title="An assessment stage recorded a verdict matching one of this pipeline&#x27;s vulnerable_when values. Work through these first."><b>0</b><span class='lbl'>vulnerable</span></div><div class='tick rev zero' title="A scan produced findings, but no assessment stage has confirmed or dismissed them yet. Either assessment has not reached these, or the pipeline has no assessment stage."><b>0</b><span class='lbl'>needs assessment</span></div></div><div class='spread' role='img' aria-label='46 drivers by outcome'><i class='err' data-b='failed' style='flex:30' title='30 errored'></i><i class='set' data-b='filtered' style='flex:16' title='16 filtered out'></i></div><p class='rest'><span class='err' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe."><i></i><b>30</b>errored</span><span class='set' title="A stage excluded these before the analysis finished, so the later stages never saw them. This is not a judgement about the item."><i></i><b>16</b>filtered out</span></p><p class='rest' id='review-tally'></p></div>
+  
+  <div class="files">
+    <a href="inventory.csv">inventory.csv</a>
+    <a href="findings.jsonl">findings.jsonl</a>
+    <a href="report.json">report.json</a>
+    <a href="#" id="export-marks" title="save your review marks next to the report as marks.json, so they render for anyone who opens it">export marks</a>
+  </div>
+</header>
+<div class="filter">
+  <span class="field"><span class="glyph">&#9906;</span>
+    <input type="search" id="q" placeholder="Filter by name" aria-label="Filter by name"></span>
+  <span class="axis"><button type='button' class='chipf non' data-b='failed' aria-pressed='false' title="a stage errored, so these were never fully analysed">Errored<b>30</b></button></span>
+  <span class="axis"><span class="lbl">reviewed</span><button type='button' class='chipf mk confirmed' data-mark='confirmed' aria-pressed='false' title="you marked these as checked while reading the report"><i></i>Confirmed</button><button type='button' class='chipf mk refuted' data-mark='refuted' aria-pressed='false' title="you checked these and they did not hold up"><i></i>Refuted</button><button type='button' class='chipf mk outstanding' data-mark='outstanding' aria-pressed='false' title="you marked these as resting on something still unproven"><i></i>Outstanding</button><button type='button' class='chipf mk unmarked' data-mark='unmarked' aria-pressed='false' title="nobody has recorded a review of these yet"><i></i>Unreviewed</button></span>
+  <span class="hint" id="hint"></span>
+</div>
+<section>
+  
+  <div class="scroll"><table data-sortable><thead><tr>
+    <th>driver</th><th class="r">findings</th>
+    <th class="r">severity</th><th>outcome</th><th class="r">review</th>
+  </tr></thead><tbody><tr class='non' data-k='segwindrvx64.sys' data-b='failed' data-sid='65329dad28e92f4b'><td class='spec'><a href='items/65329dad28e92f4b.html'>segwindrvx64.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 3.0</span><span class='chip'><em>function_count</em> 155</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span><span class='chip on'>ghidra-rtlcopymemory-user-length</span></div></td><td class='r' data-v='38'>38</td><td class='sev' data-v='380038'><span class='h'>38</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='lha.sys' data-b='failed' data-sid='e75714f8e0ff4560'><td class='spec'><a href='items/e75714f8e0ff4560.html'>LHA.sys</a><div class='strip'><span class='chip'><em>priority_score</em> 3.0</span><span class='chip'><em>function_count</em> 116</span><span class='chip'><em>dangerous_imports</em> MmGetPhysicalAddress, MmMapIoSpace, MmUnmapIoSpace</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span><span class='chip on'>ghidra-rtlcopymemory-user-length</span></div></td><td class='r' data-v='14'>14</td><td class='sev' data-v='140014'><span class='h'>14</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='procexp1627.sys' data-b='failed' data-sid='9b6a84f7c40ea51c'><td class='spec'><a href='items/9b6a84f7c40ea51c.html'>procexp1627.sys</a><div class='strip'><span class='chip'><em>priority_score</em> 2.0</span><span class='chip'><em>function_count</em> 118</span><span class='chip'><em>dangerous_imports</em> KeStackAttachProcess, MmIsAddressValid, PsLookupProcessByProcessId +1</span><span class='chip on'>ghidra-pslookup-keattach-chain</span><span class='chip on'>ghidra-rtlcopymemory-user-length</span></div></td><td class='r' data-v='11'>11</td><td class='sev' data-v='110011'><span class='h'>11</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='mtcbsv64.sys' data-b='failed' data-sid='c9cf1d627078f63a'><td class='spec'><a href='items/c9cf1d627078f63a.html'>mtcBSv64.sys</a><div class='strip'><span class='chip'><em>priority_score</em> 3.0</span><span class='chip'><em>function_count</em> 97</span><span class='chip'><em>dangerous_imports</em> MmMapIoSpace, MmUnmapIoSpace</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span><span class='chip on'>ghidra-rtlcopymemory-user-length</span></div></td><td class='r' data-v='9'>9</td><td class='sev' data-v='90009'><span class='h'>9</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='cpuz141.sys' data-b='failed' data-sid='ded2927f9a4e64ee'><td class='spec'><a href='items/ded2927f9a4e64ee.html'>cpuz141.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 6.0</span><span class='chip'><em>function_count</em> 48</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='7'>7</td><td class='sev' data-v='70007'><span class='h'>7</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='zam64.sys' data-b='failed' data-sid='543991ca8d1c6511'><td class='spec'><a href='items/543991ca8d1c6511.html'>zam64.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 2.0</span><span class='chip'><em>function_count</em> 348</span><span class='chip on'>ghidra-rtlcopymemory-user-length</span></div></td><td class='r' data-v='6'>6</td><td class='sev' data-v='60006'><span class='h'>6</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='cpuz.sys' data-b='failed' data-sid='8c95d28270a4a314'><td class='spec'><a href='items/8c95d28270a4a314.html'>cpuz.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 6.0</span><span class='chip'><em>function_count</em> 58</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span><span class='chip on'>ghidra-port-io-user-controlled</span></div></td><td class='r' data-v='34'>34</td><td class='sev' data-v='52934'><span class='h'>5</span>&thinsp;high <span class='m'>29</span>&thinsp;med</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='bdapiutil.sys' data-b='failed' data-sid='32198295d2a2700b'><td class='spec'><a href='items/32198295d2a2700b.html'>BdApiUtil.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 2.0</span><span class='chip'><em>function_count</em> 165</span><span class='chip on'>ghidra-rtlcopymemory-user-length</span><span class='chip on'>ghidra-stack-buffer-no-length-check</span></div></td><td class='r' data-v='5'>5</td><td class='sev' data-v='50005'><span class='h'>5</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='amdryzenmasterdriver.sys' data-b='failed' data-sid='a13054f349b7baa8'><td class='spec'><a href='items/a13054f349b7baa8.html'>AMDRyzenMasterDriver.sys</a><div class='strip'><span class='chip'><em>priority_score</em> 8.0</span><span class='chip'><em>function_count</em> 173</span><span class='chip'><em>dangerous_imports</em> HalGetBusDataByOffset, HalSetBusDataByOffset, IoAllocateMdl +2</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='4'>4</td><td class='sev' data-v='40004'><span class='h'>4</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='0eab16c7f54b61620277977f8c332737081a46bc6bbde50742b6904bdd54f502.sys' data-b='failed' data-sid='0eab16c7f54b6162'><td class='spec'><a href='items/0eab16c7f54b6162.html'>0eab16c7f54b61620277977f8c332737081a46bc6bbde50742b6904bdd54f502.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 6.0</span><span class='chip'><em>function_count</em> 65</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span><span class='chip on'>ghidra-rtlcopymemory-user-length</span></div></td><td class='r' data-v='3'>3</td><td class='sev' data-v='30003'><span class='h'>3</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='4ed2d2c1b00e87b926fb58b4ea43d2db35e5912975f4400aa7bd9f8c239d08b7.sys' data-b='failed' data-sid='4ed2d2c1b00e87b9'><td class='spec'><a href='items/4ed2d2c1b00e87b9.html'>4ed2d2c1b00e87b926fb58b4ea43d2db35e5912975f4400aa7bd9f8c239d08b7.sys</a><div class='strip'><span class='chip'><em>priority_score</em> 3.0</span><span class='chip'><em>function_count</em> 139</span><span class='chip'><em>dangerous_imports</em> IoAllocateMdl, MmMapIoSpace, MmUnmapIoSpace</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='3'>3</td><td class='sev' data-v='30003'><span class='h'>3</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='b205835b818d8a50903cf76936fcf8160060762725bd74a523320cfbd091c038.sys' data-b='failed' data-sid='b205835b818d8a50'><td class='spec'><a href='items/b205835b818d8a50.html'>b205835b818d8a50903cf76936fcf8160060762725bd74a523320cfbd091c038.sys</a><div class='strip'><span class='chip'><em>priority_score</em> 6.0</span><span class='chip'><em>function_count</em> 150</span><span class='chip'><em>dangerous_imports</em> IoAllocateMdl, MmMapIoSpace, MmUnmapIoSpace</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='3'>3</td><td class='sev' data-v='30003'><span class='h'>3</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='kevp64.sys' data-b='failed' data-sid='1aaa9aef39cb3c0a'><td class='spec'><a href='items/1aaa9aef39cb3c0a.html'>kEvP64.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 7.0</span><span class='chip'><em>function_count</em> 344</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span><span class='chip on'>ghidra-pslookup-keattach-chain</span></div></td><td class='r' data-v='3'>3</td><td class='sev' data-v='30003'><span class='h'>3</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='libnicm.sys' data-b='failed' data-sid='95d50c69cdbf10c9'><td class='spec'><a href='items/95d50c69cdbf10c9.html'>libnicm.sys</a><div class='strip'><span class='chip'><em>function_count</em> 110</span><span class='chip'><em>dangerous_imports</em> IoAllocateMdl, MmIsAddressValid, MmProbeAndLockPages +1</span><span class='chip on'>ghidra-rtlcopymemory-user-length</span></div></td><td class='r' data-v='3'>3</td><td class='sev' data-v='30003'><span class='h'>3</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='rtkio64.sys' data-b='failed' data-sid='7133a461aeb03b4d'><td class='spec'><a href='items/7133a461aeb03b4d.html'>rtkio64.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 3.0</span><span class='chip'><em>function_count</em> 81</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='3'>3</td><td class='sev' data-v='30003'><span class='h'>3</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='rtkiow8x64.sys' data-b='failed' data-sid='082c39fe2e321700'><td class='spec'><a href='items/082c39fe2e321700.html'>rtkiow8x64.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 6.0</span><span class='chip'><em>function_count</em> 93</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='3'>3</td><td class='sev' data-v='30003'><span class='h'>3</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='amdpowerprofiler.sys' data-b='failed' data-sid='0af5ccb3d33a9ba9'><td class='spec'><a href='items/0af5ccb3d33a9ba9.html'>AMDPowerProfiler.sys</a><div class='strip'><span class='chip'><em>priority_score</em> 6.0</span><span class='chip'><em>function_count</em> 228</span><span class='chip'><em>dangerous_imports</em> IoAllocateMdl, MmIsAddressValid, MmMapIoSpace +4</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span><span class='chip on'>ghidra-zwmapviewofsection-physmem</span></div></td><td class='r' data-v='2'>2</td><td class='sev' data-v='20002'><span class='h'>2</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='bsmi.sys' data-b='failed' data-sid='59626cac380d8fe0'><td class='spec'><a href='items/59626cac380d8fe0.html'>BSMI.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 3.0</span><span class='chip'><em>function_count</em> 27</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='2'>2</td><td class='sev' data-v='20002'><span class='h'>2</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='bsmix64.sys' data-b='failed' data-sid='552f70374715e70c'><td class='spec'><a href='items/552f70374715e70c.html'>BSMIx64.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 3.0</span><span class='chip'><em>function_count</em> 27</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='2'>2</td><td class='sev' data-v='20002'><span class='h'>2</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='corsairllaccess64.sys' data-b='failed' data-sid='000547560fea0dd4'><td class='spec'><a href='items/000547560fea0dd4.html'>CorsairLLAccess64.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 8.0</span><span class='chip'><em>function_count</em> 56</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='2'>2</td><td class='sev' data-v='20002'><span class='h'>2</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='ene.sys' data-b='failed' data-sid='175eed7a4c6de9c3'><td class='spec'><a href='items/175eed7a4c6de9c3.html'>ene.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 7.0</span><span class='chip'><em>function_count</em> 72</span><span class='chip on'>ghidra-zwmapviewofsection-physmem</span></div></td><td class='r' data-v='2'>2</td><td class='sev' data-v='20002'><span class='h'>2</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='fb0dbc3b9c897b7571b94fb2203ffb1ac0facfe366b2cb1f91904ea5335018f0.sys' data-b='failed' data-sid='fb0dbc3b9c897b75'><td class='spec'><a href='items/fb0dbc3b9c897b75.html'>fb0dbc3b9c897b7571b94fb2203ffb1ac0facfe366b2cb1f91904ea5335018f0.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 4.0</span><span class='chip'><em>function_count</em> 53</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='2'>2</td><td class='sev' data-v='20002'><span class='h'>2</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='hpportiox64.sys' data-b='failed' data-sid='c5050a2017490fff'><td class='spec'><a href='items/c5050a2017490fff.html'>HpPortIox64.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 2.0</span><span class='chip'><em>function_count</em> 95</span><span class='chip on'>ghidra-rtlcopymemory-user-length</span><span class='chip on'>ghidra-stack-buffer-no-length-check</span></div></td><td class='r' data-v='2'>2</td><td class='sev' data-v='20002'><span class='h'>2</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='lenovodiagnosticsdriver.sys' data-b='failed' data-sid='f05b1ee9e2f6ab70'><td class='spec'><a href='items/f05b1ee9e2f6ab70.html'>LenovoDiagnosticsDriver.sys</a><div class='strip'><span class='chip'><em>priority_score</em> 8.0</span><span class='chip'><em>function_count</em> 104</span><span class='chip'><em>dangerous_imports</em> HalGetBusDataByOffset, HalSetBusDataByOffset, MmMapIoSpace +1</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='2'>2</td><td class='sev' data-v='20002'><span class='h'>2</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='ntiolib.sys' data-b='failed' data-sid='d8b58f6a89a76185'><td class='spec'><a href='items/d8b58f6a89a76185.html'>NTIOLib.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 6.0</span><span class='chip'><em>function_count</em> 21</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='2'>2</td><td class='sev' data-v='20002'><span class='h'>2</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='speedfan.sys' data-b='failed' data-sid='22be050955347661'><td class='spec'><a href='items/22be050955347661.html'>speedfan.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 4.0</span><span class='chip'><em>function_count</em> 18</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='2'>2</td><td class='sev' data-v='20002'><span class='h'>2</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='rtkio.sys' data-b='failed' data-sid='478917514be37b32'><td class='spec'><a href='items/478917514be37b32.html'>rtkio.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 3.0</span><span class='chip'><em>function_count</em> 56</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span><span class='chip on'>ghidra-port-io-user-controlled</span></div></td><td class='r' data-v='29'>29</td><td class='sev' data-v='12829'><span class='h'>1</span>&thinsp;high <span class='m'>28</span>&thinsp;med</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='atszio.sys' data-b='failed' data-sid='01e024cb14b34b6d'><td class='spec'><a href='items/01e024cb14b34b6d.html'>ATSZIO.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 5.0</span><span class='chip'><em>function_count</em> 33</span><span class='chip on'>ghidra-zwmapviewofsection-physmem</span></div></td><td class='r' data-v='1'>1</td><td class='sev' data-v='10001'><span class='h'>1</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='nvflsh64.sys' data-b='failed' data-sid='a899b659b08fbae3'><td class='spec'><a href='items/a899b659b08fbae3.html'>nvflsh64.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 4.0</span><span class='chip'><em>function_count</em> 26</span><span class='chip on'>ghidra-zwmapviewofsection-physmem</span></div></td><td class='r' data-v='1'>1</td><td class='sev' data-v='10001'><span class='h'>1</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr><tr class='non' data-k='phlashnt.sys' data-b='failed' data-sid='65db1b259e305a52'><td class='spec'><a href='items/65db1b259e305a52.html'>PhlashNT.sys</a><div class='strip'><span class='chip'><em>device_on_load_path</em> True</span><span class='chip'><em>priority_score</em> 3.0</span><span class='chip'><em>function_count</em> 130</span><span class='chip on'>ghidra-mmmapiospace-user-controlled</span></div></td><td class='r' data-v='1'>1</td><td class='sev' data-v='10001'><span class='h'>1</span>&thinsp;high</td><td class='out' data-v='2'><span class='res non' title="A stage recorded an error for these, so they never finished the pipeline. Their result says nothing about whether they are safe.">Errored</span></td><td class='rev'></td></tr></tbody></table></div>
+</section><section><div class='shead q' title="A stage excluded these before the analysis finished, so the later stages never saw them. This is not a judgement about the item."><h2>Filtered out</h2><span class='n'>16</span><span class='of'>a stage excluded these, so the later stages never saw them</span></div><p class='aside'>These were excluded before the analysis finished, so they are not a judgement about the driver. Every one is listed in <a href='inventory.csv'>inventory.csv</a>.</p></section><section>
+  <div class="shead q"><h2>Rules that fired</h2>
+    <span class="n">6</span>
+    <span class="of">across every driver scanned</span></div>
+  <div class="scroll"><table data-sortable><thead><tr><th>rule</th>
+  <th class="r">hits</th></tr></thead><tbody><tr><td class='spec mono' style='color:var(--ink)'>ghidra-mmmapiospace-user-controlled</td><td class='r' data-v='85'>85</td></tr><tr><td class='spec mono' style='color:var(--ink)'>ghidra-port-io-user-controlled</td><td class='r' data-v='57'>57</td></tr><tr><td class='spec mono' style='color:var(--ink)'>ghidra-rtlcopymemory-user-length</td><td class='r' data-v='47'>47</td></tr><tr><td class='spec mono' style='color:var(--ink)'>ghidra-pslookup-keattach-chain</td><td class='r' data-v='5'>5</td></tr><tr><td class='spec mono' style='color:var(--ink)'>ghidra-zwmapviewofsection-physmem</td><td class='r' data-v='5'>5</td></tr><tr><td class='spec mono' style='color:var(--ink)'>ghidra-stack-buffer-no-length-check</td><td class='r' data-v='2'>2</td></tr></tbody></table></div>
+</section></div><script type="application/json" id="baked-marks">{}</script><script>
+(function(){
+  /* filter: hide rows that do not match, and say how many are showing */
+  var q=document.getElementById('q'),hint=document.getElementById('hint');
+  function report(){
+    var shown=0,total=0;
+    document.querySelectorAll('tbody tr').forEach(function(r){
+      if(!r.dataset.k)return; total++; if(r.style.display!=='none')shown++;
+    });
+    if(hint)hint.textContent=shown===total?total+' shown':shown+' of '+total+' shown';
+  }
+
+  /* text and outcome narrow the same list: no chip pressed means show all */
+  var chips=[].slice.call(document.querySelectorAll('.chipf'));
+  var spread=document.querySelector('.spread');
+  function apply(){
+    var v=q?q.value.toLowerCase():'';
+    var pressed=chips.filter(function(c){return c.getAttribute('aria-pressed')==='true'});
+    var on=pressed.filter(function(c){return c.dataset.b}).map(function(c){return c.dataset.b});
+    var wantMark=pressed.filter(function(c){return c.dataset.mark})
+                        .map(function(c){return c.dataset.mark});
+    document.querySelectorAll('tbody tr').forEach(function(r){
+      if(!r.dataset.k)return;
+      var hit=r.dataset.k.indexOf(v)>-1
+        &&(!on.length||on.indexOf(r.dataset.b)>-1)
+        &&(!wantMark.length||wantMark.indexOf(r.dataset.mark||'unmarked')>-1);
+      r.style.display=hit?'':'none';
+    });
+    /* the corpus bar shows which slice of the run is on screen right now */
+    if(spread){
+      spread.classList.toggle('narrowed',on.length>0);
+      [].forEach.call(spread.children,function(seg){
+        seg.classList.toggle('on',on.indexOf(seg.dataset.b)>-1);
+      });
+    }
+    report();
+  }
+  if(q)q.addEventListener('input',apply);
+  chips.forEach(function(c){
+    c.addEventListener('click',function(){
+      c.setAttribute('aria-pressed',c.getAttribute('aria-pressed')==='true'?'false':'true');
+      apply();
+    });
+  });
+  report();
+
+  /* the head parks under the filter, so it has to know how tall that is */
+  var barEl=document.querySelector('.filter');
+  function fit(){
+    document.documentElement.style.setProperty('--bar',barEl.offsetHeight+'px');
+  }
+  function stick(){barEl.classList.toggle('stuck',barEl.getBoundingClientRect().top<=0)}
+  if(barEl){
+    fit();stick();
+    // watch the bar itself rather than the window: it also changes height when
+    // its controls wrap onto another line, which a live run causes on its own
+    // as new outcomes appear and add chips. A stale height parks the table
+    // head in the wrong place.
+    if(window.ResizeObserver){ new ResizeObserver(fit).observe(barEl) }
+    else { window.addEventListener('resize',fit) }
+    window.addEventListener('scroll',stick,{passive:true});
+  }
+
+  /* a live run rewrites this file every few seconds. reload to pick that up,
+     but put the reader back where they were rather than at the top, and stop
+     once the page has gone long enough without being rewritten to be stale. */
+  var live=document.body.dataset.live,store=null,key='dz:'+location.pathname;
+  try{store=window.sessionStorage}catch(e){}
+  if(live&&store){
+    try{
+      var was=JSON.parse(store.getItem(key)||'{}');
+      if(was.q&&q){q.value=was.q;apply()}
+      if(was.y)window.scrollTo(0,was.y);
+    }catch(e){}
+    window.addEventListener('beforeunload',function(){
+      try{store.setItem(key,JSON.stringify({q:q?q.value:'',y:window.scrollY}))}catch(e){}
+    });
+    var beat=document.querySelector('.run[data-beat]');
+    var age=beat?(Date.now()-Date.parse(beat.getAttribute('data-beat')))/1000:0;
+    if(!(age>300))setTimeout(function(){location.reload()},20000);
+  }
+
+  /* review marks: what the reader has checked, which no stage can know.
+     Held in the browser because the report is a file, and exportable so they
+     can be saved next to it and stop being one person's private notes. */
+  var MK = 'dz:marks:' + (document.body.dataset.corpus || location.pathname);
+  function loadMarks(){
+    var baked = {};
+    try{ baked = JSON.parse(document.getElementById('baked-marks').textContent) }catch(e){}
+    try{
+      var mine = JSON.parse(window.localStorage.getItem(MK) || '{}');
+      for(var k in mine){ baked[k] = mine[k] }
+    }catch(e){}
+    return baked;
+  }
+  function saveMark(sid, mark){
+    try{
+      var all = JSON.parse(window.localStorage.getItem(MK) || '{}');
+      if(mark){ all[sid] = mark } else { delete all[sid] }
+      window.localStorage.setItem(MK, JSON.stringify(all));
+    }catch(e){}
+  }
+
+  var marks = loadMarks();
+
+  /* index: show each mark against its row, and let the list be narrowed to
+     whatever still needs looking at */
+  document.querySelectorAll('tr[data-sid]').forEach(function(row){
+    var m = marks[row.dataset.sid];
+    row.dataset.mark = m ? m.state : 'unmarked';
+    var cell = row.querySelector('.rev');
+    if(!cell || !m) return;
+    var note = m.note ? "<span class='note'>" + m.note.replace(/[<&]/g, function(c){
+      return c === '<' ? '&lt;' : '&amp;';
+    }) + "</span>" : '';
+    cell.innerHTML = "<span class='mark " + m.state + "'>" + m.state + note + "</span>";
+  });
+  /* what has actually been checked, counted here rather than at generation
+     time because marks made in this browser have not been saved back yet */
+  var tally = document.getElementById('review-tally');
+  if(tally){
+    var rows = document.querySelectorAll('tr[data-sid]');
+    if(rows.length){
+      var n = {confirmed:0, refuted:0, outstanding:0, unmarked:0};
+      [].forEach.call(rows, function(r){ n[r.dataset.mark] = (n[r.dataset.mark]||0) + 1 });
+      var parts = [];
+      [['confirmed','confirmed'],['refuted','did not hold up'],
+       ['outstanding','outstanding'],['unmarked','not yet reviewed']]
+        .forEach(function(pair){
+          if(n[pair[0]]) parts.push("<span class='" + pair[0] + "'><i></i><b>" +
+            n[pair[0]] + "</b>" + pair[1] + "</span>");
+        });
+      tally.innerHTML = parts.join('');
+    }
+  }
+
+  // painted before any filter runs, so narrowing by mark sees them
+  apply();
+
+  /* the control on a result's own page */
+  var panel = document.querySelector('.review[data-sid]');
+  if(panel){
+    var sid = panel.dataset.sid;
+    var box = panel.querySelector('textarea');
+    var saved = panel.querySelector('.saved');
+    var current = marks[sid] || null;
+    function paint(){
+      // a result that did not hold up needs its detail as much as an open one,
+      // so both states open the note field
+      var st = current ? current.state : '';
+      panel.classList.toggle('outstanding', st === 'outstanding');
+      panel.classList.toggle('refuted', st === 'refuted');
+      panel.querySelectorAll('button').forEach(function(b){
+        b.setAttribute('aria-pressed', String(!!current && current.state === b.dataset.state));
+      });
+      if(box && current) box.value = current.note || '';
+      saved.textContent = current
+        ? 'marked ' + current.state + (current.note ? ', with a note' : '')
+        : 'not reviewed yet';
+    }
+    panel.querySelectorAll('button').forEach(function(b){
+      b.addEventListener('click', function(){
+        var want = b.dataset.state;
+        current = (current && current.state === want)
+          ? null
+          : {state: want, note: (box && box.value) || ''};
+        saveMark(sid, current); paint();
+      });
+    });
+    if(box) box.addEventListener('input', function(){
+      if(!current) return;
+      current.note = box.value; saveMark(sid, current); paint();
+    });
+    paint();
+  }
+
+  /* marks are only durable once they leave the browser */
+  var dump = document.getElementById('export-marks');
+  if(dump) dump.addEventListener('click', function(e){
+    e.preventDefault();
+    var blob = new Blob([JSON.stringify(loadMarks(), null, 2)], {type:'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'marks.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  /* a row opens its own page; the link inside keeps it keyboard reachable */
+  document.querySelectorAll('tbody').forEach(function(body){
+    body.addEventListener('click',function(e){
+      if(e.target.closest('a'))return;
+      if(window.getSelection&&String(window.getSelection())) return;
+      var row=e.target.closest('tr'),link=row&&row.querySelector('a[href]');
+      if(link)window.location.href=link.getAttribute('href');
+    });
+  });
+
+  /* sortable columns, with the active column and direction shown */
+  document.querySelectorAll('table[data-sortable]').forEach(function(tb){
+    var head=tb.tHead.rows[0];
+    [].forEach.call(head.cells,function(th,i){
+      th.tabIndex=0;
+      th.setAttribute('title','Sort by '+th.textContent.trim());
+      th.setAttribute('aria-sort','none');
+      function sort(){
+        var body=tb.tBodies[0],rows=[].slice.call(body.rows);
+        var desc=th.dataset.dir!=='desc';
+        [].forEach.call(head.cells,function(c){
+          if(c!==th){delete c.dataset.dir;c.setAttribute('aria-sort','none')}
+        });
+        th.dataset.dir=desc?'desc':'asc';
+        th.setAttribute('aria-sort',desc?'descending':'ascending');
+        rows.sort(function(a,b){
+          var x=(a.cells[i].dataset.v||a.cells[i].innerText).trim();
+          var y=(b.cells[i].dataset.v||b.cells[i].innerText).trim();
+          var nx=parseFloat(x),ny=parseFloat(y),r;
+          r=(!isNaN(nx)&&!isNaN(ny)&&x!==''&&y!=='')?nx-ny:x.localeCompare(y);
+          return desc?-r:r;
+        });
+        rows.forEach(function(r){body.appendChild(r)});
+      }
+      th.addEventListener('click',sort);
+      th.addEventListener('keydown',function(e){
+        if(e.key==='Enter'||e.key===' '){e.preventDefault();sort()}
+      });
+    });
+  });
+})();
+
+(function(){
+  var el=document.querySelector('.run[data-beat]');
+  if(!el) return;
+  var beat=Date.parse(el.getAttribute('data-beat'));
+  if(isNaN(beat)) return;
+  var live=el.classList.contains('running'), age=el.querySelector('.age');
+  var label=el.querySelector('span');
+  function ago(s){
+    if(s<60) return Math.max(0,Math.round(s))+'s ago';
+    if(s<3600) return Math.round(s/60)+' min ago';
+    if(s<86400) return Math.round(s/3600)+' hr ago';
+    return Math.round(s/86400)+' d ago';
+  }
+  function tick(){
+    var s=(Date.now()-beat)/1000;
+    if(!live){ age.textContent='written '+ago(s); return; }
+    // a run rewrites this page every few seconds. a gap far wider than that
+    // means the page is a leftover, whatever it says about itself.
+    if(s>180){
+      el.classList.remove('running'); el.classList.add('stopped');
+      label.textContent='no longer updating';
+      age.textContent='last written '+ago(s);
+      live=false;
+      return;
+    }
+    age.textContent='updated '+ago(s);
+  }
+  tick(); setInterval(tick,1000);
+})();
+</script></body></html>

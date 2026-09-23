@@ -35,3 +35,6 @@ toolchain/
 # C++ compiler build directory
 compiler/build/
 
+
+# Ghidra
+ghidra*

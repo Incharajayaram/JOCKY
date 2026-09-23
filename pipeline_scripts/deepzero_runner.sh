@@ -38,14 +38,14 @@ fi
 
 cd DeepZero
 if [ ! -d ".venv" ]; then
-    echo "[*] Setting up Python virtual environment..."
-    python3 -m venv .venv
+    echo "[*] Setting up Python virtual environment with Python 3.11..."
+    python3.11 -m venv .venv
 fi
 
 echo "[*] Activating venv and installing requirements..."
 source .venv/bin/activate
-pip install -q -r requirements.txt
-pip install -q litellm google-generativeai pandas # For Gemini and aggregation
+pip install -q -e .[full]
+pip install -q google-generativeai pandas semgrep # For Gemini, aggregation, and semgrep scanner
 
 # 4. Configure API Keys
 if [ -z "$GEMINI_API_KEY" ]; then
@@ -55,7 +55,7 @@ if [ -z "$GEMINI_API_KEY" ]; then
     exit 1
 fi
 
-export LITELLM_MODEL="gemini/gemini-1.5-pro-latest"
+export LITELLM_MODEL="gemini/gemini-3.5-flash"
 
 # 5. Check for Downloaded Corpus
 CORPUS_DIR="/home/incharanew/Downloads/drivers_out"
@@ -68,11 +68,8 @@ fi
 echo "[+] Pointing DeepZero at corpus: $CORPUS_DIR"
 
 # 6. Execute DeepZero Pipeline
-echo "[*] Running DeepZero ingestion pipeline..."
-python3 deepzero.py ingest --corpus "$CORPUS_DIR"
-
 echo "[*] Running DeepZero AI analysis pipeline..."
-python3 deepzero.py analyze
+deepzero run -p loldrivers "$CORPUS_DIR"
 
 echo "[+] Analysis complete! State directory populated."
 echo "[+] To aggregate results and start the interactive LLM REPL, run:"
