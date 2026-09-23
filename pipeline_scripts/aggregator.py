@@ -50,7 +50,7 @@ class DeepZeroREPL(cmd.Cmd):
 
 def aggregate_results():
     # Crawl standard output paths
-    base_dirs = ["DeepZero/state", "DeepZero/results", "DeepZero/.state"]
+    base_dirs = ["DeepZero/work", "DeepZero/state", "DeepZero/results", "DeepZero/.state"]
     target_dir = None
     for d in base_dirs:
         if os.path.isdir(d):
