@@ -282,3 +282,8 @@ class VariantConstructor:
     """Construct a tagged union variant: Ok(value) or Error(code, msg)"""
     variant_name: str
     args: List[Any]  # Arguments for variant fields
+
+@dataclass
+class UseStmt:
+    """Import a module: use jocky.linux.modules;"""
+    module_path: str  # e.g., "jocky.linux.modules"
