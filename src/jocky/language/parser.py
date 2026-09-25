@@ -11,6 +11,7 @@ from .ast import (
     EnumDef, EnumVariant,
     TypeAlias,
     Pattern, WildcardPattern, LiteralPattern, VariantPattern, MatchArm, MatchExpr,
+    UseStmt,
     JType,
 )
 from typing import Optional, Any, List
@@ -92,7 +93,9 @@ class Parser:
         return Program(decls)
 
     def parse_decl(self) -> Any:
-        if self.match(TokenType.FN):
+        if self.match(TokenType.USE):
+            return self.parse_use_stmt()
+        elif self.match(TokenType.FN):
             return self.parse_func_decl()
         elif self.match(TokenType.FFI):
             return self.parse_ffi_decl()
@@ -103,7 +106,7 @@ class Parser:
         elif self.match(TokenType.TYPE):
             return self.parse_type_alias()
         else:
-            raise ParseError(f"Unexpected token {self.peek().type.name} at line {self.peek().line}; expected fn, ffi, struct, enum, or type")
+            raise ParseError(f"Unexpected token {self.peek().type.name} at line {self.peek().line}; expected use, fn, ffi, struct, enum, or type")
 
     def parse_func_decl(self) -> FuncDecl:
         self.expect(TokenType.FN)
@@ -186,6 +189,17 @@ class Parser:
         target_type = self.parse_type()
         self.expect(TokenType.SEMICOLON)
         return TypeAlias(name, target_type)
+
+    def parse_use_stmt(self) -> UseStmt:
+        self.expect(TokenType.USE)
+        # Parse module path: jocky.linux.modules
+        parts = [self.expect(TokenType.IDENT).value]
+        while self.match(TokenType.DOT):
+            self.advance()
+            parts.append(self.expect(TokenType.IDENT).value)
+        module_path = ".".join(parts)
+        self.expect(TokenType.SEMICOLON)
+        return UseStmt(module_path)
 
     def parse_match_expr(self) -> MatchExpr:
         self.expect(TokenType.MATCH)

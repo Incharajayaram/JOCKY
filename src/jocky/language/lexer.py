@@ -11,6 +11,7 @@ class TokenType(Enum):
     # Keywords
     FN = auto()
     FFI = auto()
+    USE = auto()
     LET = auto()
     IF = auto()
     ELSE = auto()
@@ -79,6 +80,7 @@ class TokenType(Enum):
 KEYWORDS = {
     "fn": TokenType.FN,
     "ffi": TokenType.FFI,
+    "use": TokenType.USE,
     "let": TokenType.LET,
     "if": TokenType.IF,
     "else": TokenType.ELSE,
@@ -196,9 +198,13 @@ class Lexer:
 
     def tokenize(self) -> list[Token]:
         while True:
-            self.skip_whitespace()
-            self.skip_comment()
-            self.skip_whitespace()
+            # Skip whitespace and comments, repeating until none remain
+            while True:
+                self.skip_whitespace()
+                if self.peek() == "/" and self.peek(1) == "/":
+                    self.skip_comment()
+                else:
+                    break
 
             start_line, start_col = self.line, self.column
             ch = self.peek()

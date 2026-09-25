@@ -3,6 +3,7 @@ from jocky.core.context import BuildContext
 from jocky.language.lexer import Lexer
 from jocky.language.parser import Parser
 from jocky.language.checker import TypeChecker
+from jocky.language.resolver import ModuleResolver
 from pathlib import Path
 
 _PRELUDE_PATH = Path(__file__).parent.parent / "stdlib" / "prelude.jky"
@@ -24,6 +25,11 @@ class ParseStage(Stage):
         tokens = lexer.tokenize()
         parser = Parser(tokens)
         ast = parser.parse()
+
+        # Resolve modules
+        resolver = ModuleResolver(ctx.input_file.parent)
+        ast = resolver.resolve_program(ast)
+
         ctx.state["ast"] = ast
 
         checker = TypeChecker()

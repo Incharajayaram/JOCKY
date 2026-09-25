@@ -1,0 +1,36 @@
+// JOCKY Linux kernel access bindings
+// Provides read/write access to kernel memory via /proc/kcore or /proc/kallsyms
+
+ffi jocky_linux_kernel_init() -> i8*;
+ffi jocky_linux_kernel_destroy(ctx: i8*) -> void;
+ffi jocky_linux_kread(ctx: i8*, kva: i64, buf: i8*, size: i32) -> i32;
+ffi jocky_linux_kwrite(ctx: i8*, kva: i64, data: i8*, size: i32) -> i32;
+ffi jocky_linux_ksym(ctx: i8*, name: string) -> i64;
+
+// Initialize kernel access context
+fn kernel_init() -> i8* {
+    return jocky_linux_kernel_init();
+}
+
+// Clean up kernel access context
+fn kernel_destroy(ctx: i8*) -> void {
+    jocky_linux_kernel_destroy(ctx);
+}
+
+// Read from kernel virtual address
+// Returns number of bytes read, or -1 on error
+fn kread(ctx: i8*, kva: i64, buf: i8*, size: i32) -> i32 {
+    return jocky_linux_kread(ctx, kva, buf, size);
+}
+
+// Write to kernel virtual address
+// Returns number of bytes written, or -1 on error
+fn kwrite(ctx: i8*, kva: i64, data: i8*, size: i32) -> i32 {
+    return jocky_linux_kwrite(ctx, kva, data, size);
+}
+
+// Resolve kernel symbol to virtual address
+// Returns the virtual address, or 0 if not found
+fn ksym(ctx: i8*, name: string) -> i64 {
+    return jocky_linux_ksym(ctx, name);
+}

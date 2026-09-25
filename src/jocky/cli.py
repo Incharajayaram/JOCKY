@@ -197,12 +197,19 @@ def verify(file: str):
     input_path = Path(file)
     src = input_path.read_text()
 
+    # Include prelude if not disabled
+    prelude_path = Path(__file__).parent / "stdlib" / "prelude.jky"
+    if prelude_path.exists():
+        prelude_src = prelude_path.read_text()
+        src = prelude_src + "\n" + src
+
     header("JOCKY Verify")
     console.print(f"  [dim]File[/dim]  {input_path}")
     console.print()
 
     from jocky.language.lexer import Lexer
     from jocky.language.parser import Parser
+    from jocky.language.resolver import ModuleResolver
     from jocky.language.checker import TypeChecker
 
     with console.status("[bold cyan]Lexing...[/bold cyan]", spinner="dots"):
@@ -215,6 +222,11 @@ def verify(file: str):
         ast = parser.parse()
     decl_count = len(ast.decls)
     success(f"Parser produced AST with {decl_count} top-level declaration(s)")
+
+    with console.status("[bold cyan]Resolving modules...[/bold cyan]", spinner="dots"):
+        resolver = ModuleResolver(input_path.parent)
+        ast = resolver.resolve_program(ast)
+    success(f"Resolved to {len(ast.decls)} declaration(s)")
 
     with console.status("[bold cyan]Type-checking...[/bold cyan]", spinner="dots"):
         checker = TypeChecker()

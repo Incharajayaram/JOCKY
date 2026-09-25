@@ -1,0 +1,27 @@
+// JOCKY Linux module loading bindings
+// Wraps dlopen/dlsym/dlclose for runtime module loading on Linux
+
+ffi dlopen(path: string, flags: i32) -> i8*;
+ffi dlsym(handle: i8*, name: string) -> i8*;
+ffi dlclose(handle: i8*) -> i32;
+ffi dlerror() -> string;
+
+// Constants for dlopen flags
+type RTLD_LAZY = i32;   // 0x00001 - lazy binding
+type RTLD_NOW = i32;    // 0x00002 - immediate binding
+type RTLD_GLOBAL = i32; // 0x00100 - symbols available to subsequently loaded libraries
+
+fn module_load(path: string) -> i8* {
+    let handle = dlopen(path, 1);  // RTLD_LAZY
+    return handle;
+}
+
+fn module_unload(handle: i8*) -> bool {
+    let result = dlclose(handle);
+    return result == 0;
+}
+
+fn module_symbol(handle: i8*, name: string) -> i8* {
+    let sym = dlsym(handle, name);
+    return sym;
+}
