@@ -69,12 +69,15 @@
 
 **Status:** Parser can successfully parse struct, enum, and array declarations!
 
-#### Phase 2: Type Checking (IN PROGRESS)
-- [ ] 2.1 Update TypeChecker to recognize struct/enum types
-- [ ] 2.2 Validate field access on structs
-- [ ] 2.3 Validate array indexing
-- [ ] 2.4 Implement struct literal type inference
-- [ ] 2.5 Write type checker tests
+#### Phase 2: Type Checking (COMPLETED ✅)
+- [x] 2.1 Update TypeChecker to recognize struct/enum types
+- [x] 2.2 Validate field access on structs
+- [x] 2.3 Validate array indexing
+- [x] 2.4 Implement struct literal type inference
+- [x] 2.5 Write type checker tests
+
+**Status:** Type checker validates structs, enums, arrays, and field access!
+Verified with struct_example.jky and struct_advanced.jky
 
 #### Phase 3: Code Generation (TODO)
 - [ ] 3.1 Generate LLVM struct types (%structName = type { ... })

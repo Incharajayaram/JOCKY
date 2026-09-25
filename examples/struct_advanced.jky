@@ -1,0 +1,17 @@
+struct Person {
+    age: i32;
+    active: bool;
+};
+
+fn is_adult(age: i32) -> bool {
+    if age >= 18 {
+        return true;
+    }
+    return false;
+}
+
+fn main() -> i32 {
+    let numbers: i32[5] = [10, 20, 30, 40, 50];
+    let status: bool = is_adult(25);
+    return 0;
+}
