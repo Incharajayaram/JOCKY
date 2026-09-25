@@ -365,6 +365,12 @@
   - [x] Privilege escalation framework (cred modification)
 
 ### Toolchain
+- ✅ **Improved error messages** – source location tracking (COMPLETED)
+  - ✅ Line and column information in errors
+  - ✅ Source context display with visual indicators
+  - ✅ Error codes for categorized errors (E0001-E0010)
+  - ✅ ErrorFormatter for pretty error output
+
 - [ ] **Build system performance** – incremental compilation
   - [ ] Cache intermediate stages
   - [ ] Parallel stage execution
@@ -561,7 +567,7 @@
 | **Documentation** | 12/12 | - | - | ✅ |
 | **Tooling** | 8/10 | - | 2 | Low |
 
-**Overall: 95/129 features (74% complete)** ⬆️ +16 this session
+**Overall: 96/129 features (74% complete)** ⬆️ +17 this session
 
 **This session (2026-09-26):**
 - Language: structs, enums, arrays, type aliases, pattern matching, tagged unions (6 features)
