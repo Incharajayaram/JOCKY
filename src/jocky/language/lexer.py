@@ -74,6 +74,7 @@ class TokenType(Enum):
     SEMICOLON = auto()
     COMMA = auto()
     DOT = auto()
+    COLONCOLON = auto()  # ::
 
     EOF = auto()
 
@@ -317,6 +318,9 @@ class Lexer:
             elif ch == "]":
                 self.advance()
                 self.tokens.append(Token(TokenType.RBRACKET, "]", start_line, start_col))
+            elif ch == ":" and self.peek(1) == ":":
+                self.advance(); self.advance()
+                self.tokens.append(Token(TokenType.COLONCOLON, "::", start_line, start_col))
             elif ch == ":":
                 self.advance()
                 self.tokens.append(Token(TokenType.COLON, ":", start_line, start_col))
