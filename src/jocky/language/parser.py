@@ -10,6 +10,7 @@ from .ast import (
     ArrayType, ArrayLiteralExpr,
     EnumDef, EnumVariant,
     TypeAlias,
+    Pattern, WildcardPattern, LiteralPattern, VariantPattern, MatchArm, MatchExpr,
     JType,
 )
 from typing import Optional, Any, List
@@ -170,6 +171,48 @@ class Parser:
         self.expect(TokenType.SEMICOLON)
         return TypeAlias(name, target_type)
 
+    def parse_match_expr(self) -> MatchExpr:
+        self.expect(TokenType.MATCH)
+        scrutinee = self.parse_expr()
+        self.expect(TokenType.LBRACE)
+        arms = []
+        while not self.match(TokenType.RBRACE):
+            pattern = self.parse_pattern()
+            self.expect(TokenType.ARROW_FAT)
+            # Parse the arm body (could be a block or single expression)
+            if self.match(TokenType.LBRACE):
+                body = self.parse_block()
+            else:
+                # Single expression arm
+                expr = self.parse_expr()
+                body = Block([ExprStmt(expr)])
+            arms.append(MatchArm(pattern, body))
+            if self.match(TokenType.COMMA):
+                self.advance()
+        self.expect(TokenType.RBRACE)
+        return MatchExpr(scrutinee, arms)
+
+    def parse_pattern(self) -> Pattern:
+        tok = self.peek()
+        if tok.type == TokenType.IDENT:
+            # Variant pattern or wildcard
+            name = self.advance().value
+            if name == "_":
+                return WildcardPattern()
+            return VariantPattern(name)
+        elif tok.type == TokenType.NUMBER:
+            # Literal pattern
+            val = self.advance().value
+            return LiteralPattern(IntLiteral(val))
+        elif tok.type == TokenType.TRUE:
+            self.advance()
+            return LiteralPattern(BoolLiteral(True))
+        elif tok.type == TokenType.FALSE:
+            self.advance()
+            return LiteralPattern(BoolLiteral(False))
+        else:
+            raise ParseError(f"Expected pattern, got {tok.type.name} at line {tok.line}")
+
     def parse_params(self) -> List[Param]:
         params, _ = self.parse_params_variadic()
         return params
@@ -312,7 +355,9 @@ class Parser:
             rhs = self.parse_expr()
             self.expect(TokenType.SEMICOLON)
             return AssignStmt(expr, rhs)
-        self.expect(TokenType.SEMICOLON)
+        # Match expressions consume their own braces, so no semicolon needed
+        if not isinstance(expr, MatchExpr):
+            self.expect(TokenType.SEMICOLON)
         return ExprStmt(expr)
 
     # ---- Expression parsing with precedence climbing ----
@@ -470,6 +515,9 @@ class Parser:
         elif tok.type == TokenType.IDENT:
             self.advance()
             return VarRef(tok.value)
+        elif tok.type == TokenType.MATCH:
+            # Match expression: match expr { pattern => body, ... }
+            return self.parse_match_expr()
         elif tok.type == TokenType.LBRACKET:
             # Array literal: [1, 2, 3]
             self.advance()

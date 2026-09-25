@@ -242,3 +242,35 @@ class StructLiteralExpr:
 @dataclass
 class ArrayLiteralExpr:
     elements: List[Any]
+
+@dataclass
+class Pattern:
+    """Base class for patterns"""
+    pass
+
+@dataclass
+class WildcardPattern(Pattern):
+    """Match anything: _"""
+    pass
+
+@dataclass
+class LiteralPattern(Pattern):
+    """Match a literal value"""
+    value: Any  # IntLiteral, BoolLiteral, etc.
+
+@dataclass
+class VariantPattern(Pattern):
+    """Match an enum variant: EnumName"""
+    name: str
+
+@dataclass
+class MatchArm:
+    """One arm of a match expression"""
+    pattern: Pattern
+    body: Block
+
+@dataclass
+class MatchExpr:
+    """Match expression: match expr { pattern => body, ... }"""
+    scrutinee: Any  # The expression being matched
+    arms: List[MatchArm]
