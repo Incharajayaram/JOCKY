@@ -11,6 +11,7 @@ from .ast import (
     EnumDef, EnumVariant,
     TypeAlias,
     Pattern, WildcardPattern, LiteralPattern, VariantPattern, MatchArm, MatchExpr,
+    ModulePath, UseStmt, ModDecl,
     JType,
 )
 from .errors import ParseError as BaseParseError, SourceRange
@@ -108,10 +109,14 @@ class Parser:
             return self.parse_enum_decl()
         elif self.match(TokenType.TYPE):
             return self.parse_type_alias()
+        elif self.match(TokenType.USE):
+            return self.parse_use_stmt()
+        elif self.match(TokenType.MOD):
+            return self.parse_mod_decl()
         else:
             tok = self.peek()
             source_range = SourceRange.at(tok.line, tok.column)
-            raise ParseError(f"Unexpected token {tok.type.name}; expected fn, ffi, struct, enum, or type", source_range)
+            raise ParseError(f"Unexpected token {tok.type.name}; expected fn, ffi, struct, enum, type, mod, or use", source_range)
 
     def parse_func_decl(self) -> FuncDecl:
         self.expect(TokenType.FN)
@@ -194,6 +199,42 @@ class Parser:
         target_type = self.parse_type()
         self.expect(TokenType.SEMICOLON)
         return TypeAlias(name, target_type)
+
+    def parse_use_stmt(self) -> UseStmt:
+        self.expect(TokenType.USE)
+        components = []
+        components.append(self.expect(TokenType.IDENT).value)
+
+        all_flag = False
+        while self.match(TokenType.COLON):
+            self.advance()
+            self.expect(TokenType.COLON)
+            if self.match(TokenType.STAR):
+                self.advance()
+                all_flag = True
+                break
+            else:
+                components.append(self.expect(TokenType.IDENT).value)
+
+        self.expect(TokenType.SEMICOLON)
+        return UseStmt(ModulePath(components), all=all_flag)
+
+    def parse_mod_decl(self) -> ModDecl:
+        public = False
+        if self.match(TokenType.IDENT) and self.peek().value == "pub":
+            self.advance()
+            public = True
+
+        self.expect(TokenType.MOD)
+        name = self.expect(TokenType.IDENT).value
+        self.expect(TokenType.LBRACE)
+
+        items = []
+        while not self.match(TokenType.RBRACE):
+            items.append(self.parse_decl())
+
+        self.expect(TokenType.RBRACE)
+        return ModDecl(name, items, public=public)
 
     def parse_match_expr(self) -> MatchExpr:
         self.expect(TokenType.MATCH)
