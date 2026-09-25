@@ -18,6 +18,11 @@ static void printUsage(const char* prog) {
               << "  --cc           Compile C source through JOCKY pipeline\n"
               << "  --target <triple>  Cross-compile target (e.g., x86_64-w64-mingw32)\n"
               << "  --msvc         Use MSVC toolchain (clang-cl + lld-link) for Windows\n"
+              << "  --forensic     Run forensic analysis after compilation\n"
+              << "  --analyze-only <file>  Analyze existing binary (no compilation)\n"
+              << "  --report-format <fmt>  Forensic report format: json, html (default: json)\n"
+              << "  --static       Link statically (no dynamic dependencies)\n"
+              << "  --byovd        Include BYOVD runtime (Windows kernel driver exploit)\n"
               << "  -k             Keep intermediate files\n"
               << "  -h             Show this help\n";
 }
@@ -44,6 +49,17 @@ int main(int argc, char** argv) {
             opts.noRuntime = true;
         } else if (std::strcmp(argv[i], "--target") == 0 && i + 1 < argc) {
             opts.target = argv[++i];
+        } else if (std::strcmp(argv[i], "--forensic") == 0) {
+            opts.runForensic = true;
+        } else if (std::strcmp(argv[i], "--analyze-only") == 0 && i + 1 < argc) {
+            opts.analyzeOnly = true;
+            input = argv[++i];
+        } else if (std::strcmp(argv[i], "--report-format") == 0 && i + 1 < argc) {
+            opts.reportFormat = argv[++i];
+        } else if (std::strcmp(argv[i], "--static") == 0) {
+            opts.staticLink = true;
+        } else if (std::strcmp(argv[i], "--byovd") == 0) {
+            opts.byovd = true;
         } else if (std::strcmp(argv[i], "-k") == 0) {
             opts.keepIntermediates = true;
         } else if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {

