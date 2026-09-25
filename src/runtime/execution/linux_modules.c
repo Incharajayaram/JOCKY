@@ -4,6 +4,8 @@
 #include "../include/jocky_rt.h"
 #include <dlfcn.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifdef __linux__
 

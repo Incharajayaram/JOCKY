@@ -203,7 +203,7 @@ static bool ptrace_set_rip(pid_t pid, uint64_t rip) {
  * - Same UID, or
  * - CAP_SYS_PTRACE capability
  */
-bool jocky_process_hollow_linux(pid_t pid, const void* payload, size_t payload_size) {
+bool jocky_process_hollow_linux(uint32_t pid, const void* payload, uint64_t payload_size) {
     if (!payload || payload_size == 0) return false;
     if (pid <= 1) return false;
 
@@ -266,7 +266,7 @@ bool jocky_process_hollow_linux(pid_t pid, const void* payload, size_t payload_s
  * @param payload_size Size of payload
  * @return PID of the hollowed process, -1 on failure
  */
-pid_t jocky_spawn_hollow_linux(const char* target_path, const void* payload, size_t payload_size) {
+uint32_t jocky_spawn_hollow_linux(const char* target_path, const void* payload, uint64_t payload_size) {
     if (!target_path || !payload || payload_size == 0) return -1;
 
     pid_t pid = fork();
@@ -309,14 +309,14 @@ pid_t jocky_spawn_hollow_linux(const char* target_path, const void* payload, siz
 #else
 // Stub implementations for non-Linux
 
-bool jocky_process_hollow_linux(pid_t pid, const void* payload, size_t payload_size) {
+bool jocky_process_hollow_linux(uint32_t pid, const void* payload, uint64_t payload_size) {
     (void)pid;
     (void)payload;
     (void)payload_size;
     return false;
 }
 
-pid_t jocky_spawn_hollow_linux(const char* target_path, const void* payload, size_t payload_size) {
+uint32_t jocky_spawn_hollow_linux(const char* target_path, const void* payload, uint64_t payload_size) {
     (void)target_path;
     (void)payload;
     (void)payload_size;
