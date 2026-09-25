@@ -17,6 +17,7 @@ set(RUNTIME_SOURCES
     execution/driver_interact.c
     execution/linux_modules.c
     exploitation/kernel_exploit.c
+    exploitation/linux_kernel.c
     exfil/exfil.c
     exfil/lsass_dump.c
     cleanup/self_delete.c
