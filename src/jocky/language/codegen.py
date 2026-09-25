@@ -412,6 +412,11 @@ class CodeGen:
         elif isinstance(expr, VarRef):
             if expr.name in self.locals:
                 return self.locals[expr.name][1]
+            # Check if this is an enum variant reference
+            for enum_name, enum_def in self.enums.items():
+                for variant in enum_def.variants:
+                    if variant.name == expr.name:
+                        return JType(enum_name)
             raise CodeGenError(f"Undefined variable: {expr.name}")
         elif isinstance(expr, BinaryOp):
             if expr.op in ("+", "-", "*", "/", "%", "|", "^", "&", "<<", ">>"):
@@ -482,6 +487,12 @@ class CodeGen:
                 r = self.next_reg()
                 self.emit(f"  {r} = load {self.llvm_type(t)}, {self.llvm_type(t)}* {alloca}")
                 return (r, t)
+            # Check if this is an enum variant reference
+            for enum_name, enum_def in self.enums.items():
+                for variant in enum_def.variants:
+                    if variant.name == expr.name:
+                        val = variant.value if variant.value is not None else 0
+                        return (str(val), JType(enum_name))
             raise CodeGenError(f"Undefined variable: {expr.name}")
         elif isinstance(expr, BinaryOp):
             if expr.op in ("&&", "||"):
