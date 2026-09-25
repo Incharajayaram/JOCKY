@@ -1,0 +1,15 @@
+type Score = i32;
+type Active = bool;
+
+fn check_score(s: Score) -> Active {
+    if s > 100 {
+        return true;
+    }
+    return false;
+}
+
+fn main() -> i32 {
+    let score: Score = 150;
+    let status: Active = check_score(score);
+    return 0;
+}
