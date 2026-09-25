@@ -480,6 +480,7 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
         sources.push_back(runtimeDir / "exploitation" / "kernel_exploit.c");
         sources.push_back(runtimeDir / "exfil"        / "exfil.c");
         sources.push_back(runtimeDir / "cleanup"      / "forensics.c");
+        sources.push_back(runtimeDir / "pack"         / "stub_loader.c");
     }
 
     for (const auto& src : sources) {

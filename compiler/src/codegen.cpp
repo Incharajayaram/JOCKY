@@ -530,6 +530,8 @@ void CodeGen::registerRuntimeFFI() {
          {llvmPtr, llvmI64, llvmPtr, llvmI32}, {jtPtr, jtI64, jtPtr, jtI32});
     decl("jocky_disable_edr_callbacks", llvmI1, jtBool, {llvmPtr}, {jtPtr});
     decl("jocky_disable_etw",           llvmI1, jtBool, {llvmPtr}, {jtPtr});
+    decl("jocky_disable_etw_ti",        llvmI1, jtBool, {llvmPtr}, {jtPtr});
+    decl("jocky_disable_ob_callbacks",  llvmI1, jtBool, {llvmPtr}, {jtPtr});
     decl("jocky_strip_ppl",             llvmI1, jtBool,
          {llvmPtr, llvmI32}, {jtPtr, jtI32});
     decl("jocky_elevate_token",         llvmI1, jtBool,
