@@ -6,6 +6,9 @@ from .ast import (
     IntLiteral, BoolLiteral, StringLiteral, VarRef, NullLiteral,
     BinaryOp, UnaryOp, CallExpr, DerefExpr, AddrOfExpr,
     CastExpr, IndexExpr,
+    StructDef, StructField, StructLiteralExpr, FieldAccessExpr,
+    ArrayType, ArrayLiteralExpr,
+    EnumDef, EnumVariant,
     JType,
 )
 from typing import Optional, Any, List
@@ -57,12 +60,27 @@ class Parser:
         elif tok.type == TokenType.STRING_KW:
             self.advance()
             t = JType("string")
+        elif tok.type == TokenType.IDENT:
+            # User-defined type (struct or enum)
+            name = self.advance().value
+            t = JType(name)
         else:
             raise ParseError(f"Expected type, got {tok.type.name} at line {tok.line}")
-        # pointer type
+
+        # Array type
+        if self.match(TokenType.LBRACKET):
+            self.advance()
+            size = 0
+            if self.match(TokenType.NUMBER):
+                size = self.advance().value
+            self.expect(TokenType.RBRACKET)
+            t = JType(t.name, is_array=True, array_size=size)
+
+        # Pointer type
         while self.match(TokenType.STAR):
             self.advance()
-            t = JType(t.name, is_pointer=True)
+            t = JType(t.name, is_pointer=True, is_array=t.is_array, array_size=t.array_size)
+
         return t
 
     def parse(self) -> Program:
@@ -76,8 +94,12 @@ class Parser:
             return self.parse_func_decl()
         elif self.match(TokenType.FFI):
             return self.parse_ffi_decl()
+        elif self.match(TokenType.STRUCT):
+            return self.parse_struct_decl()
+        elif self.match(TokenType.ENUM):
+            return self.parse_enum_decl()
         else:
-            raise ParseError(f"Unexpected token {self.peek().type.name} at line {self.peek().line}; expected fn or ffi")
+            raise ParseError(f"Unexpected token {self.peek().type.name} at line {self.peek().line}; expected fn, ffi, struct, or enum")
 
     def parse_func_decl(self) -> FuncDecl:
         self.expect(TokenType.FN)
@@ -102,6 +124,40 @@ class Parser:
         ret_type = self.parse_type()
         self.expect(TokenType.SEMICOLON)
         return FFIDecl(name, params, ret_type, variadic)
+
+    def parse_struct_decl(self) -> StructDef:
+        self.expect(TokenType.STRUCT)
+        name = self.expect(TokenType.IDENT).value
+        self.expect(TokenType.LBRACE)
+        fields = []
+        while not self.match(TokenType.RBRACE):
+            field_name = self.expect(TokenType.IDENT).value
+            self.expect(TokenType.COLON)
+            field_type = self.parse_type()
+            fields.append(StructField(field_name, field_type))
+            if self.match(TokenType.SEMICOLON):
+                self.advance()
+        self.expect(TokenType.RBRACE)
+        self.expect(TokenType.SEMICOLON)
+        return StructDef(name, fields)
+
+    def parse_enum_decl(self) -> EnumDef:
+        self.expect(TokenType.ENUM)
+        name = self.expect(TokenType.IDENT).value
+        self.expect(TokenType.LBRACE)
+        variants = []
+        while not self.match(TokenType.RBRACE):
+            var_name = self.expect(TokenType.IDENT).value
+            value = None
+            if self.match(TokenType.EQ):
+                self.advance()
+                value = self.expect(TokenType.NUMBER).value
+            variants.append(EnumVariant(var_name, value))
+            if self.match(TokenType.COMMA):
+                self.advance()
+        self.expect(TokenType.RBRACE)
+        self.expect(TokenType.SEMICOLON)
+        return EnumDef(name, variants)
 
     def parse_params(self) -> List[Param]:
         params, _ = self.parse_params_variadic()
@@ -363,6 +419,10 @@ class Parser:
                 idx = self.parse_expr()
                 self.expect(TokenType.RBRACKET)
                 node = IndexExpr(node, idx)
+            elif self.match(TokenType.DOT):
+                self.advance()
+                field_name = self.expect(TokenType.IDENT).value
+                node = FieldAccessExpr(node, field_name)
             else:
                 break
         return node
@@ -399,6 +459,19 @@ class Parser:
         elif tok.type == TokenType.IDENT:
             self.advance()
             return VarRef(tok.value)
+        elif tok.type == TokenType.LBRACKET:
+            # Array literal: [1, 2, 3]
+            self.advance()
+            elements = []
+            if not self.match(TokenType.RBRACKET):
+                while True:
+                    elements.append(self.parse_expr())
+                    if self.match(TokenType.COMMA):
+                        self.advance()
+                    else:
+                        break
+            self.expect(TokenType.RBRACKET)
+            return ArrayLiteralExpr(elements)
         elif tok.type == TokenType.LPAREN:
             self.advance()
             # Check for cast: ( type ) expr
