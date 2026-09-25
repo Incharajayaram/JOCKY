@@ -547,6 +547,54 @@ bool jocky_module_has_symbol(void* handle, const char* symbol_name);
 uintptr_t jocky_module_base(const char* path);
 
 /* ============================================================================
+ * Kernel Exploitation Primitives (Linux only)
+ * ============================================================================ */
+
+/* Read from kernel memory via /proc/kcore
+ * Requires: root or specific kernel configurations
+ * Returns: bytes read, 0 on failure
+ */
+size_t jocky_kread(uint64_t kva, void* buf, size_t size);
+
+/* Write to kernel memory via /proc/kcore
+ * Requires: root and writable /proc/kcore
+ * Returns: bytes written, 0 on failure
+ */
+size_t jocky_kwrite(uint64_t kva, const void* data, size_t size);
+
+/* Find kernel symbol address from /proc/kallsyms or /proc/modules
+ * Returns: kernel address of symbol, 0 if not found
+ */
+uint64_t jocky_ksym(const char* symbol_name);
+
+/* Disable SELinux enforcement
+ * Writes 0 to /sys/fs/selinux/enforce
+ * Requires: root or CAP_SYS_ADMIN
+ */
+bool jocky_disable_selinux(void);
+
+/* Check SMEP (Supervisor Mode Execution Protection) status
+ * Returns: 1 if enabled, 0 if disabled, -1 on error
+ */
+int jocky_smep_status(void);
+
+/* Check SMAP (Supervisor Mode Access Prevention) status
+ * Returns: 1 if enabled, 0 if disabled, -1 on error
+ */
+int jocky_smap_status(void);
+
+/* Check KPTI (Kernel Page Table Isolation) status
+ * Returns: 1 if enabled, 0 if disabled, -1 on error
+ */
+int jocky_kpti_status(void);
+
+/* Attempt privilege escalation via kernel memory write
+ * Modifies task_struct.cred to grant root privileges
+ * Requires: kernel memory write capability and kernel address
+ */
+bool jocky_escalate_privs_kwrite(void);
+
+/* ============================================================================
  * Process Hollowing (Linux only, requires ptrace capability)
  * ============================================================================ */
 
