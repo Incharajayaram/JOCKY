@@ -1,7 +1,8 @@
 from .ast import *
+from .errors import CodeGenError as BaseCodeGenError, SourceRange
 from typing import Dict, List, Tuple, Any, Optional
 
-class CodeGenError(Exception):
+class CodeGenError(BaseCodeGenError):
     pass
 
 class CodeGen:
