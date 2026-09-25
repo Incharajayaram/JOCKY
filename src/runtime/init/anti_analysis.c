@@ -263,15 +263,145 @@ void jocky_decrypt_rc4(uint8_t* data, size_t len, const uint8_t* key, size_t key
 }
 
 /* ============================================================================
+ * Integrity Verification (.jtamp)
+ * ============================================================================ */
+
+#ifdef _WIN32
+
+/* CRC32 (IEEE / zlib polynomial) – must match packer.cpp exactly. */
+static uint32_t at_crc32(const uint8_t* data, size_t len)
+{
+    uint32_t c = 0xFFFFFFFFu;
+    for (size_t i = 0; i < len; i++) {
+        c ^= data[i];
+        for (int j = 0; j < 8; j++)
+            c = (c & 1u) ? (0xEDB88320u ^ (c >> 1)) : (c >> 1);
+    }
+    return c ^ 0xFFFFFFFFu;
+}
+
+/* Minimal packed PE structures – only the fields we read. */
+#pragma pack(push, 1)
+typedef struct { uint16_t machine; uint16_t numSections; uint32_t ts;
+                 uint32_t symPtr; uint32_t numSym; uint16_t optSize;
+                 uint16_t chars; } at_coff_t;
+typedef struct { char name[8]; uint32_t virtSize; uint32_t virtAddr;
+                 uint32_t rawSize; uint32_t rawPtr; uint32_t relPtr;
+                 uint32_t lnPtr; uint16_t numRel; uint16_t numLn;
+                 uint32_t chars; } at_sec_t;
+#pragma pack(pop)
+
+/* .jtamp section layout (all LE):
+ *   [0..7]   "JOCKYTMP"
+ *   [8..11]  flags  (0x1 = version 1 / CRC32)
+ *   [12..15] XOR-folded CRC32 of all other section raw data */
+static const uint8_t JTAMP_MAGIC[8] = {'J','O','C','K','Y','T','M','P'};
+
+bool jocky_verify_integrity(void)
+{
+    /* All declarations at the top – avoids MSVC "goto skips init" errors. */
+    char       path[MAX_PATH];
+    HANDLE     hf;
+    DWORD      fsize, nread;
+    uint8_t*   buf;
+    bool       result;
+    uint32_t   peOff, secOff, stored, computed;
+    at_coff_t* coff;
+    at_sec_t*  secs;
+    bool       found_jtamp;
+    uint16_t   i;
+
+    if (!GetModuleFileNameA(NULL, path, MAX_PATH))
+        return true;
+
+    hf = CreateFileA(path, GENERIC_READ,
+                     FILE_SHARE_READ | FILE_SHARE_DELETE,
+                     NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hf == INVALID_HANDLE_VALUE)
+        return true;
+
+    fsize = GetFileSize(hf, NULL);
+    if (fsize == INVALID_FILE_SIZE || fsize < 0x40) { CloseHandle(hf); return true; }
+
+    buf = (uint8_t*)VirtualAlloc(NULL, fsize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (!buf) { CloseHandle(hf); return true; }
+
+    nread = 0;
+    if (!ReadFile(hf, buf, fsize, &nread, NULL) || nread != fsize) {
+        CloseHandle(hf); VirtualFree(buf, 0, MEM_RELEASE); return true;
+    }
+    CloseHandle(hf);
+
+    result      = true;
+    stored      = 0;
+    computed    = 0;
+    found_jtamp = false;
+
+    /* Validate MZ + PE signatures. */
+    if (buf[0] != 'M' || buf[1] != 'Z') goto done;
+    peOff = *(uint32_t*)(buf + 0x3C);
+    if (peOff + 4 + sizeof(at_coff_t) > fsize) goto done;
+    if (buf[peOff] != 'P' || buf[peOff + 1] != 'E') goto done;
+
+    coff   = (at_coff_t*)(buf + peOff + 4);
+    secOff = peOff + 4 + (uint32_t)sizeof(at_coff_t) + coff->optSize;
+    if (secOff + (uint32_t)coff->numSections * sizeof(at_sec_t) > fsize) goto done;
+
+    secs = (at_sec_t*)(buf + secOff);
+
+    /* Find .jtamp and read the stored checksum. */
+    for (i = 0; i < coff->numSections; i++) {
+        if (memcmp(secs[i].name, JTAMP_MAGIC, 8) != 0) continue;
+        /* layout: magic(8) + flags(4) + checksum(4) */
+        if (secs[i].rawPtr + 12 + 4 <= fsize) {
+            stored      = *(uint32_t*)(buf + secs[i].rawPtr + 12);
+            found_jtamp = true;
+        }
+        break;
+    }
+
+    if (!found_jtamp) goto done; /* unpacked build – nothing to verify */
+
+    /* Compute XOR-folded CRC32 over every section except .jtamp,
+     * matching packer.cpp addAntiTamper() exactly. */
+    for (i = 0; i < coff->numSections; i++) {
+        at_sec_t* s = &secs[i];
+        if (memcmp(s->name, JTAMP_MAGIC, 8) == 0) continue;
+        if (s->rawPtr > 0 && s->rawSize > 0 && s->rawPtr + s->rawSize <= fsize)
+            computed ^= at_crc32(buf + s->rawPtr, s->rawSize);
+    }
+
+    if (computed != stored)
+        result = false;
+
+done:
+    VirtualFree(buf, 0, MEM_RELEASE);
+    if (!result)
+        ExitProcess(0xDEAD1337u);
+    return true;
+}
+
+#else  /* non-Windows stub */
+
+bool jocky_verify_integrity(void) { return true; }
+
+#endif /* _WIN32 */
+
+/* ============================================================================
  * Initialization
  * ============================================================================ */
 
 uint32_t jocky_runtime_init(void)
 {
-    uint32_t threats = jocky_check_analysis_environment();
+    /* Integrity check must run first so a patched binary never reaches
+     * the anti-analysis or evasion routines. */
+    jocky_verify_integrity();
 
-    /* Optionally: if threats detected, we could exit or take evasive action.
-     * For the SIH framework, we just report them and let the caller decide. */
+#ifdef _WIN32
+    /* Pre-load the .jmani manifest so jocky_driver_invoke() works
+     * without an extra call.  Silently a no-op if no .jmani section. */
+    jocky_manifest_load();
+#endif
 
-    return threats;
+    return jocky_check_analysis_environment();
 }
