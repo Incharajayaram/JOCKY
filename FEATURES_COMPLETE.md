@@ -51,7 +51,7 @@
 - ✅ **Enums** – enumeration types (IMPLEMENTED)
   - ✅ Enum declarations with variants
   - ✅ Variant value assignment
-  - ⏳ Pattern matching (future)
+  - ✅ Pattern matching (IMPLEMENTED)
   - ⏳ Tagged unions (future)
 - ✅ **Arrays** – fixed-size and dynamic arrays (IMPLEMENTED)
   - ✅ Array type syntax `Type[Size]`
@@ -59,7 +59,11 @@
   - ✅ Array indexing `arr[i]`
   - ⏳ Dynamic arrays (future)
   - ⏳ Length intrinsic (future)
-- ⏳ **Pattern matching** – match expressions
+- ✅ **Pattern matching** – match expressions (IMPLEMENTED)
+  - ✅ Match syntax: `match scrutinee { pattern => body, ... }`
+  - ✅ Pattern types: literals, wildcards, enum variants
+  - ✅ Switch-based code generation
+  - ✅ Type checking for patterns
 - ⏳ **Generics/templates** – polymorphic functions/types
 - ⏳ **Macros** – compile-time meta-programming
 - ⏳ **Closures/lambdas** – anonymous functions
@@ -372,9 +376,7 @@
 
 ### Language Features
 - [ ] **Generics/Polymorphism** – `fn max<T>(a: T, b: T) -> T`
-- [ ] **Pattern matching** – `match expr { case1 => ..., case2 => ... }`
 - [ ] **Closures/Lambdas** – Anonymous functions with capture
-- [ ] **Type aliases** – `type MyInt = i32;`
 - [ ] **Module system** – `mod foo { ... }`, `use foo::bar;`
 - [ ] **Attributes/Decorators** – `#[inline]`, `#[no_mangle]`
 
@@ -541,7 +543,7 @@
 
 | Category | Implemented | Partial | Pending | Priority |
 |---|---|---|---|---|
-| **Language** | 14/20 | 2 | 4 | High |
+| **Language** | 15/20 | 2 | 3 | High |
 | **Compiler** | 12/12 | - | - | ✅ |
 | **Obfuscation** | 12/15 | - | 3 | Med |
 | **Runtime** | 45/50 | 3 | 2 | High |
@@ -554,7 +556,7 @@
 | **Documentation** | 12/12 | - | - | ✅ |
 | **Tooling** | 8/10 | - | 2 | Low |
 
-**Overall: 85/129 features (66% complete)** ⬆️ +6 this session (structs, enums, arrays, type aliases)
+**Overall: 86/129 features (67% complete)** ⬆️ +7 this session (structs, enums, arrays, type aliases, pattern matching)
 
 ---
 

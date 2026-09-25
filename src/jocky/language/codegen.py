@@ -453,6 +453,15 @@ class CodeGen:
             return JType(elem_type.name, is_array=True, array_size=len(expr.elements))
         elif isinstance(expr, StructLiteralExpr):
             return JType(expr.struct_type, is_pointer=False)
+        elif isinstance(expr, MatchExpr):
+            # Infer type from first arm
+            if expr.arms:
+                for stmt in expr.arms[0].body.stmts:
+                    if isinstance(stmt, ExprStmt):
+                        return self.infer_type(stmt.expr)
+                    elif isinstance(stmt, ReturnStmt) and stmt.value:
+                        return self.infer_type(stmt.value)
+            return JType("void")
         raise CodeGenError(f"Cannot infer type for {type(expr).__name__}")
 
     def emit_expr(self, expr: Any) -> Tuple[str, JType]:
@@ -563,6 +572,8 @@ class CodeGen:
                 self.emit(f"  {gep} = getelementptr %{expr.struct_type}, %{expr.struct_type}* {alloca}, i32 0, i32 {i}")
                 self.emit(f"  store {self.llvm_type(field.type)} {val}, {self.llvm_type(field.type)}* {gep}")
             return (alloca, JType(expr.struct_type, is_pointer=False))
+        elif isinstance(expr, MatchExpr):
+            return self.emit_match(expr)
         else:
             raise CodeGenError(f"Unknown expression: {type(expr).__name__}")
 
@@ -698,3 +709,114 @@ class CodeGen:
         r = self.next_reg()
         self.emit(f"  {r} = call {self.llvm_type(ret)} @{expr.name}({arg_str})")
         return (r, ret)
+
+    def emit_match(self, expr: MatchExpr) -> Tuple[str, JType]:
+        """Emit match expression as a switch-like dispatch."""
+        from .ast import WildcardPattern, LiteralPattern, VariantPattern
+
+        scrutinee_val, scrutinee_type = self.emit_expr(expr.scrutinee)
+
+        # Generate labels for each arm and merge
+        arm_labels = [self.next_label("arm") for _ in expr.arms]
+        merge_label = self.next_label("merge")
+
+        # Build switch table for literal and variant patterns
+        switch_cases = []  # List of (value, label) for switch
+        wildcard_label = None
+
+        for i, arm in enumerate(expr.arms):
+            pattern = arm.pattern
+            if isinstance(pattern, LiteralPattern):
+                # Extract literal value
+                if isinstance(pattern.value, IntLiteral):
+                    switch_cases.append((pattern.value.value, arm_labels[i]))
+                elif isinstance(pattern.value, BoolLiteral):
+                    switch_cases.append((1 if pattern.value.value else 0, arm_labels[i]))
+            elif isinstance(pattern, VariantPattern):
+                # For enum variants, use their assigned value
+                if scrutinee_type.name in self.enums:
+                    enum_def = self.enums[scrutinee_type.name]
+                    for variant in enum_def.variants:
+                        if variant.name == pattern.name:
+                            val = variant.value if variant.value is not None else 0
+                            switch_cases.append((val, arm_labels[i]))
+                            break
+            elif isinstance(pattern, WildcardPattern):
+                wildcard_label = arm_labels[i]
+
+        # Default to wildcard or first label if no wildcard
+        default_label = wildcard_label if wildcard_label else arm_labels[0]
+
+        # Emit switch instruction
+        switch_line = f"  switch {self.llvm_type(scrutinee_type)} {scrutinee_val}, label %{default_label} [\n"
+        for value, label in switch_cases:
+            switch_line += f"    {self.llvm_type(scrutinee_type)} {value}, label %{label}\n"
+        switch_line += "  ]"
+        self.emit(switch_line)
+
+        # Emit each arm's code
+        arm_values = []
+        arm_blocks = []
+        result_type = None
+        has_early_return = False
+
+        for i, arm in enumerate(expr.arms):
+            self.emit_label(arm_labels[i])
+
+            # Emit arm body and collect result
+            last_val = None
+            last_type = None
+            arm_has_return = False
+            for stmt in arm.body.stmts:
+                if isinstance(stmt, ExprStmt):
+                    last_val, last_type = self.emit_expr(stmt.expr)
+                elif isinstance(stmt, ReturnStmt):
+                    # Match can have early returns
+                    arm_has_return = True
+                    if stmt.value:
+                        val, vt = self.emit_expr(stmt.value)
+                        self.emit(f"  ret {self.llvm_type(vt)} {val}")
+                    else:
+                        self.emit(f"  ret void")
+                    has_early_return = True
+                else:
+                    self.emit_stmt(stmt)
+
+            # Default result type from first arm
+            if result_type is None and last_type:
+                result_type = last_type
+
+            if last_val is not None and not arm_has_return:
+                arm_values.append((last_val, last_type, arm_labels[i]))
+
+            # Branch to merge (unless there was an explicit return)
+            if not arm_has_return:
+                self.emit(f"  br label %{merge_label}")
+
+            arm_blocks.append(arm_labels[i])
+
+        # If all arms returned early, we're done
+        if has_early_return and not arm_values:
+            return ("", JType("void"))
+
+        # Merge block (only needed if some arms don't return)
+        if not has_early_return or arm_values:
+            self.emit_label(merge_label)
+
+            # Collect results with phi node if needed
+            if arm_values and result_type:
+                r = self.next_reg()
+                phi_line = f"  {r} = phi {self.llvm_type(result_type)} "
+                phi_pairs = []
+                for val, vt, block in arm_values:
+                    # Cast value to result type if needed
+                    if vt.name != result_type.name or vt.is_pointer != result_type.is_pointer:
+                        casted_val = self.emit_cast(val, vt, result_type)
+                    else:
+                        casted_val = val
+                    phi_pairs.append(f"[ {casted_val}, %{block} ]")
+                phi_line += ", ".join(phi_pairs)
+                self.emit(phi_line)
+                return (r, result_type)
+
+        return ("", result_type or JType("void"))
