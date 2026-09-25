@@ -8,9 +8,12 @@ set(RUNTIME_SOURCES
     init/anti_analysis.c
     evasion/unhook.c
     evasion/syscalls.c
+    evasion/stack_spoof.c
     execution/hollow.c
+    execution/inmem.c
     execution/byovd.c
     execution/driver_interact.c
+    exploitation/kernel_exploit.c
     cleanup/self_delete.c
     cleanup/logs.c
 )
@@ -21,9 +24,12 @@ if(NOT WIN32)
     list(REMOVE_ITEM RUNTIME_SOURCES
         evasion/unhook.c
         evasion/syscalls.c
+        evasion/stack_spoof.c
         execution/hollow.c
+        execution/inmem.c
         execution/byovd.c
         execution/driver_interact.c
+        exploitation/kernel_exploit.c
     )
 endif()
 
