@@ -19,6 +19,7 @@ set(RUNTIME_SOURCES
     cleanup/self_delete.c
     cleanup/logs.c
     cleanup/forensics.c
+    pack/stub_loader.c
 )
 
 # Platform-specific filtering
