@@ -262,6 +262,40 @@ class TypeChecker:
                 if not self.types_equal(val_type, field.type):
                     raise TypeError(f"Field {field.name}: expected {field.type}, got {val_type}")
             return JType(expr.struct_type, is_pointer=False)
+        elif isinstance(expr, VariantConstructor):
+            # Extract enum type and variant name from "EnumType::VariantName"
+            parts = expr.variant_name.split("::")
+            if len(parts) != 2:
+                raise TypeError(f"Invalid variant name: {expr.variant_name}")
+            enum_name, variant_name = parts
+
+            if enum_name not in self.enums:
+                raise TypeError(f"Unknown enum type: {enum_name}")
+
+            enum_def = self.enums[enum_name]
+            # Find the variant
+            variant = None
+            for v in enum_def.variants:
+                if v.name == variant_name:
+                    variant = v
+                    break
+
+            if variant is None:
+                raise TypeError(f"Unknown variant {variant_name} in enum {enum_name}")
+
+            # Verify arguments match variant fields
+            if variant.fields:
+                if len(expr.args) != len(variant.fields):
+                    raise TypeError(f"Variant {variant_name} expects {len(variant.fields)} args, got {len(expr.args)}")
+                for i, (arg, field) in enumerate(zip(expr.args, variant.fields)):
+                    arg_type = self.typeof(arg)
+                    if not self.types_equal(arg_type, field.type):
+                        raise TypeError(f"Arg {i}: expected {field.type}, got {arg_type}")
+            else:
+                if len(expr.args) != 0:
+                    raise TypeError(f"Variant {variant_name} expects 0 args, got {len(expr.args)}")
+
+            return JType(enum_name)
         elif isinstance(expr, MatchExpr):
             # Type check the scrutinee (value being matched)
             scrutinee_type = self.typeof(expr.scrutinee)

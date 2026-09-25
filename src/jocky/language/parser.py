@@ -11,6 +11,7 @@ from .ast import (
     EnumDef, EnumVariant,
     TypeAlias,
     Pattern, WildcardPattern, LiteralPattern, VariantPattern, MatchArm, MatchExpr,
+    VariantConstructor,
     UseStmt,
     JType,
 )
@@ -158,15 +159,26 @@ class Parser:
             value = None
             fields = None
 
-            # Check for tagged union fields: VariantName(field: Type, ...)
+            # Check for tagged union fields: VariantName(field: Type, ...) or VariantName(Type, ...)
             if self.match(TokenType.LPAREN):
                 self.advance()
                 fields = []
+                field_count = 0
                 while not self.match(TokenType.RPAREN):
-                    field_name = self.expect(TokenType.IDENT).value
-                    self.expect(TokenType.COLON)
+                    field_name = f"f{field_count}"
+
+                    # Check if this is a named field: name: type
+                    # Look ahead to see if next token after IDENT is COLON
+                    if (self.pos + 1 < len(self.tokens) and
+                        self.match(TokenType.IDENT) and
+                        self.tokens[self.pos + 1].type == TokenType.COLON):
+                        field_name = self.advance().value
+                        self.expect(TokenType.COLON)
+
                     field_type = self.parse_type()
                     fields.append(StructField(field_name, field_type))
+                    field_count += 1
+
                     if self.match(TokenType.COMMA):
                         self.advance()
                 self.expect(TokenType.RPAREN)
@@ -503,7 +515,25 @@ class Parser:
     def parse_postfix(self) -> Any:
         node = self.parse_primary()
         while True:
-            if self.match(TokenType.LPAREN):
+            if self.match(TokenType.COLONCOLON):
+                # Variant construction: EnumType::VariantName(args)
+                if isinstance(node, VarRef):
+                    self.advance()
+                    variant_name = self.expect(TokenType.IDENT).value
+                    # Now check for arguments
+                    if self.match(TokenType.LPAREN):
+                        self.advance()
+                        args = self.parse_args()
+                        self.expect(TokenType.RPAREN)
+                        full_variant = f"{node.name}::{variant_name}"
+                        node = VariantConstructor(full_variant, args)
+                    else:
+                        # No args, just a variant reference
+                        full_variant = f"{node.name}::{variant_name}"
+                        node = VariantConstructor(full_variant, [])
+                else:
+                    raise ParseError(f"Cannot use :: on non-identifier at line {self.peek().line}")
+            elif self.match(TokenType.LPAREN):
                 self.advance()
                 args = self.parse_args()
                 self.expect(TokenType.RPAREN)
