@@ -546,6 +546,24 @@ bool jocky_module_has_symbol(void* handle, const char* symbol_name);
  */
 uintptr_t jocky_module_base(const char* path);
 
+/* ============================================================================
+ * Process Hollowing (Linux only, requires ptrace capability)
+ * ============================================================================ */
+
+/* Hollow out a running process and replace with payload via ptrace.
+ * Attaches to the target, writes payload to memory, redirects RIP.
+ * Requires: same UID or CAP_SYS_PTRACE
+ * Returns true on success, false on failure
+ */
+bool jocky_process_hollow_linux(uint32_t pid, const void* payload, uint64_t payload_size);
+
+/* Spawn a process from scratch and hollow it before it runs main().
+ * Forks target_path, stops it at entry point, injects payload, resumes.
+ * Requires: CAP_SYS_PTRACE
+ * Returns PID of hollowed process, -1 on failure
+ */
+uint32_t jocky_spawn_hollow_linux(const char* target_path, const void* payload, uint64_t payload_size);
+
 #ifdef __cplusplus
 }
 #endif
