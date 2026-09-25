@@ -11,6 +11,7 @@ set(RUNTIME_SOURCES
     evasion/syscalls.c
     evasion/stack_spoof.c
     execution/hollow.c
+    execution/linux_hollow.c
     execution/inmem.c
     execution/byovd.c
     execution/driver_interact.c
@@ -26,7 +27,7 @@ set(RUNTIME_SOURCES
 
 # Platform-specific filtering
 if(NOT WIN32)
-    # Remove Windows-only sources on Linux
+    # Remove Windows-only sources on Linux (keep linux_hollow.c, linux_modules.c)
     list(REMOVE_ITEM RUNTIME_SOURCES
         evasion/unhook.c
         evasion/syscalls.c
