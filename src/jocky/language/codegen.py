@@ -769,20 +769,49 @@ class CodeGen:
             # Handle pattern bindings for tagged unions
             pattern = arm.pattern
             if isinstance(pattern, VariantPattern) and pattern.bindings:
-                # For each binding, allocate space and add to locals
-                # Note: actual field extraction not yet implemented
-                # This allows type-checking to pass but bindings will be zero-initialized
+                # For tagged union field extraction, we need to:
+                # 1. Know the memory layout of the variant's data
+                # 2. Calculate the offset of each field within the variant
+                # 3. Load the value from scrutinee + offset
+                #
+                # Currently: scrutinee_type is i32 (the tag), but for real tagged unions
+                # we'd receive a struct/pointer containing both tag and data.
+                # This requires runtime representation changes first.
+                #
+                # For now: allocate space and extract if scrutinee has data layout info
                 if scrutinee_type.name in self.enums:
                     enum_def = self.enums[scrutinee_type.name]
                     for variant in enum_def.variants:
                         if variant.name == pattern.name and variant.fields:
+                            # Calculate offset of this variant's data
+                            # Offset 0 is tag (i32 = 4 bytes), then aligned fields
+                            current_offset = 4  # After tag
+
                             for binding_name, field in zip(pattern.bindings, variant.fields):
                                 # Allocate space for the field
                                 alloca = self.next_reg()
                                 self.emit(f"  {alloca} = alloca {self.llvm_type(field.type)}")
-                                # Zero-initialize (TODO: extract actual value from variant)
-                                self.emit(f"  store {self.llvm_type(field.type)} 0, {self.llvm_type(field.type)}* {alloca}")
+
+                                # If scrutinee is a pointer to tagged union struct, extract field
+                                # For now: if scrutinee is just i32 tag, zero-initialize
+                                if scrutinee_type.is_pointer:
+                                    # Scrutinee is pointer to union data, extract field at offset
+                                    gep = self.next_reg()
+                                    self.emit(f"  {gep} = getelementptr i8, i8* {scrutinee_val}, i32 {current_offset}")
+                                    field_ptr = self.next_reg()
+                                    self.emit(f"  {field_ptr} = bitcast i8* {gep} to {self.llvm_type(field.type)}*")
+                                    val = self.next_reg()
+                                    self.emit(f"  {val} = load {self.llvm_type(field.type)}, {self.llvm_type(field.type)}* {field_ptr}")
+                                    self.emit(f"  store {self.llvm_type(field.type)} {val}, {self.llvm_type(field.type)}* {alloca}")
+                                else:
+                                    # Scrutinee is just the tag (i32), can't extract fields
+                                    # Zero-initialize as placeholder
+                                    self.emit(f"  store {self.llvm_type(field.type)} 0, {self.llvm_type(field.type)}* {alloca}")
+
                                 self.locals[binding_name] = (alloca, field.type)
+
+                                # Update offset for next field (simplified: assume no padding)
+                                current_offset += (field.type.size_bytes() if hasattr(field.type, 'size_bytes') else 8)
                             break
 
             # Emit arm body and collect result
