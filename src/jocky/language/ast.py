@@ -7,11 +7,19 @@ from typing import Optional, Any, List
 class JType:
     name: str
     is_pointer: bool = False
+    is_array: bool = False
+    array_size: int = 0  # 0 means not an array or unsized
 
     def __str__(self):
-        return self.name + ("*" if self.is_pointer else "")
+        base = self.name
+        if self.is_array:
+            base += f"[{self.array_size}]" if self.array_size > 0 else "[]"
+        if self.is_pointer:
+            base += "*"
+        return base
 
     def llvm_type(self) -> str:
+        """Generate LLVM IR type representation."""
         if self.name == "void":
             return "void"
         if self.name == "bool":
@@ -25,21 +33,43 @@ class JType:
         elif self.name == "string":
             base = "i8"
         else:
+            # User-defined struct
             base = f"%{self.name}"
+
+        # Handle array
+        if self.is_array:
+            if self.array_size > 0:
+                base = f"[{self.array_size} x {base}]"
+            else:
+                # Dynamic array - represent as pointer
+                base = base + "*"
+
+        # Handle pointer
         if self.is_pointer or self.name == "string":
             return base + "*"
         return base
 
-    def size_bytes(self) -> int:
+    def size_bytes(self, struct_defs: dict = None) -> int:
+        """Estimate size in bytes. Requires struct_defs for user-defined types."""
         if self.name in ("i8", "bool"):
-            return 1
-        if self.name == "i32":
-            return 4
-        if self.name == "i64":
-            return 8
-        if self.name == "string":
-            return 8
-        return 8
+            size = 1
+        elif self.name == "i32":
+            size = 4
+        elif self.name == "i64":
+            size = 8
+        elif self.name == "string":
+            size = 8
+        elif self.is_pointer:
+            size = 8
+        elif self.name in struct_defs or True:  # User-defined struct
+            size = 8  # Placeholder: should calculate from fields
+        else:
+            size = 8
+
+        if self.is_array and self.array_size > 0:
+            size *= self.array_size
+
+        return size
 
 # --- AST Nodes ---
 
@@ -65,6 +95,31 @@ class FFIDecl:
     params: List[Param]
     ret_type: JType
     variadic: bool = False
+
+@dataclass
+class StructField:
+    name: str
+    type: JType
+
+@dataclass
+class StructDef:
+    name: str
+    fields: List[StructField]
+
+@dataclass
+class ArrayType:
+    element_type: JType
+    size: int  # 0 means unsized / inferred
+
+@dataclass
+class EnumVariant:
+    name: str
+    value: Optional[int] = None
+
+@dataclass
+class EnumDef:
+    name: str
+    variants: List[EnumVariant]
 
 @dataclass
 class Block:
@@ -168,3 +223,17 @@ class ContinueStmt:
 @dataclass
 class NullLiteral:
     pass
+
+@dataclass
+class FieldAccessExpr:
+    object: Any
+    field: str
+
+@dataclass
+class StructLiteralExpr:
+    struct_type: str
+    fields: dict  # field_name -> value
+
+@dataclass
+class ArrayLiteralExpr:
+    elements: List[Any]
