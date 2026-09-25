@@ -14,6 +14,7 @@ set(RUNTIME_SOURCES
     execution/byovd.c
     execution/driver_interact.c
     exploitation/kernel_exploit.c
+    exfil/exfil.c
     cleanup/self_delete.c
     cleanup/logs.c
 )
@@ -30,6 +31,7 @@ if(NOT WIN32)
         execution/byovd.c
         execution/driver_interact.c
         exploitation/kernel_exploit.c
+        exfil/exfil.c
     )
 endif()
 
@@ -38,7 +40,7 @@ add_library(jocky_rt STATIC ${RUNTIME_SOURCES})
 target_include_directories(jocky_rt PUBLIC include)
 
 if(WIN32)
-    target_link_libraries(jocky_rt PUBLIC ntdll)
+    target_link_libraries(jocky_rt PUBLIC ntdll winhttp dnsapi)
 endif()
 
 # Example: build a test executable
