@@ -7,26 +7,47 @@
 #include <sys/wait.h>
 #include <sys/user.h>
 #include <sys/mman.h>
-#include <elf.h>
 #include <string.h>
 #include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
 
 #ifdef __linux__
 
+// Portable ELF constants (no libelf dependency needed)
+#define ELF_MAGIC_BYTE0 0x7f
+
 /**
- * Parse ELF header from a binary file.
+ * Parse ELF header from a binary file (portable, no libelf).
  * Returns 1 on success, 0 on failure
  */
-static int parse_elf_header(const char* path, Elf64_Ehdr* ehdr) {
+static int parse_elf_header(const char* path, uint64_t* entry_point) {
     FILE* f = fopen(path, "rb");
     if (!f) return 0;
 
-    size_t n = fread(ehdr, 1, sizeof(Elf64_Ehdr), f);
+    // ELF64 header: first 64 bytes
+    unsigned char header[64];
+    size_t n = fread(header, 1, 64, f);
     fclose(f);
 
-    if (n != sizeof(Elf64_Ehdr)) return 0;
-    if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0) return 0;
+    if (n < 64) return 0;
 
+    // Check ELF magic: 0x7f 'E' 'L' 'F'
+    if (header[0] != 0x7f || header[1] != 'E' || header[2] != 'L' || header[3] != 'F') {
+        return 0;
+    }
+
+    // Check 64-bit (header[4] == 2)
+    if (header[4] != 2) return 0;
+
+    // Extract entry point at offset 32 (little-endian uint64_t)
+    uint64_t entry = 0;
+    for (int i = 0; i < 8; i++) {
+        entry |= ((uint64_t)header[32 + i]) << (i * 8);
+    }
+
+    *entry_point = entry;
     return 1;
 }
 
@@ -35,9 +56,9 @@ static int parse_elf_header(const char* path, Elf64_Ehdr* ehdr) {
  * Returns the entry point address, or 0 on failure
  */
 static uint64_t get_elf_entry(const char* path) {
-    Elf64_Ehdr ehdr;
-    if (!parse_elf_header(path, &ehdr)) return 0;
-    return ehdr.e_entry;
+    uint64_t entry = 0;
+    if (!parse_elf_header(path, &entry)) return 0;
+    return entry;
 }
 
 /**
