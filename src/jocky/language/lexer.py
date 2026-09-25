@@ -25,6 +25,8 @@ class TokenType(Enum):
     STRUCT = auto()
     ENUM = auto()
     TYPE = auto()
+    MATCH = auto()
+    ARROW_FAT = auto()  # =>
 
     # Types
     I8 = auto()
@@ -91,6 +93,7 @@ KEYWORDS = {
     "struct": TokenType.STRUCT,
     "enum": TokenType.ENUM,
     "type": TokenType.TYPE,
+    "match": TokenType.MATCH,
     "i8": TokenType.I8,
     "i32": TokenType.I32,
     "i64": TokenType.I64,
@@ -236,6 +239,9 @@ class Lexer:
             elif ch == "=" and self.peek(1) == "=":
                 self.advance(); self.advance()
                 self.tokens.append(Token(TokenType.EQEQ, "==", start_line, start_col))
+            elif ch == "=" and self.peek(1) == ">":
+                self.advance(); self.advance()
+                self.tokens.append(Token(TokenType.ARROW_FAT, "=>", start_line, start_col))
             elif ch == "=":
                 self.advance()
                 self.tokens.append(Token(TokenType.EQ, "=", start_line, start_col))
