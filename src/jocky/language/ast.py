@@ -122,6 +122,11 @@ class EnumDef:
     variants: List[EnumVariant]
 
 @dataclass
+class TypeAlias:
+    name: str
+    target_type: JType
+
+@dataclass
 class Block:
     stmts: List[Any]
 

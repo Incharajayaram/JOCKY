@@ -17,6 +17,7 @@ class CodeGen:
         self.functions: Dict[str, (List[JType], JType)] = {}
         self.structs: Dict[str, StructDef] = {}  # struct_name -> StructDef
         self.enums: Dict[str, EnumDef] = {}      # enum_name -> EnumDef
+        self.type_aliases: Dict[str, JType] = {} # alias_name -> JType
         self.loop_stack: List[Tuple[str, str]] = []  # [(continue_label, break_label)]
 
     def next_reg(self) -> str:
@@ -49,7 +50,9 @@ class CodeGen:
     def gen(self, prog: Program) -> str:
         # First pass: collect signatures and definitions
         for decl in prog.decls:
-            if isinstance(decl, StructDef):
+            if isinstance(decl, TypeAlias):
+                self.type_aliases[decl.name] = decl.target_type
+            elif isinstance(decl, StructDef):
                 self.structs[decl.name] = decl
             elif isinstance(decl, EnumDef):
                 self.enums[decl.name] = decl
@@ -102,7 +105,22 @@ class CodeGen:
         self.emit(f"declare {ret} @{decl.name}({params})")
 
     def llvm_type(self, t: JType) -> str:
-        return t.llvm_type()
+        # Resolve type aliases before getting LLVM type
+        resolved = self.resolve_type_alias(t)
+        return resolved.llvm_type()
+
+    def resolve_type_alias(self, t: JType) -> JType:
+        """Resolve type alias recursively."""
+        if t.name in self.type_aliases:
+            resolved = self.type_aliases[t.name]
+            # Preserve pointer and array flags
+            return JType(
+                resolved.name,
+                is_pointer=t.is_pointer or resolved.is_pointer,
+                is_array=t.is_array or resolved.is_array,
+                array_size=t.array_size or resolved.array_size
+            )
+        return t
 
     def collect_lets(self, stmts: List[Any]) -> List[Tuple[str, JType]]:
         """Walk statement list recursively and collect (name, type) for every LetStmt."""
@@ -110,6 +128,8 @@ class CodeGen:
         for stmt in stmts:
             if isinstance(stmt, LetStmt):
                 t = stmt.type if stmt.type else self.infer_type(stmt.init)
+                # Resolve type aliases
+                t = self.resolve_type_alias(t)
                 result.append((stmt.name, t))
             elif isinstance(stmt, IfStmt):
                 result.extend(self.collect_lets(stmt.then_block.stmts))
@@ -120,6 +140,8 @@ class CodeGen:
             elif isinstance(stmt, ForStmt):
                 if isinstance(stmt.init, LetStmt):
                     t = stmt.init.type if stmt.init.type else self.infer_type(stmt.init.init)
+                    # Resolve type aliases
+                    t = self.resolve_type_alias(t)
                     result.append((stmt.init.name, t))
                 result.extend(self.collect_lets(stmt.body.stmts))
         return result
@@ -178,7 +200,10 @@ class CodeGen:
     def emit_stmt(self, stmt: Any):
         if isinstance(stmt, LetStmt):
             t = stmt.type if stmt.type else self.infer_type(stmt.init)
+            # Resolve type aliases
+            t = self.resolve_type_alias(t)
             val, vt = self.emit_expr(stmt.init)
+            vt = self.resolve_type_alias(vt)
             if t.name != vt.name or t.is_pointer != vt.is_pointer:
                 val = self.emit_cast(val, vt, t)
             # Alloca was hoisted to entry block; retrieve it
@@ -655,9 +680,13 @@ class CodeGen:
             ptypes, ret, _ = sig
         else:
             ptypes, ret = sig
+        # Resolve type aliases in parameter and return types
+        ptypes = [self.resolve_type_alias(pt) for pt in ptypes]
+        ret = self.resolve_type_alias(ret)
         args = []
         for i, arg in enumerate(expr.args):
             val, vt = self.emit_expr(arg)
+            vt = self.resolve_type_alias(vt)
             if i < len(ptypes) and (ptypes[i].name != vt.name or ptypes[i].is_pointer != vt.is_pointer):
                 val = self.emit_cast(val, vt, ptypes[i])
                 vt = ptypes[i]

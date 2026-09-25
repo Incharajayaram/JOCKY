@@ -9,14 +9,19 @@ class TypeChecker:
         self.functions: Dict[str, (List[JType], JType)] = {}
         self.structs: Dict[str, StructDef] = {}  # struct_name -> StructDef
         self.enums: Dict[str, EnumDef] = {}      # enum_name -> EnumDef
+        self.type_aliases: Dict[str, JType] = {} # alias_name -> JType
         self.locals: Dict[str, JType] = {}
         self.current_ret: JType = JType("void")
         self.loop_depth: int = 0
 
     def check(self, prog: Program):
-        # First pass: collect struct/enum and function signatures
+        # First pass: collect type aliases, struct/enum and function signatures
         for decl in prog.decls:
-            if isinstance(decl, StructDef):
+            if isinstance(decl, TypeAlias):
+                # Resolve the target type (recursively resolve aliases)
+                resolved = self.resolve_type_alias(decl.target_type)
+                self.type_aliases[decl.name] = resolved
+            elif isinstance(decl, StructDef):
                 self.structs[decl.name] = decl
             elif isinstance(decl, EnumDef):
                 self.enums[decl.name] = decl
@@ -26,6 +31,20 @@ class TypeChecker:
             elif isinstance(decl, FFIDecl):
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, decl.variadic)
+
+    def resolve_type_alias(self, t: JType) -> JType:
+        """Resolve type alias recursively."""
+        if t.name in self.type_aliases:
+            # Follow the alias
+            resolved = self.type_aliases[t.name]
+            # Preserve pointer and array flags
+            return JType(
+                resolved.name,
+                is_pointer=t.is_pointer or resolved.is_pointer,
+                is_array=t.is_array or resolved.is_array,
+                array_size=t.array_size or resolved.array_size
+            )
+        return t
 
         # Second pass: check bodies
         for decl in prog.decls:
@@ -119,7 +138,9 @@ class TypeChecker:
             return JType("i8", is_pointer=True)
         elif isinstance(expr, VarRef):
             if expr.name in self.locals:
-                return self.locals[expr.name]
+                # Resolve type aliases when loading variables
+                var_type = self.locals[expr.name]
+                return self.resolve_type_alias(var_type)
             raise TypeError(f"Undefined variable: {expr.name}")
         elif isinstance(expr, BinaryOp):
             lt = self.typeof(expr.left)

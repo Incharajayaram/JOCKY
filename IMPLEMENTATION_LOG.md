@@ -107,3 +107,21 @@ Verified with struct_example.jky and struct_advanced.jky
 ✓ Function calls:       Call with proper type passing
 ✓ Control flow:         If/then/else with correct branches
 ```
+
+## Next Priorities
+
+### Feature 4: Type Aliases (QUEUED)
+`type MyInt = i32;`
+- [ ] 4.1 Add TypeAlias AST node
+- [ ] 4.2 Parser support
+- [ ] 4.3 Type checker resolution
+- [ ] 4.4 Codegen (passthrough)
+**Estimated:** 1 day
+
+### Feature 5: Pattern Matching (QUEUED)
+`match x { Variant1 => ..., Variant2 => ... }`
+- [ ] 5.1 Match expression syntax
+- [ ] 5.2 Pattern binding and guards
+- [ ] 5.3 Enum variant pattern support
+- [ ] 5.4 Codegen (jump tables)
+**Estimated:** 2 days
