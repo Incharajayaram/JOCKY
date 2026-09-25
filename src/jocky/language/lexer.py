@@ -24,6 +24,7 @@ class TokenType(Enum):
     NULL = auto()
     STRUCT = auto()
     ENUM = auto()
+    TYPE = auto()
 
     # Types
     I8 = auto()
@@ -89,6 +90,7 @@ KEYWORDS = {
     "null": TokenType.NULL,
     "struct": TokenType.STRUCT,
     "enum": TokenType.ENUM,
+    "type": TokenType.TYPE,
     "i8": TokenType.I8,
     "i32": TokenType.I32,
     "i64": TokenType.I64,

@@ -9,6 +9,7 @@ from .ast import (
     StructDef, StructField, StructLiteralExpr, FieldAccessExpr,
     ArrayType, ArrayLiteralExpr,
     EnumDef, EnumVariant,
+    TypeAlias,
     JType,
 )
 from typing import Optional, Any, List
@@ -98,8 +99,10 @@ class Parser:
             return self.parse_struct_decl()
         elif self.match(TokenType.ENUM):
             return self.parse_enum_decl()
+        elif self.match(TokenType.TYPE):
+            return self.parse_type_alias()
         else:
-            raise ParseError(f"Unexpected token {self.peek().type.name} at line {self.peek().line}; expected fn, ffi, struct, or enum")
+            raise ParseError(f"Unexpected token {self.peek().type.name} at line {self.peek().line}; expected fn, ffi, struct, enum, or type")
 
     def parse_func_decl(self) -> FuncDecl:
         self.expect(TokenType.FN)
@@ -158,6 +161,14 @@ class Parser:
         self.expect(TokenType.RBRACE)
         self.expect(TokenType.SEMICOLON)
         return EnumDef(name, variants)
+
+    def parse_type_alias(self) -> TypeAlias:
+        self.expect(TokenType.TYPE)
+        name = self.expect(TokenType.IDENT).value
+        self.expect(TokenType.EQ)
+        target_type = self.parse_type()
+        self.expect(TokenType.SEMICOLON)
+        return TypeAlias(name, target_type)
 
     def parse_params(self) -> List[Param]:
         params, _ = self.parse_params_variadic()
