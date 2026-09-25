@@ -1,5 +1,5 @@
 from .ast import *
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 
 class CodeGenError(Exception):
     pass
@@ -12,9 +12,10 @@ class CodeGen:
         self.reg_counter = 0
         self.label_counter = 0
         self.current_func = ""
+        self.current_block = "entry"
         self.locals: Dict[str, Tuple[str, JType]] = {}
         self.functions: Dict[str, (List[JType], JType)] = {}
-        self.in_entry_block = True
+        self.loop_stack: List[Tuple[str, str]] = []  # [(continue_label, break_label)]
 
     def next_reg(self) -> str:
         r = f"%{self.reg_counter}"
@@ -31,6 +32,7 @@ class CodeGen:
 
     def emit_label(self, label: str):
         self.output_lines.append(f"{label}:")
+        self.current_block = label
 
     def get_string_const(self, s: str) -> Tuple[str, int]:
         if s in self.string_constants:
@@ -52,10 +54,13 @@ class CodeGen:
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, decl.variadic)
 
-        # Emit FFI declarations
+        # Emit FFI declarations (deduplicated)
+        emitted_ffis: set = set()
         for decl in prog.decls:
             if isinstance(decl, FFIDecl):
-                self.emit_ffi_decl(decl)
+                if decl.name not in emitted_ffis:
+                    self.emit_ffi_decl(decl)
+                    emitted_ffis.add(decl.name)
 
         # Emit function definitions
         for decl in prog.decls:
@@ -66,7 +71,6 @@ class CodeGen:
         prelude = []
         for s, name in self.string_constants.items():
             length = len(s.encode("utf-8")) + 1
-            # Escape for LLVM IR
             escaped = s.encode("utf-8").replace(b"\\", b"\\5C").replace(b"\n", b"\\0A").replace(b"\t", b"\\09").replace(b'"', b'\\22')
             prelude.append(f'{name} = private constant [{length} x i8] c"{escaped.decode("latin-1")}\\00"')
 
@@ -85,24 +89,55 @@ class CodeGen:
     def llvm_type(self, t: JType) -> str:
         return t.llvm_type()
 
+    def collect_lets(self, stmts: List[Any]) -> List[Tuple[str, JType]]:
+        """Walk statement list recursively and collect (name, type) for every LetStmt."""
+        result = []
+        for stmt in stmts:
+            if isinstance(stmt, LetStmt):
+                t = stmt.type if stmt.type else self.infer_type(stmt.init)
+                result.append((stmt.name, t))
+            elif isinstance(stmt, IfStmt):
+                result.extend(self.collect_lets(stmt.then_block.stmts))
+                if stmt.else_block:
+                    result.extend(self.collect_lets(stmt.else_block.stmts))
+            elif isinstance(stmt, WhileStmt):
+                result.extend(self.collect_lets(stmt.body.stmts))
+            elif isinstance(stmt, ForStmt):
+                if isinstance(stmt.init, LetStmt):
+                    t = stmt.init.type if stmt.init.type else self.infer_type(stmt.init.init)
+                    result.append((stmt.init.name, t))
+                result.extend(self.collect_lets(stmt.body.stmts))
+        return result
+
     def emit_func(self, decl: FuncDecl):
         self.current_func = decl.name
         self.reg_counter = 0
         self.label_counter = 0
         self.locals = {}
-        self.in_entry_block = True
+        self.loop_stack = []
+        self.current_block = "entry"
 
         params = ", ".join(f"{self.llvm_type(p.type)} %{p.name}" for p in decl.params)
         ret = self.llvm_type(decl.ret_type)
         self.emit(f"define {ret} @{decl.name}({params}) {{")
         self.emit("entry:")
 
-        # Allocate params and store them
+        # Allocate params
         for p in decl.params:
             alloca = self.next_reg()
             self.emit(f"  {alloca} = alloca {self.llvm_type(p.type)}")
             self.emit(f"  store {self.llvm_type(p.type)} %{p.name}, {self.llvm_type(p.type)}* {alloca}")
             self.locals[p.name] = (alloca, p.type)
+
+        # Hoist all LetStmt allocas to the entry block for mem2reg compatibility
+        all_lets = self.collect_lets(decl.body.stmts)
+        seen_names: set = set()
+        for name, t in all_lets:
+            if name not in seen_names and name not in self.locals:
+                alloca = self.next_reg()
+                self.emit(f"  {alloca} = alloca {self.llvm_type(t)}")
+                self.locals[name] = (alloca, t)
+                seen_names.add(name)
 
         self.emit_block(decl.body)
 
@@ -131,8 +166,15 @@ class CodeGen:
             val, vt = self.emit_expr(stmt.init)
             if t.name != vt.name or t.is_pointer != vt.is_pointer:
                 val = self.emit_cast(val, vt, t)
-            alloca = self.next_reg()
-            self.emit(f"  {alloca} = alloca {self.llvm_type(t)}")
+            # Alloca was hoisted to entry block; retrieve it
+            if stmt.name in self.locals:
+                alloca, stored_t = self.locals[stmt.name]
+                if stored_t.name != t.name or stored_t.is_pointer != t.is_pointer:
+                    val = self.emit_cast(val, t, stored_t)
+                    t = stored_t
+            else:
+                alloca = self.next_reg()
+                self.emit(f"  {alloca} = alloca {self.llvm_type(t)}")
             self.emit(f"  store {self.llvm_type(t)} {val}, {self.llvm_type(t)}* {alloca}")
             self.locals[stmt.name] = (alloca, t)
         elif isinstance(stmt, AssignStmt):
@@ -177,6 +219,14 @@ class CodeGen:
                 self.emit(f"  ret {self.llvm_type(vt)} {val}")
         elif isinstance(stmt, ExprStmt):
             self.emit_expr(stmt.expr)
+        elif isinstance(stmt, BreakStmt):
+            if self.loop_stack:
+                _, break_lbl = self.loop_stack[-1]
+                self.emit(f"  br label %{break_lbl}")
+        elif isinstance(stmt, ContinueStmt):
+            if self.loop_stack:
+                cont_lbl, _ = self.loop_stack[-1]
+                self.emit(f"  br label %{cont_lbl}")
 
     def emit_if(self, stmt: IfStmt):
         then_label = self.next_label("then")
@@ -219,16 +269,51 @@ class CodeGen:
         self.emit(f"  br i1 {cond_val}, label %{body}, label %{exit_l}")
 
         self.emit_label(body)
+        self.loop_stack.append((header, exit_l))
         self.emit_block(stmt.body)
+        self.loop_stack.pop()
         if not self.last_line_is_terminator():
             self.emit(f"  br label %{header}")
 
         self.emit_label(exit_l)
 
     def emit_for(self, stmt: ForStmt):
-        # init; while(cond) { body; step; }
+        header = self.next_label("for_cond")
+        step_block = self.next_label("for_step")
+        body_block = self.next_label("for_body")
+        exit_block = self.next_label("for_exit")
+
+        # emit init
         self.emit_stmt(stmt.init)
-        self.emit_while(WhileStmt(stmt.cond, Block(stmt.body.stmts + [ExprStmt(stmt.step)])))
+        self.emit(f"  br label %{header}")
+
+        # condition
+        self.emit_label(header)
+        cond_val, ct = self.emit_expr(stmt.cond)
+        if ct.name != "bool":
+            cond_val = self.emit_to_bool(cond_val, ct)
+        self.emit(f"  br i1 {cond_val}, label %{body_block}, label %{exit_block}")
+
+        # body — continue jumps to step_block
+        self.emit_label(body_block)
+        self.loop_stack.append((step_block, exit_block))
+        self.emit_block(stmt.body)
+        self.loop_stack.pop()
+        if not self.last_line_is_terminator():
+            self.emit(f"  br label %{step_block}")
+
+        # step
+        self.emit_label(step_block)
+        step = stmt.step
+        if isinstance(step, AssignStmt):
+            self.emit_stmt(step)
+        elif isinstance(step, IntLiteral) and step.value == 0:
+            pass  # empty step
+        else:
+            self.emit_expr(step)
+        self.emit(f"  br label %{header}")
+
+        self.emit_label(exit_block)
 
     def emit_to_bool(self, val: str, t: JType) -> str:
         if self.is_numeric(t):
@@ -261,9 +346,6 @@ class CodeGen:
             else:
                 self.emit(f"  {r} = trunc {self.llvm_type(from_t)} {val} to {self.llvm_type(to_t)}")
             return r
-        if from_t.name == "i8" and to_t.name == "string":
-            # i8 to i8* doesn't make sense directly, but allow if it's a pointer cast
-            pass
         # Pointer casts
         if from_t.is_pointer and to_t.is_pointer:
             r = self.next_reg()
@@ -285,12 +367,14 @@ class CodeGen:
             return JType("bool")
         elif isinstance(expr, StringLiteral):
             return JType("string")
+        elif isinstance(expr, NullLiteral):
+            return JType("i8", is_pointer=True)
         elif isinstance(expr, VarRef):
             if expr.name in self.locals:
                 return self.locals[expr.name][1]
             raise CodeGenError(f"Undefined variable: {expr.name}")
         elif isinstance(expr, BinaryOp):
-            if expr.op in ("+", "-", "*", "/", "%"):
+            if expr.op in ("+", "-", "*", "/", "%", "|", "^", "&", "<<", ">>"):
                 return self.infer_type(expr.left)
             return JType("bool")
         elif isinstance(expr, UnaryOp):
@@ -320,6 +404,8 @@ class CodeGen:
             return (str(expr.value), JType("i32"))
         elif isinstance(expr, BoolLiteral):
             return ("1" if expr.value else "0", JType("bool"))
+        elif isinstance(expr, NullLiteral):
+            return ("null", JType("i8", is_pointer=True))
         elif isinstance(expr, StringLiteral):
             name, length = self.get_string_const(expr.value)
             gep = self.next_reg()
@@ -333,6 +419,8 @@ class CodeGen:
                 return (r, t)
             raise CodeGenError(f"Undefined variable: {expr.name}")
         elif isinstance(expr, BinaryOp):
+            if expr.op in ("&&", "||"):
+                return self.emit_logical(expr)
             return self.emit_binary(expr)
         elif isinstance(expr, UnaryOp):
             return self.emit_unary(expr)
@@ -366,14 +454,42 @@ class CodeGen:
         else:
             raise CodeGenError(f"Unknown expression: {type(expr).__name__}")
 
+    def emit_logical(self, expr: BinaryOp) -> Tuple[str, JType]:
+        """Short-circuit evaluation for && and || using phi nodes."""
+        rhs_block = self.next_label("sc_rhs")
+        merge_block = self.next_label("sc_merge")
+
+        lhs_val, _ = self.emit_expr(expr.left)
+        lhs_end = self.current_block  # predecessor for the false/true branch
+
+        if expr.op == "&&":
+            # lhs true → eval rhs; lhs false → short-circuit false
+            self.emit(f"  br i1 {lhs_val}, label %{rhs_block}, label %{merge_block}")
+        else:  # ||
+            # lhs true → short-circuit true; lhs false → eval rhs
+            self.emit(f"  br i1 {lhs_val}, label %{merge_block}, label %{rhs_block}")
+
+        self.emit_label(rhs_block)
+        rhs_val, _ = self.emit_expr(expr.right)
+        rhs_end = self.current_block
+        self.emit(f"  br label %{merge_block}")
+
+        self.emit_label(merge_block)
+        r = self.next_reg()
+        if expr.op == "&&":
+            self.emit(f"  {r} = phi i1 [ 0, %{lhs_end} ], [ {rhs_val}, %{rhs_end} ]")
+        else:
+            self.emit(f"  {r} = phi i1 [ 1, %{lhs_end} ], [ {rhs_val}, %{rhs_end} ]")
+
+        return (r, JType("bool"))
+
     def emit_binary(self, expr: BinaryOp) -> Tuple[str, JType]:
         left, lt = self.emit_expr(expr.left)
         right, rt = self.emit_expr(expr.right)
 
-        # Promote to common type for arithmetic
+        # Promote to common type for arithmetic / bitwise
         if self.is_numeric(lt) and self.is_numeric(rt):
             if lt.name != rt.name:
-                # Promote smaller to larger
                 if lt.size_bytes() < rt.size_bytes():
                     left = self.emit_cast(left, lt, rt)
                     lt = rt
@@ -395,6 +511,16 @@ class CodeGen:
             self.emit(f"  {r} = sdiv {self.llvm_type(typ)} {left}, {right}")
         elif op == "%":
             self.emit(f"  {r} = srem {self.llvm_type(typ)} {left}, {right}")
+        elif op == "|":
+            self.emit(f"  {r} = or {self.llvm_type(typ)} {left}, {right}")
+        elif op == "^":
+            self.emit(f"  {r} = xor {self.llvm_type(typ)} {left}, {right}")
+        elif op == "&":
+            self.emit(f"  {r} = and {self.llvm_type(typ)} {left}, {right}")
+        elif op == "<<":
+            self.emit(f"  {r} = shl {self.llvm_type(typ)} {left}, {right}")
+        elif op == ">>":
+            self.emit(f"  {r} = lshr {self.llvm_type(typ)} {left}, {right}")
         elif op == "==":
             self.emit(f"  {r} = icmp eq {self.llvm_type(typ)} {left}, {right}")
             typ = JType("bool")
@@ -413,12 +539,6 @@ class CodeGen:
         elif op == ">=":
             self.emit(f"  {r} = icmp sge {self.llvm_type(typ)} {left}, {right}")
             typ = JType("bool")
-        elif op == "&&":
-            self.emit(f"  {r} = and i1 {left}, {right}")
-            typ = JType("bool")
-        elif op == "||":
-            self.emit(f"  {r} = or i1 {left}, {right}")
-            typ = JType("bool")
         else:
             raise CodeGenError(f"Unknown binary op: {op}")
 
@@ -434,6 +554,9 @@ class CodeGen:
         elif op == "!":
             self.emit(f"  {r} = xor i1 {operand}, 1")
             return (r, JType("bool"))
+        elif op == "~":
+            self.emit(f"  {r} = xor {self.llvm_type(t)} {operand}, -1")
+            return (r, t)
         else:
             raise CodeGenError(f"Unknown unary op: {op}")
 

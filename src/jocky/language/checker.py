@@ -9,6 +9,7 @@ class TypeChecker:
         self.functions: Dict[str, (List[JType], JType)] = {}
         self.locals: Dict[str, JType] = {}
         self.current_ret: JType = JType("void")
+        self.loop_depth: int = 0
 
     def check(self, prog: Program):
         # First pass: collect function signatures
@@ -33,7 +34,6 @@ class TypeChecker:
         self.current_ret = decl.ret_type
         self.check_block(decl.body)
         self.locals = old_locals
-        # Update function signature with variadic flag (always false for user funcs)
         ptypes = [p.type for p in decl.params]
         self.functions[decl.name] = (ptypes, decl.ret_type, False)
 
@@ -43,7 +43,7 @@ class TypeChecker:
 
     def check_stmt(self, stmt: Any):
         if isinstance(stmt, LetStmt):
-            init_type = self.typeof(stmt.init)
+            init_type = self.typeof(stmt.init, type_hint=stmt.type)
             if stmt.type is not None:
                 if not self.types_equal(stmt.type, init_type):
                     raise TypeError(f"Type mismatch in let: expected {stmt.type}, got {init_type}")
@@ -66,14 +66,22 @@ class TypeChecker:
             ct = self.typeof(stmt.cond)
             if ct.name != "bool":
                 raise TypeError("While condition must be bool")
+            self.loop_depth += 1
             self.check_block(stmt.body)
+            self.loop_depth -= 1
         elif isinstance(stmt, ForStmt):
             self.check_stmt(stmt.init)
             ct = self.typeof(stmt.cond)
             if ct.name != "bool":
                 raise TypeError("For condition must be bool")
-            self.check_stmt(ExprStmt(stmt.step))
+            # step can be AssignStmt, ExprStmt, or bare expression (IntLiteral(0))
+            if isinstance(stmt.step, (AssignStmt, ExprStmt)):
+                self.check_stmt(stmt.step)
+            elif not isinstance(stmt.step, IntLiteral):
+                self.typeof(stmt.step)
+            self.loop_depth += 1
             self.check_block(stmt.body)
+            self.loop_depth -= 1
         elif isinstance(stmt, ReturnStmt):
             if stmt.value is None:
                 if self.current_ret.name != "void":
@@ -84,15 +92,25 @@ class TypeChecker:
                     raise TypeError(f"Return type mismatch: expected {self.current_ret}, got {vt}")
         elif isinstance(stmt, ExprStmt):
             self.typeof(stmt.expr)
+        elif isinstance(stmt, BreakStmt):
+            if self.loop_depth == 0:
+                raise TypeError("'break' outside loop")
+        elif isinstance(stmt, ContinueStmt):
+            if self.loop_depth == 0:
+                raise TypeError("'continue' outside loop")
 
-    def typeof(self, expr: Any) -> JType:
+    def typeof(self, expr: Any, type_hint: Optional[JType] = None) -> JType:
         if isinstance(expr, IntLiteral):
-            # Infer based on value size? Default to i32
+            if type_hint is not None and type_hint.name in ("i8", "i32", "i64") and not type_hint.is_pointer:
+                return type_hint
             return JType("i32")
         elif isinstance(expr, BoolLiteral):
             return JType("bool")
         elif isinstance(expr, StringLiteral):
             return JType("string")
+        elif isinstance(expr, NullLiteral):
+            # null is a null pointer; compatible with any pointer via cast
+            return JType("i8", is_pointer=True)
         elif isinstance(expr, VarRef):
             if expr.name in self.locals:
                 return self.locals[expr.name]
@@ -112,6 +130,14 @@ class TypeChecker:
                 if lt.name != "bool" or rt.name != "bool":
                     raise TypeError(f"Logical op requires bool: {lt}, {rt}")
                 return JType("bool")
+            elif expr.op in ("|", "^", "&"):
+                if not self.is_numeric(lt) or not self.is_numeric(rt):
+                    raise TypeError(f"Bitwise op requires integer types: {lt}, {rt}")
+                return lt
+            elif expr.op in ("<<", ">>"):
+                if not self.is_numeric(lt) or not self.is_numeric(rt):
+                    raise TypeError(f"Shift op requires integer types: {lt}, {rt}")
+                return lt
             else:
                 raise TypeError(f"Unknown binary op: {expr.op}")
         elif isinstance(expr, UnaryOp):
@@ -124,6 +150,10 @@ class TypeChecker:
                 if t.name != "bool":
                     raise TypeError("Unary ! requires bool")
                 return JType("bool")
+            elif expr.op == "~":
+                if not self.is_numeric(t):
+                    raise TypeError("Bitwise ~ requires integer type")
+                return t
             else:
                 raise TypeError(f"Unknown unary op: {expr.op}")
         elif isinstance(expr, CallExpr):
@@ -151,7 +181,6 @@ class TypeChecker:
         elif isinstance(expr, AddrOfExpr):
             t = self.typeof(expr.operand)
             if isinstance(expr.operand, VarRef):
-                # Variable address -> pointer to variable type
                 return JType(t.name, is_pointer=True)
             raise TypeError("Can only take address of variables")
         elif isinstance(expr, CastExpr):
@@ -171,4 +200,10 @@ class TypeChecker:
         return t.name in ("i8", "i32", "i64")
 
     def types_equal(self, a: JType, b: JType) -> bool:
-        return a.name == b.name and a.is_pointer == b.is_pointer
+        if a.name == b.name and a.is_pointer == b.is_pointer:
+            return True
+        # null literal (i8*) is compatible with any other pointer type
+        if a.is_pointer and b.is_pointer:
+            if a.name == "i8" or b.name == "i8":
+                return True
+        return False
