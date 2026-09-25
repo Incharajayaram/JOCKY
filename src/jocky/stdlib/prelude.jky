@@ -31,7 +31,7 @@ ffi jocky_decrypt_rc4(buf: i8*, size: i32, key: i8*, keylen: i32) -> void;
 // ---- Evasion ----
 ffi jocky_unhook_ntdll() -> bool;
 ffi jocky_get_syscall_number(name: string) -> i32;
-ffi jocky_spoof_call(fn: i8*, a1: i64, a2: i64, a3: i64, a4: i64) -> i64;
+ffi jocky_spoof_call(func: i8*, a1: i64, a2: i64, a3: i64, a4: i64) -> i64;
 ffi jocky_spoof_syscall(ssn: i32, a1: i64, a2: i64, a3: i64, a4: i64) -> i64;
 
 // ---- BYOVD / driver interaction ----

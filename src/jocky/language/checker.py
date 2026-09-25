@@ -17,7 +17,10 @@ class TypeChecker:
     def check(self, prog: Program):
         # First pass: collect type aliases, struct/enum and function signatures
         for decl in prog.decls:
-            if isinstance(decl, TypeAlias):
+            if isinstance(decl, UseStmt):
+                # Module imports are already resolved; skip them
+                pass
+            elif isinstance(decl, TypeAlias):
                 # Resolve the target type (recursively resolve aliases)
                 resolved = self.resolve_type_alias(decl.target_type)
                 self.type_aliases[decl.name] = resolved

