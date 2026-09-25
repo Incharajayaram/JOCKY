@@ -15,6 +15,8 @@ class CodeGen:
         self.current_block = "entry"
         self.locals: Dict[str, Tuple[str, JType]] = {}
         self.functions: Dict[str, (List[JType], JType)] = {}
+        self.structs: Dict[str, StructDef] = {}  # struct_name -> StructDef
+        self.enums: Dict[str, EnumDef] = {}      # enum_name -> EnumDef
         self.loop_stack: List[Tuple[str, str]] = []  # [(continue_label, break_label)]
 
     def next_reg(self) -> str:
@@ -45,14 +47,22 @@ class CodeGen:
         return name, length
 
     def gen(self, prog: Program) -> str:
-        # First pass: collect signatures
+        # First pass: collect signatures and definitions
         for decl in prog.decls:
-            if isinstance(decl, FuncDecl):
+            if isinstance(decl, StructDef):
+                self.structs[decl.name] = decl
+            elif isinstance(decl, EnumDef):
+                self.enums[decl.name] = decl
+            elif isinstance(decl, FuncDecl):
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, False)
             elif isinstance(decl, FFIDecl):
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, decl.variadic)
+
+        # Emit struct type definitions
+        for struct_name, struct_def in self.structs.items():
+            self.emit_struct_def(struct_def)
 
         # Emit FFI declarations (deduplicated)
         emitted_ffis: set = set()
@@ -75,6 +85,11 @@ class CodeGen:
             prelude.append(f'{name} = private constant [{length} x i8] c"{escaped.decode("latin-1")}\\00"')
 
         return "\n".join(prelude + [""] + self.output_lines)
+
+    def emit_struct_def(self, struct_def: StructDef):
+        """Emit LLVM struct type definition."""
+        field_types = ", ".join(self.llvm_type(f.type) for f in struct_def.fields)
+        self.emit(f"%{struct_def.name} = type {{ {field_types} }}")
 
     def emit_ffi_decl(self, decl: FFIDecl):
         params = ", ".join(self.llvm_type(t) for t in [p.type for p in decl.params])
@@ -396,7 +411,23 @@ class CodeGen:
             return expr.target_type
         elif isinstance(expr, IndexExpr):
             t = self.infer_type(expr.base)
-            return JType(t.name, is_pointer=False)
+            return JType(t.name, is_pointer=False, is_array=False)
+        elif isinstance(expr, FieldAccessExpr):
+            obj_type = self.infer_type(expr.object)
+            if obj_type.name not in self.structs:
+                raise CodeGenError(f"Cannot access field on non-struct: {obj_type}")
+            struct_def = self.structs[obj_type.name]
+            for field in struct_def.fields:
+                if field.name == expr.field:
+                    return field.type
+            raise CodeGenError(f"Struct {obj_type.name} has no field {expr.field}")
+        elif isinstance(expr, ArrayLiteralExpr):
+            if len(expr.elements) == 0:
+                raise CodeGenError("Cannot infer type of empty array")
+            elem_type = self.infer_type(expr.elements[0])
+            return JType(elem_type.name, is_array=True, array_size=len(expr.elements))
+        elif isinstance(expr, StructLiteralExpr):
+            return JType(expr.struct_type, is_pointer=False)
         raise CodeGenError(f"Cannot infer type for {type(expr).__name__}")
 
     def emit_expr(self, expr: Any) -> Tuple[str, JType]:
@@ -445,12 +476,68 @@ class CodeGen:
         elif isinstance(expr, IndexExpr):
             base, bt = self.emit_expr(expr.base)
             idx, _ = self.emit_expr(expr.index)
-            elem_type = JType(bt.name, is_pointer=False)
+            # For arrays, element type is stored in the base name
+            elem_type = JType(bt.name, is_pointer=False, is_array=False)
             gep = self.next_reg()
             self.emit(f"  {gep} = getelementptr {self.llvm_type(elem_type)}, {self.llvm_type(bt)} {base}, i32 {idx}")
             r = self.next_reg()
             self.emit(f"  {r} = load {self.llvm_type(elem_type)}, {self.llvm_type(elem_type)}* {gep}")
             return (r, elem_type)
+        elif isinstance(expr, FieldAccessExpr):
+            # Load struct value and extract field via GEP
+            obj, obj_type = self.emit_expr(expr.object)
+            if obj_type.name not in self.structs:
+                raise CodeGenError(f"Cannot access field on non-struct: {obj_type}")
+            struct_def = self.structs[obj_type.name]
+            # Find field index
+            field_idx = -1
+            field_type = None
+            for i, field in enumerate(struct_def.fields):
+                if field.name == expr.field:
+                    field_idx = i
+                    field_type = field.type
+                    break
+            if field_idx < 0:
+                raise CodeGenError(f"Struct {obj_type.name} has no field {expr.field}")
+            # Use GEP to get field pointer
+            gep = self.next_reg()
+            self.emit(f"  {gep} = getelementptr %{obj_type.name}, %{obj_type.name}* {obj}, i32 0, i32 {field_idx}")
+            r = self.next_reg()
+            self.emit(f"  {r} = load {self.llvm_type(field_type)}, {self.llvm_type(field_type)}* {gep}")
+            return (r, field_type)
+        elif isinstance(expr, ArrayLiteralExpr):
+            # Allocate array on stack and initialize elements
+            elem_type = JType("i32")  # Will be inferred from first element
+            if len(expr.elements) > 0:
+                elem_val, elem_type = self.emit_expr(expr.elements[0])
+            # Allocate array
+            array_type = JType(elem_type.name, is_array=True, array_size=len(expr.elements))
+            alloca = self.next_reg()
+            self.emit(f"  {alloca} = alloca {self.llvm_type(array_type)}")
+            # Initialize elements
+            for i, elem_expr in enumerate(expr.elements):
+                elem_val, elem_type = self.emit_expr(elem_expr)
+                gep = self.next_reg()
+                self.emit(f"  {gep} = getelementptr {self.llvm_type(elem_type)}, {self.llvm_type(array_type)} {alloca}, i32 0, i32 {i}")
+                self.emit(f"  store {self.llvm_type(elem_type)} {elem_val}, {self.llvm_type(elem_type)}* {gep}")
+            return (alloca, array_type)
+        elif isinstance(expr, StructLiteralExpr):
+            # Allocate struct on stack and initialize fields
+            if expr.struct_type not in self.structs:
+                raise CodeGenError(f"Unknown struct: {expr.struct_type}")
+            struct_def = self.structs[expr.struct_type]
+            # Allocate struct
+            alloca = self.next_reg()
+            self.emit(f"  {alloca} = alloca %{expr.struct_type}")
+            # Initialize fields
+            for i, field in enumerate(struct_def.fields):
+                if field.name not in expr.fields:
+                    raise CodeGenError(f"Missing field {field.name} in struct init")
+                val, val_type = self.emit_expr(expr.fields[field.name])
+                gep = self.next_reg()
+                self.emit(f"  {gep} = getelementptr %{expr.struct_type}, %{expr.struct_type}* {alloca}, i32 0, i32 {i}")
+                self.emit(f"  store {self.llvm_type(field.type)} {val}, {self.llvm_type(field.type)}* {gep}")
+            return (alloca, JType(expr.struct_type, is_pointer=False))
         else:
             raise CodeGenError(f"Unknown expression: {type(expr).__name__}")
 

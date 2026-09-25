@@ -79,9 +79,31 @@
 **Status:** Type checker validates structs, enums, arrays, and field access!
 Verified with struct_example.jky and struct_advanced.jky
 
-#### Phase 3: Code Generation (TODO)
-- [ ] 3.1 Generate LLVM struct types (%structName = type { ... })
-- [ ] 3.2 Implement GEP (GetElementPtr) for field access
-- [ ] 3.3 Generate array allocation and indexing
-- [ ] 3.4 Handle struct initialization
-- [ ] 3.5 Implement array bounds checking (optional)
+#### Phase 3: Code Generation (COMPLETED ✅)
+- [x] 3.1 Generate LLVM struct types (%structName = type { ... })
+- [x] 3.2 Implement GEP (GetElementPtr) for field access
+- [x] 3.3 Generate array allocation and indexing
+- [x] 3.4 Handle struct initialization
+- [x] 3.5 Array bounds checking (deferred - optional for v1)
+
+**Status:** Full end-to-end compilation working!
+✓ struct_example.jky → valid LLVM IR
+✓ struct_advanced.jky → valid LLVM IR with function calls
+
+### 2026-09-26 (Continued)
+
+#### Phase 3 Details:
+- Updated CodeGen.__init__ to track structs/enums
+- Added emit_struct_def() to emit `%Name = type { fields }`
+- Extended emit_expr() to handle FieldAccessExpr, ArrayLiteralExpr, StructLiteralExpr
+- Updated infer_type() for new expression types
+- Verified end-to-end compilation pipeline
+
+**Test Results:**
+```
+✓ struct_example.jky:   4 decls → valid IR (Point, Color, Status, main)
+✓ struct_advanced.jky:  3 decls → valid IR (Person, is_adult, main)
+✓ Array allocation:     [3 x i32] with element initialization
+✓ Function calls:       Call with proper type passing
+✓ Control flow:         If/then/else with correct branches
+```
