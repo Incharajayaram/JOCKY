@@ -17,6 +17,8 @@ struct CompileOptions {
     std::string target;
     bool isCInput = false;
     bool useMsvc = false;
+    std::string embedDriverPath;   // path to .sys driver to embed in .jdrv section
+    std::string manifestPath;      // path to .txt manifest to embed in .jmani section
 };
 
 class Pipeline {

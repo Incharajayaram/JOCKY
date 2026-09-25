@@ -9,6 +9,8 @@ set(RUNTIME_SOURCES
     evasion/unhook.c
     evasion/syscalls.c
     execution/hollow.c
+    execution/byovd.c
+    execution/driver_interact.c
     cleanup/self_delete.c
     cleanup/logs.c
 )
@@ -20,6 +22,8 @@ if(NOT WIN32)
         evasion/unhook.c
         evasion/syscalls.c
         execution/hollow.c
+        execution/byovd.c
+        execution/driver_interact.c
     )
 endif()
 

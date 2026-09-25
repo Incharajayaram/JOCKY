@@ -20,15 +20,12 @@ llvm::Type* CodeGen::llvmType(const JType& t) {
         case JTypeKind::I64:    base = llvm::Type::getInt64Ty(ctx); break;
         case JTypeKind::String: base = llvm::Type::getInt8Ty(ctx); break;
         case JTypeKind::Custom: base = llvm::StructType::getTypeByName(ctx, t.customName); break;
-        case JTypeKind::Pointer: {
-            JType inner = t;
-            inner.isPointer = false;
-            return llvm::PointerType::get(llvmType(inner), 0);
-        }
+        case JTypeKind::Pointer:
+            return llvm::PointerType::get(ctx, 0);
     }
     if (!base) throw CodeGenError("Unknown type kind");
     if (t.isPointer || t.kind == JTypeKind::String)
-        return llvm::PointerType::get(base, 0);
+        return llvm::PointerType::get(ctx, 0);
     return base;
 }
 
@@ -274,8 +271,7 @@ llvm::Value* CodeGen::emitExpr(Expr& expr) {
         return llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), bl->value ? 1 : 0);
     }
     if (auto* sl = dynamic_cast<StringLiteral*>(&expr)) {
-        llvm::Constant* str = builder->CreateGlobalStringPtr(sl->value, ".str");
-        return str;
+        return builder->CreateGlobalString(sl->value, ".str", 0, mod.get());
     }
     if (auto* vr = dynamic_cast<VarRef*>(&expr)) {
         auto it = locals.find(vr->name);

@@ -34,7 +34,4 @@ toolchain/
 
 # C++ compiler build directory
 compiler/build/
-
-
-# Ghidra
-ghidra*
+ghidra_11.1.2_PUBLIC/

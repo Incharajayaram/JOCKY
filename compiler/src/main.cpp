@@ -10,7 +10,9 @@ static void printUsage(const char* prog) {
               << "Options:\n"
               << "  -o <file>      Output executable name (default: input stem)\n"
               << "  -p <profile>   Obfuscation profile: none, light, standard, aggressive, paranoid (default: standard)\n"
-              << "  --pack         Pack final binary with custom packer (Windows) or UPX (Linux)\n"
+              << "  --pack         Encrypt PE sections (Windows) or UPX-pack (Linux)\n"
+              << "  --embed-driver <path>  Embed a .sys driver in .jdrv PE section (Windows only)\n"
+              << "  --manifest <path>      Embed a driver IOCTL manifest in .jmani PE section (Windows only)\n"
               << "  --encrypt-strings  Encrypt string literals via MLIR\n"
               << "  --no-runtime   Skip anti-analysis runtime (cleaner binary)\n"
               << "  --cc           Compile C source through JOCKY pipeline\n"
@@ -51,6 +53,10 @@ int main(int argc, char** argv) {
             opts.isCInput = true;
         } else if (std::strcmp(argv[i], "--msvc") == 0) {
             opts.useMsvc = true;
+        } else if (std::strcmp(argv[i], "--embed-driver") == 0 && i + 1 < argc) {
+            opts.embedDriverPath = argv[++i];
+        } else if (std::strcmp(argv[i], "--manifest") == 0 && i + 1 < argc) {
+            opts.manifestPath = argv[++i];
         } else if (argv[i][0] != '-') {
             input = argv[i];
         } else {
