@@ -67,7 +67,7 @@ class TypeChecker:
 
     def process_module_decl(self, mod_decl: ModDecl):
         """Process a module declaration."""
-        module = Module(mod_decl.name, public=mod_decl.public)
+        module = Module(mod_decl.name)
         self.module_registry.register_module(module)
 
         # Process declarations within the module
@@ -254,9 +254,15 @@ class TypeChecker:
             else:
                 raise TypeError(f"Unknown unary op: {expr.op}")
         elif isinstance(expr, CallExpr):
-            if expr.name not in self.functions:
+            # Check in functions first, then visible imports
+            if expr.name in self.functions:
+                sig = self.functions[expr.name]
+            elif expr.name in self.visible_symbols:
+                symbol = self.visible_symbols[expr.name]
+                sig = symbol.type_info
+            else:
                 raise TypeError(f"Undefined function: {expr.name}")
-            sig = self.functions[expr.name]
+
             if len(sig) == 3:
                 ptypes, ret, is_variadic = sig
             else:
