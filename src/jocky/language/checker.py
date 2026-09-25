@@ -259,8 +259,65 @@ class TypeChecker:
                 if not self.types_equal(val_type, field.type):
                     raise TypeError(f"Field {field.name}: expected {field.type}, got {val_type}")
             return JType(expr.struct_type, is_pointer=False)
+        elif isinstance(expr, MatchExpr):
+            # Type check the scrutinee (value being matched)
+            scrutinee_type = self.typeof(expr.scrutinee)
+
+            # Check all arms and verify they return compatible types
+            arm_types = []
+            for arm in expr.arms:
+                # Validate pattern matches scrutinee type
+                self.check_pattern(arm.pattern, scrutinee_type)
+                # Type check the arm body
+                arm_type = None
+                for stmt in arm.body.stmts:
+                    if isinstance(stmt, ReturnStmt):
+                        if stmt.value:
+                            arm_type = self.typeof(stmt.value)
+                        else:
+                            arm_type = JType("void")
+                    elif isinstance(stmt, ExprStmt):
+                        arm_type = self.typeof(stmt.expr)
+                if arm_type is None:
+                    arm_type = JType("void")
+                arm_types.append(arm_type)
+
+            # All arms must return same type
+            if arm_types:
+                first_type = arm_types[0]
+                for i, arm_type in enumerate(arm_types[1:], 1):
+                    if not self.types_equal(first_type, arm_type):
+                        raise TypeError(f"Match arm {i} type {arm_type} doesn't match first arm type {first_type}")
+                return first_type
+            return JType("void")
         else:
             raise TypeError(f"Unknown expression type: {type(expr).__name__}")
+
+    def check_pattern(self, pattern: Any, scrutinee_type: JType):
+        """Verify a pattern is compatible with the scrutinee type."""
+        from .ast import WildcardPattern, LiteralPattern, VariantPattern
+
+        if isinstance(pattern, WildcardPattern):
+            # Wildcard matches anything
+            pass
+        elif isinstance(pattern, LiteralPattern):
+            # Literal must match scrutinee type
+            pat_type = self.typeof(pattern.value)
+            if not self.types_equal(pat_type, scrutinee_type):
+                raise TypeError(f"Pattern type {pat_type} doesn't match scrutinee type {scrutinee_type}")
+        elif isinstance(pattern, VariantPattern):
+            # Variant pattern must be an enum variant
+            if scrutinee_type.name not in self.enums:
+                raise TypeError(f"Cannot match enum variant on non-enum type {scrutinee_type}")
+            enum_def = self.enums[scrutinee_type.name]
+            # Check if variant exists
+            found = False
+            for variant in enum_def.variants:
+                if variant.name == pattern.name:
+                    found = True
+                    break
+            if not found:
+                raise TypeError(f"Enum {scrutinee_type.name} has no variant {pattern.name}")
 
     def is_numeric(self, t: JType) -> bool:
         return t.name in ("i8", "i32", "i64") and not t.is_pointer
