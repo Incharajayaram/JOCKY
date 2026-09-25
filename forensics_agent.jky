@@ -1,0 +1,27 @@
+ffi jocky_collect_system_info() -> i32;
+ffi jocky_enum_processes() -> i32;
+ffi jocky_enum_network() -> i32;
+ffi jocky_check_persistence() -> i32;
+ffi printf(fmt: string, ...) -> i32;
+
+fn main() -> i32 {
+    printf("JOCKY Forensic Agent v1.0\n");
+    printf("===========================\n\n");
+    
+    printf("[Phase 1/4] Collecting system info...\n");
+    jocky_collect_system_info();
+    
+    printf("\n[Phase 2/4] Enumerating processes...\n");
+    jocky_enum_processes();
+    
+    printf("\n[Phase 3/4] Checking network state...\n");
+    jocky_enum_network();
+    
+    printf("\n[Phase 4/4] Checking persistence mechanisms...\n");
+    jocky_check_persistence();
+    
+    printf("\n===========================\n");
+    printf("Forensic collection complete.\n");
+    
+    return 0;
+}

