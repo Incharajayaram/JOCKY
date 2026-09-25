@@ -141,6 +141,11 @@ class TypeChecker:
                 # Resolve type aliases when loading variables
                 var_type = self.locals[expr.name]
                 return self.resolve_type_alias(var_type)
+            # Check if this is an enum variant reference
+            for enum_name, enum_def in self.enums.items():
+                for variant in enum_def.variants:
+                    if variant.name == expr.name:
+                        return JType(enum_name)
             raise TypeError(f"Undefined variable: {expr.name}")
         elif isinstance(expr, BinaryOp):
             lt = self.typeof(expr.left)
