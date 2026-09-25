@@ -269,6 +269,34 @@ bool jocky_disable_dse(jocky_byovd_t* ctx);
  * No-op if jocky_disable_dse() was never called. */
 bool jocky_restore_dse(jocky_byovd_t* ctx);
 
+/* Load an unsigned kernel driver within a timed, PatchGuard-safe DSE window.
+ *
+ * Orchestrates the full sequence atomically:
+ *   [pre-window]
+ *     1. Enable SeLoadDriverPrivilege on the current token
+ *     2. Register a kernel-driver SCM service entry for driver_path
+ *        (done BEFORE patching — no slow SCM RPC inside the timed region)
+ *   [DSE window  ←  target < 500 ms, always exits in ≤ 2 s]
+ *     3. jocky_disable_dse(ctx)        → CI!g_CiOptions = 0
+ *     4. NtLoadDriver(registry_path)   → direct NTAPI call, no SCM
+ *     5. jocky_restore_dse(ctx)        → CI!g_CiOptions = original
+ *        (unconditional — runs even on NtLoadDriver error)
+ *   [post-window]
+ *     6. Delete the SCM service entry
+ *     7. Return true iff NtLoadDriver succeeded
+ *
+ * PatchGuard re-verifies g_CiOptions on a timer (~5-10 min retail).
+ * By restoring unconditionally and immediately, the patch window stays
+ * well below the detection threshold.
+ *
+ * driver_path  — absolute wide path to the unsigned .sys file
+ * service_name — SCM service name (NULL → auto-generated "jky_<hash>")
+ *
+ * Requires: active jocky_byovd_t ctx + SeLoadDriverPrivilege / SYSTEM. */
+bool jocky_dse_load_driver(jocky_byovd_t* ctx,
+                            const wchar_t* driver_path,
+                            const char*    service_name);
+
 #endif /* _WIN32 (kernel exploitation) */
 
 /* ============================================================================
