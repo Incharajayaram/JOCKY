@@ -153,10 +153,26 @@ class Parser:
         while not self.match(TokenType.RBRACE):
             var_name = self.expect(TokenType.IDENT).value
             value = None
-            if self.match(TokenType.EQ):
+            fields = None
+
+            # Check for tagged union fields: VariantName(field: Type, ...)
+            if self.match(TokenType.LPAREN):
+                self.advance()
+                fields = []
+                while not self.match(TokenType.RPAREN):
+                    field_name = self.expect(TokenType.IDENT).value
+                    self.expect(TokenType.COLON)
+                    field_type = self.parse_type()
+                    fields.append(StructField(field_name, field_type))
+                    if self.match(TokenType.COMMA):
+                        self.advance()
+                self.expect(TokenType.RPAREN)
+            # Or plain variant with value: VariantName = 42
+            elif self.match(TokenType.EQ):
                 self.advance()
                 value = self.expect(TokenType.NUMBER).value
-            variants.append(EnumVariant(var_name, value))
+
+            variants.append(EnumVariant(var_name, value, fields))
             if self.match(TokenType.COMMA):
                 self.advance()
         self.expect(TokenType.RBRACE)
@@ -199,7 +215,18 @@ class Parser:
             name = self.advance().value
             if name == "_":
                 return WildcardPattern()
-            return VariantPattern(name)
+            # Check for tagged union field bindings: VariantName(x, y, ...)
+            bindings = None
+            if self.match(TokenType.LPAREN):
+                self.advance()
+                bindings = []
+                while not self.match(TokenType.RPAREN):
+                    binding_name = self.expect(TokenType.IDENT).value
+                    bindings.append(binding_name)
+                    if self.match(TokenType.COMMA):
+                        self.advance()
+                self.expect(TokenType.RPAREN)
+            return VariantPattern(name, bindings)
         elif tok.type == TokenType.NUMBER:
             # Literal pattern
             val = self.advance().value

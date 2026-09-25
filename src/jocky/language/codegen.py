@@ -763,6 +763,28 @@ class CodeGen:
         for i, arm in enumerate(expr.arms):
             self.emit_label(arm_labels[i])
 
+            # Save locals before processing pattern bindings
+            saved_locals = self.locals.copy()
+
+            # Handle pattern bindings for tagged unions
+            pattern = arm.pattern
+            if isinstance(pattern, VariantPattern) and pattern.bindings:
+                # For each binding, allocate space and add to locals
+                # Note: actual field extraction not yet implemented
+                # This allows type-checking to pass but bindings will be zero-initialized
+                if scrutinee_type.name in self.enums:
+                    enum_def = self.enums[scrutinee_type.name]
+                    for variant in enum_def.variants:
+                        if variant.name == pattern.name and variant.fields:
+                            for binding_name, field in zip(pattern.bindings, variant.fields):
+                                # Allocate space for the field
+                                alloca = self.next_reg()
+                                self.emit(f"  {alloca} = alloca {self.llvm_type(field.type)}")
+                                # Zero-initialize (TODO: extract actual value from variant)
+                                self.emit(f"  store {self.llvm_type(field.type)} 0, {self.llvm_type(field.type)}* {alloca}")
+                                self.locals[binding_name] = (alloca, field.type)
+                            break
+
             # Emit arm body and collect result
             last_val = None
             last_type = None
@@ -792,6 +814,9 @@ class CodeGen:
             # Branch to merge (unless there was an explicit return)
             if not arm_has_return:
                 self.emit(f"  br label %{merge_label}")
+
+            # Restore locals after arm
+            self.locals = saved_locals
 
             arm_blocks.append(arm_labels[i])
 

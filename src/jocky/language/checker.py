@@ -1,5 +1,5 @@
 from .ast import *
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
 
 class TypeError(Exception):
     pass
@@ -32,6 +32,11 @@ class TypeChecker:
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, decl.variadic)
 
+        # Second pass: check bodies
+        for decl in prog.decls:
+            if isinstance(decl, FuncDecl):
+                self.check_func(decl)
+
     def resolve_type_alias(self, t: JType) -> JType:
         """Resolve type alias recursively."""
         if t.name in self.type_aliases:
@@ -45,11 +50,6 @@ class TypeChecker:
                 array_size=t.array_size or resolved.array_size
             )
         return t
-
-        # Second pass: check bodies
-        for decl in prog.decls:
-            if isinstance(decl, FuncDecl):
-                self.check_func(decl)
 
     def check_func(self, decl: FuncDecl):
         old_locals = self.locals
@@ -266,8 +266,15 @@ class TypeChecker:
             # Check all arms and verify they return compatible types
             arm_types = []
             for arm in expr.arms:
-                # Validate pattern matches scrutinee type
-                self.check_pattern(arm.pattern, scrutinee_type)
+                # Save locals before arm
+                old_locals = self.locals.copy()
+
+                # Validate pattern matches scrutinee type and get bindings
+                bindings = self.check_pattern(arm.pattern, scrutinee_type)
+                # Add bindings to local scope for this arm
+                for binding_name, binding_type in bindings:
+                    self.locals[binding_name] = binding_type
+
                 # Type check the arm body
                 arm_type = None
                 for stmt in arm.body.stmts:
@@ -282,6 +289,9 @@ class TypeChecker:
                     arm_type = JType("void")
                 arm_types.append(arm_type)
 
+                # Restore locals after arm
+                self.locals = old_locals
+
             # All arms must return same type
             if arm_types:
                 first_type = arm_types[0]
@@ -293,31 +303,47 @@ class TypeChecker:
         else:
             raise TypeError(f"Unknown expression type: {type(expr).__name__}")
 
-    def check_pattern(self, pattern: Any, scrutinee_type: JType):
-        """Verify a pattern is compatible with the scrutinee type."""
+    def check_pattern(self, pattern: Any, scrutinee_type: JType) -> List[Tuple[str, JType]]:
+        """Verify a pattern is compatible with scrutinee type. Returns bindings (name, type)."""
         from .ast import WildcardPattern, LiteralPattern, VariantPattern
 
         if isinstance(pattern, WildcardPattern):
             # Wildcard matches anything
-            pass
+            return []
         elif isinstance(pattern, LiteralPattern):
             # Literal must match scrutinee type
             pat_type = self.typeof(pattern.value)
             if not self.types_equal(pat_type, scrutinee_type):
                 raise TypeError(f"Pattern type {pat_type} doesn't match scrutinee type {scrutinee_type}")
+            return []
         elif isinstance(pattern, VariantPattern):
             # Variant pattern must be an enum variant
             if scrutinee_type.name not in self.enums:
                 raise TypeError(f"Cannot match enum variant on non-enum type {scrutinee_type}")
             enum_def = self.enums[scrutinee_type.name]
             # Check if variant exists
-            found = False
+            found_variant = None
             for variant in enum_def.variants:
                 if variant.name == pattern.name:
-                    found = True
+                    found_variant = variant
                     break
-            if not found:
+            if not found_variant:
                 raise TypeError(f"Enum {scrutinee_type.name} has no variant {pattern.name}")
+
+            # Check bindings match variant fields
+            bindings = []
+            if pattern.bindings:
+                if not found_variant.fields:
+                    raise TypeError(f"Variant {pattern.name} has no fields, but pattern expects {len(pattern.bindings)}")
+                if len(pattern.bindings) != len(found_variant.fields):
+                    raise TypeError(f"Variant {pattern.name} has {len(found_variant.fields)} fields, pattern expects {len(pattern.bindings)}")
+                # Create bindings for each field
+                for binding_name, field in zip(pattern.bindings, found_variant.fields):
+                    bindings.append((binding_name, field.type))
+            elif found_variant.fields:
+                raise TypeError(f"Variant {pattern.name} has fields, but pattern provides no bindings")
+
+            return bindings
 
     def is_numeric(self, t: JType) -> bool:
         return t.name in ("i8", "i32", "i64") and not t.is_pointer
