@@ -1,0 +1,21 @@
+struct Point {
+    x: i32;
+    y: i32;
+};
+
+struct Color {
+    r: i32;
+    g: i32;
+    b: i32;
+};
+
+enum Status {
+    OK = 0,
+    ERROR = 1,
+    PENDING = 2
+};
+
+fn main() -> i32 {
+    let nums: i32[3] = [1, 2, 3];
+    return 0;
+}

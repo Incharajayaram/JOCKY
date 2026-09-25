@@ -22,6 +22,8 @@ class TokenType(Enum):
     BREAK = auto()
     CONTINUE = auto()
     NULL = auto()
+    STRUCT = auto()
+    ENUM = auto()
 
     # Types
     I8 = auto()
@@ -67,6 +69,7 @@ class TokenType(Enum):
     COLON = auto()
     SEMICOLON = auto()
     COMMA = auto()
+    DOT = auto()
 
     EOF = auto()
 
@@ -84,6 +87,8 @@ KEYWORDS = {
     "break": TokenType.BREAK,
     "continue": TokenType.CONTINUE,
     "null": TokenType.NULL,
+    "struct": TokenType.STRUCT,
+    "enum": TokenType.ENUM,
     "i8": TokenType.I8,
     "i32": TokenType.I32,
     "i64": TokenType.I64,
@@ -277,6 +282,9 @@ class Lexer:
             elif ch == "." and self.peek(1) == "." and self.peek(2) == ".":
                 self.advance(); self.advance(); self.advance()
                 self.tokens.append(Token(TokenType.ELLIPSIS, "...", start_line, start_col))
+            elif ch == ".":
+                self.advance()
+                self.tokens.append(Token(TokenType.DOT, ".", start_line, start_col))
             elif ch == "(":
                 self.advance()
                 self.tokens.append(Token(TokenType.LPAREN, "(", start_line, start_col))
