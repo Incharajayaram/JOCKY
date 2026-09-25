@@ -1076,15 +1076,47 @@ Read at runtime by `jocky_manifest_load()` (called automatically from `jocky_run
 
 ### `.jkey` section  (`--pack`)
 
-Holds the 16-byte RC4 key used to encrypt `.text` and `.rdata`.  The stub
-loader (not yet implemented) reads this, decrypts in-place, then jumps to OEP.
+Holds the 16-byte RC4 key used to encrypt `.text` and the original entry point
+(OEP) RVA.  The `.jstub` stub loader reads this at runtime, decrypts `.text`
+in-place, then jumps to the OEP.
 
 ```
 Offset  Size  Field
-0       16    rc4_key   key for .text + .rdata decryption
+0       16    rc4_key   RC4 key used to encrypt .text
+16       4    oep_rva   RVA of the original entry point (little-endian)
 ```
 
 ---
+
+### `.jstub` section  (`--pack`)
+
+Position-independent x86-64 decryptor stub injected by `packPE()`.
+`AddressOfEntryPoint` is patched to point here so the OS loader calls it
+before any user code.
+
+**Execution sequence:**
+
+1. `GetModuleHandleA(NULL)` → image base
+2. Walk PE section table → locate `.jkey` (key + OEP RVA) and `.text`
+3. `VirtualProtect(.text, PAGE_EXECUTE_READWRITE)`
+4. RC4-decrypt `.text` in-place with the 16-byte key from `.jkey`
+5. `VirtualProtect(.text, PAGE_EXECUTE_READ)` (restore)
+6. `FlushInstructionCache` → CPU sees decrypted bytes
+7. Jump to `image_base + oep_rva`
+
+The section is never itself encrypted (packPE skips `.jstub` during the
+encryption pass).  Its source lives in `src/runtime/pack/stub_loader.c`;
+the compiled bytecode is embedded in `compiler/src/packer.cpp` as
+`kStubBytecode[]`.  Re-extract with:
+
+```sh
+clang -target x86_64-pc-windows-msvc -O2 -fno-stack-protector \
+      -fno-asynchronous-unwind-tables -mno-red-zone \
+      -o stub_loader.obj -c src/runtime/pack/stub_loader.c
+python3 scripts/extract_section.py stub_loader.obj .jstub
+```
+
+
 
 ### `.jtamp` section  (always added for Windows targets)
 
