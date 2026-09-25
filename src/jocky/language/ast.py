@@ -282,3 +282,43 @@ class VariantConstructor:
     """Construct a tagged union variant: Ok(value) or Error(code, msg)"""
     variant_name: str
     args: List[Any]  # Arguments for variant fields
+
+
+@dataclass
+class ModulePath:
+    """Represents a module path: mod::submod::name"""
+    components: List[str]
+
+    def __str__(self):
+        return "::".join(self.components)
+
+    @staticmethod
+    def from_string(path_str: str):
+        return ModulePath(path_str.split("::"))
+
+
+@dataclass
+class UseStmt:
+    """Import statement: use module::symbol or use module::*"""
+    path: ModulePath
+    all: bool = False  # True for use module::*, False for specific symbol
+
+    @property
+    def module_path(self) -> ModulePath:
+        if self.all:
+            return self.path
+        return ModulePath(self.path.components[:-1])
+
+    @property
+    def symbol(self) -> Optional[str]:
+        if self.all:
+            return None
+        return self.path.components[-1] if self.path.components else None
+
+
+@dataclass
+class ModDecl:
+    """Module declaration: mod name { items }"""
+    name: str
+    items: List[Any]  # Functions, structs, enums, other modules
+    public: bool = False  # pub mod vs private mod
