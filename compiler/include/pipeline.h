@@ -17,8 +17,11 @@ struct CompileOptions {
     std::string target;
     bool isCInput = false;
     bool useMsvc = false;
-    std::string embedDriverPath;   // path to .sys driver to embed in .jdrv section
-    std::string manifestPath;      // path to .txt manifest to embed in .jmani section
+    bool runForensic = false;
+    bool analyzeOnly = false;
+    std::string reportFormat = "json";
+    bool staticLink = false;
+    bool byovd = false;
 };
 
 class Pipeline {
@@ -29,7 +32,7 @@ private:
     bool emitLLVMIR(const CompileOptions& opts, const std::string& llPath);
     bool runObfuscation(const CompileOptions& opts, const std::string& inBc, const std::string& outBc);
     bool compileToObject(const CompileOptions& opts, const std::string& bc, const std::string& obj);
-    bool compileRuntime(const std::string& clang, const std::string& outDir, std::vector<std::string>& outObjs, const std::string& targetFlag, bool noRuntime);
+    bool compileRuntime(const std::string& clang, const std::string& outDir, std::vector<std::string>& outObjs, const std::string& targetFlag, bool noRuntime, bool byovd);
     bool linkExecutable(const CompileOptions& opts, const std::string& clang,
                         const std::string& obj, const std::vector<std::string>& runtimeObjs,
                         const std::string& exe);

