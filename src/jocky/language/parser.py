@@ -2,8 +2,8 @@ from .lexer import Token, TokenType, Lexer
 from .ast import (
     Program, FuncDecl, FFIDecl, Param, Block,
     LetStmt, AssignStmt, IfStmt, WhileStmt, ForStmt,
-    ReturnStmt, ExprStmt,
-    IntLiteral, BoolLiteral, StringLiteral, VarRef,
+    ReturnStmt, ExprStmt, BreakStmt, ContinueStmt,
+    IntLiteral, BoolLiteral, StringLiteral, VarRef, NullLiteral,
     BinaryOp, UnaryOp, CallExpr, DerefExpr, AddrOfExpr,
     CastExpr, IndexExpr,
     JType,
@@ -146,6 +146,14 @@ class Parser:
             return self.parse_for_stmt()
         elif self.match(TokenType.RETURN):
             return self.parse_return_stmt()
+        elif self.match(TokenType.BREAK):
+            self.advance()
+            self.expect(TokenType.SEMICOLON)
+            return BreakStmt()
+        elif self.match(TokenType.CONTINUE):
+            self.advance()
+            self.expect(TokenType.SEMICOLON)
+            return ContinueStmt()
         else:
             return self.parse_expr_or_assign_stmt()
 
@@ -168,7 +176,11 @@ class Parser:
         else_block = None
         if self.match(TokenType.ELSE):
             self.advance()
-            else_block = self.parse_block()
+            if self.match(TokenType.IF):
+                # else-if chaining: wrap the nested if in a Block
+                else_block = Block([self.parse_if_stmt()])
+            else:
+                else_block = self.parse_block()
         return IfStmt(cond, then_block, else_block)
 
     def parse_while_stmt(self) -> WhileStmt:
@@ -237,6 +249,8 @@ class Parser:
         return ExprStmt(expr)
 
     # ---- Expression parsing with precedence climbing ----
+    # Precedence (low to high):
+    #   || → && → | → ^ → & → == → < → << → + → * → unary
 
     def parse_expr(self) -> Any:
         return self.parse_or()
@@ -250,8 +264,32 @@ class Parser:
         return left
 
     def parse_and(self) -> Any:
-        left = self.parse_eq()
+        left = self.parse_bitor()
         while self.match(TokenType.ANDAND):
+            op = self.advance().value
+            right = self.parse_bitor()
+            left = BinaryOp(op, left, right)
+        return left
+
+    def parse_bitor(self) -> Any:
+        left = self.parse_bitxor()
+        while self.match(TokenType.PIPE):
+            op = self.advance().value
+            right = self.parse_bitxor()
+            left = BinaryOp(op, left, right)
+        return left
+
+    def parse_bitxor(self) -> Any:
+        left = self.parse_bitand()
+        while self.match(TokenType.CARET):
+            op = self.advance().value
+            right = self.parse_bitand()
+            left = BinaryOp(op, left, right)
+        return left
+
+    def parse_bitand(self) -> Any:
+        left = self.parse_eq()
+        while self.match(TokenType.AMPERSAND):
             op = self.advance().value
             right = self.parse_eq()
             left = BinaryOp(op, left, right)
@@ -266,8 +304,16 @@ class Parser:
         return left
 
     def parse_rel(self) -> Any:
-        left = self.parse_add()
+        left = self.parse_shift()
         while self.match(TokenType.LT, TokenType.GT, TokenType.LE, TokenType.GE):
+            op = self.advance().value
+            right = self.parse_shift()
+            left = BinaryOp(op, left, right)
+        return left
+
+    def parse_shift(self) -> Any:
+        left = self.parse_add()
+        while self.match(TokenType.LSHIFT, TokenType.RSHIFT):
             op = self.advance().value
             right = self.parse_add()
             left = BinaryOp(op, left, right)
@@ -290,7 +336,8 @@ class Parser:
         return left
 
     def parse_unary(self) -> Any:
-        if self.match(TokenType.MINUS, TokenType.BANG, TokenType.STAR, TokenType.AMPERSAND):
+        if self.match(TokenType.MINUS, TokenType.BANG, TokenType.STAR,
+                      TokenType.AMPERSAND, TokenType.TILDE):
             op = self.advance().value
             operand = self.parse_unary()
             if op == "*":
@@ -346,6 +393,9 @@ class Parser:
         elif tok.type == TokenType.FALSE:
             self.advance()
             return BoolLiteral(False)
+        elif tok.type == TokenType.NULL:
+            self.advance()
+            return NullLiteral()
         elif tok.type == TokenType.IDENT:
             self.advance()
             return VarRef(tok.value)

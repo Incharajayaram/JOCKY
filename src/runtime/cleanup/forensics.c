@@ -14,58 +14,12 @@
 #ifdef _WIN32
 
 #include "jocky_rt.h"
+#include "jocky_internal.h"
 #include <windows.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-
-/* ── Shared helpers ─────────────────────────────────────────────────── */
-
-static bool enable_privilege(const wchar_t* name)
-{
-    HANDLE hTok;
-    if (!OpenProcessToken(GetCurrentProcess(),
-                          TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hTok))
-        return false;
-
-    LUID luid;
-    bool ok = false;
-    if (LookupPrivilegeValueW(NULL, name, &luid)) {
-        TOKEN_PRIVILEGES tp;
-        tp.PrivilegeCount           = 1;
-        tp.Privileges[0].Luid       = luid;
-        tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-        ok = AdjustTokenPrivileges(hTok, FALSE, &tp, 0, NULL, NULL) &&
-             GetLastError() == ERROR_SUCCESS;
-    }
-    CloseHandle(hTok);
-    return ok;
-}
-
-/* Delete all files matching a wildcard pattern (no recursion). */
-static void wipe_glob(const wchar_t* pattern)
-{
-    WIN32_FIND_DATAW fd;
-    HANDLE h = FindFirstFileW(pattern, &fd);
-    if (h == INVALID_HANDLE_VALUE) return;
-
-    wchar_t dir[MAX_PATH];
-    wcsncpy_s(dir, MAX_PATH, pattern, _TRUNCATE);
-    wchar_t* sl = wcsrchr(dir, L'\\');
-    if (!sl) { FindClose(h); return; }
-    *(sl + 1) = L'\0';
-
-    do {
-        if (!wcscmp(fd.cFileName, L".") || !wcscmp(fd.cFileName, L"..")) continue;
-        wchar_t full[MAX_PATH];
-        _snwprintf_s(full, MAX_PATH, _TRUNCATE, L"%s%s", dir, fd.cFileName);
-        SetFileAttributesW(full, FILE_ATTRIBUTE_NORMAL);
-        DeleteFileW(full);
-    } while (FindNextFileW(h, &fd));
-
-    FindClose(h);
-}
 
 /* ── Prefetch ───────────────────────────────────────────────────────── */
 

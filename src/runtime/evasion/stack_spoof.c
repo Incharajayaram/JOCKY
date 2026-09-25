@@ -120,14 +120,21 @@ static spoof_stub_t* build_stub(PVOID gadget, PVOID target_fn)
     return s;
 }
 
-/* ── Cached gadget (found once) ─────────────────────────────────────── */
+/* ── Cached gadget (found once, thread-safe) ────────────────────────── */
 
-static PVOID s_gadget = NULL;
+static volatile PVOID s_gadget = NULL;
 
 static PVOID get_gadget(void)
 {
-    if (!s_gadget) s_gadget = jocky_find_ret_gadget();
-    return s_gadget;
+    PVOID g = s_gadget;
+    if (!g) {
+        PVOID found = jocky_find_ret_gadget();
+        /* CAS: first winner's value stays; loser's result is discarded. */
+        PVOID prev = InterlockedCompareExchangePointer(
+                         (volatile PVOID*)&s_gadget, found, NULL);
+        g = (prev == NULL) ? found : prev;
+    }
+    return g;
 }
 
 /* ── Public API ─────────────────────────────────────────────────────── */

