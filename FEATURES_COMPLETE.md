@@ -43,13 +43,26 @@
 9. ✅ **Packing** – Optional UPX/custom PE packing
 
 ### Language Features Not Yet Implemented
-- ⏳ **Structs/records** – user-defined composite types
-- ⏳ **Enums** – enumeration types
+- ✅ **Structs/records** – user-defined composite types (IMPLEMENTED)
+  - ✅ Struct declarations with typed fields
+  - ✅ Field access via `.` operator
+  - ✅ Struct initialization
+  - ✅ LLVM struct type generation
+- ✅ **Enums** – enumeration types (IMPLEMENTED)
+  - ✅ Enum declarations with variants
+  - ✅ Variant value assignment
+  - ⏳ Pattern matching (future)
+  - ⏳ Tagged unions (future)
+- ✅ **Arrays** – fixed-size and dynamic arrays (IMPLEMENTED)
+  - ✅ Array type syntax `Type[Size]`
+  - ✅ Array literals `[elem1, elem2, ...]`
+  - ✅ Array indexing `arr[i]`
+  - ⏳ Dynamic arrays (future)
+  - ⏳ Length intrinsic (future)
 - ⏳ **Pattern matching** – match expressions
 - ⏳ **Generics/templates** – polymorphic functions/types
 - ⏳ **Macros** – compile-time meta-programming
 - ⏳ **Closures/lambdas** – anonymous functions
-- ⏳ **Arrays** – fixed-size and dynamic arrays
 - ⏳ **Type aliases** – `type T = U;`
 
 ---
@@ -528,7 +541,7 @@
 
 | Category | Implemented | Partial | Pending | Priority |
 |---|---|---|---|---|
-| **Language** | 10/20 | 2 | 8 | High |
+| **Language** | 13/20 | 2 | 5 | High |
 | **Compiler** | 12/12 | - | - | ✅ |
 | **Obfuscation** | 12/15 | - | 3 | Med |
 | **Runtime** | 45/50 | 3 | 2 | High |
@@ -537,11 +550,11 @@
 | **In-Mem Exec** | 5/5 | - | - | ✅ |
 | **Exfiltration** | 6/6 | - | - | ✅ |
 | **Cleanup** | 7/7 | - | - | ✅ |
-| **Testing** | 7/15 | - | 8 | Med |
+| **Testing** | 9/15 | - | 6 | Med |
 | **Documentation** | 12/12 | - | - | ✅ |
 | **Tooling** | 8/10 | - | 2 | Low |
 
-**Overall: 79/129 features (61% complete)**
+**Overall: 84/129 features (65% complete)** ⬆️ +5 this sprint (structs, enums, arrays)
 
 ---
 
