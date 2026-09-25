@@ -52,7 +52,10 @@
   - ✅ Enum declarations with variants
   - ✅ Variant value assignment
   - ✅ Pattern matching (IMPLEMENTED)
-  - ⏳ Tagged unions (future)
+  - ✅ Tagged unions (IMPLEMENTED)
+    - ✅ Variants with associated data: `Ok(value: i32)`
+    - ✅ Pattern matching field extraction: `Ok(v) => ...`
+    - ⏳ Variant construction (future)
 - ✅ **Arrays** – fixed-size and dynamic arrays (IMPLEMENTED)
   - ✅ Array type syntax `Type[Size]`
   - ✅ Array literals `[elem1, elem2, ...]`
@@ -342,22 +345,26 @@
   - Estimated effort: 2 days
 
 ### Runtime Features
-- [ ] **Cross-platform module loading** – Linux .so support
-  - [ ] dlopen/dlsym integration
-  - [ ] Symbol resolution
-  - [ ] Unloading
-  - Estimated effort: 2 days
+- [x] **Cross-platform module loading** – Linux .so support (IMPLEMENTED)
+  - [x] dlopen/dlsym integration
+  - [x] Symbol resolution
+  - [x] Unloading
+  - [x] Feature detection (has_symbol)
+  - [x] Module base address lookup (ASLR)
 
-- [ ] **Process hollowing on Linux** – ptrace-based process replacement
-  - [ ] ELF header manipulation
-  - [ ] Segment remapping
-  - Estimated effort: 3 days
+- [x] **Process hollowing on Linux** – ptrace-based process replacement (IMPLEMENTED)
+  - [x] ptrace attachment and control
+  - [x] Memory read/write via PTRACE_PEEKDATA/POKEDATA
+  - [x] RIP redirection (execution hijacking)
+  - [x] Spawn and hollow (fork → hollow before main)
+  - [x] Portable ELF parsing (no libelf dependency)
 
-- [ ] **Linux kernel exploitation primitives**
-  - [ ] /proc/kcore reading
-  - [ ] SMEP/SMAP bypass techniques
-  - [ ] eBPF-based kernel access
-  - Estimated effort: 4 days
+- [x] **Linux kernel exploitation primitives** (IMPLEMENTED)
+  - [x] /proc/kcore reading and writing
+  - [x] Kernel symbol resolution (/proc/kallsyms, /proc/modules)
+  - [x] SELinux disable capability
+  - [x] SMEP/SMAP/KPTI detection
+  - [x] Privilege escalation framework (cred modification)
 
 ### Toolchain
 - [ ] **Build system performance** – incremental compilation
@@ -543,7 +550,7 @@
 
 | Category | Implemented | Partial | Pending | Priority |
 |---|---|---|---|---|
-| **Language** | 15/20 | 2 | 3 | High |
+| **Language** | 16/20 | 2 | 2 | High |
 | **Compiler** | 12/12 | - | - | ✅ |
 | **Obfuscation** | 12/15 | - | 3 | Med |
 | **Runtime** | 45/50 | 3 | 2 | High |
@@ -556,7 +563,12 @@
 | **Documentation** | 12/12 | - | - | ✅ |
 | **Tooling** | 8/10 | - | 2 | Low |
 
-**Overall: 86/129 features (67% complete)** ⬆️ +7 this session (structs, enums, arrays, type aliases, pattern matching)
+**Overall: 92/129 features (71% complete)** ⬆️ +13 this session
+
+**This session:**
+- Language: structs, enums, arrays, type aliases, pattern matching, tagged unions (6 features)
+- Runtime: module loading, process hollowing, kernel exploitation (3 features)  
+- Fixes: tagged union codegen, portable ELF parsing, second-pass type checking bug
 
 ---
 
