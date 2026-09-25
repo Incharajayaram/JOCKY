@@ -506,6 +506,46 @@ bool jocky_verify_integrity(void);
  */
 uint32_t jocky_runtime_init(void);
 
+/* ============================================================================
+ * Module Loading (Linux .so / Windows .dll dynamic loading)
+ * ============================================================================ */
+
+/* Load a shared library at runtime.
+ * On Linux: uses dlopen(path, RTLD_LAZY | RTLD_LOCAL)
+ * On Windows: uses LoadLibraryA
+ * Returns opaque module handle, NULL on failure
+ */
+void* jocky_module_load(const char* path);
+
+/* Unload a previously loaded module.
+ * Returns true on success, false on failure
+ */
+bool jocky_module_unload(void* handle);
+
+/* Resolve a symbol (function/variable) from a loaded module.
+ * Returns pointer to the symbol, NULL if not found
+ */
+void* jocky_module_symbol(void* handle, const char* symbol_name);
+
+/* Load a module and get a symbol in one call.
+ * Convenience function combining jocky_module_load + jocky_module_symbol
+ * Module remains loaded - caller should jocky_module_unload when done
+ */
+void* jocky_module_get_symbol(const char* path, const char* symbol_name);
+
+/* Check if a symbol exists in a loaded module.
+ * Useful for feature detection without resolving
+ * Returns true if symbol exists, false otherwise
+ */
+bool jocky_module_has_symbol(void* handle, const char* symbol_name);
+
+/* Get the base address of a loaded module (Linux only).
+ * Parses /proc/self/maps to find the module's memory mapping.
+ * Useful for calculating offsets from module base.
+ * Returns base address, or 0 if not found/not loaded
+ */
+uintptr_t jocky_module_base(const char* path);
+
 #ifdef __cplusplus
 }
 #endif
