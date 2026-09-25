@@ -19,6 +19,9 @@ class TokenType(Enum):
     RETURN = auto()
     TRUE = auto()
     FALSE = auto()
+    BREAK = auto()
+    CONTINUE = auto()
+    NULL = auto()
 
     # Types
     I8 = auto()
@@ -47,6 +50,12 @@ class TokenType(Enum):
     AMPERSAND = auto()
     ARROW = auto()
     ELLIPSIS = auto()
+    # Bitwise
+    PIPE = auto()
+    CARET = auto()
+    TILDE = auto()
+    LSHIFT = auto()
+    RSHIFT = auto()
 
     # Delimiters
     LPAREN = auto()
@@ -72,6 +81,9 @@ KEYWORDS = {
     "return": TokenType.RETURN,
     "true": TokenType.TRUE,
     "false": TokenType.FALSE,
+    "break": TokenType.BREAK,
+    "continue": TokenType.CONTINUE,
+    "null": TokenType.NULL,
     "i8": TokenType.I8,
     "i32": TokenType.I32,
     "i64": TokenType.I64,
@@ -193,11 +205,12 @@ class Lexer:
                 tok_type = KEYWORDS.get(ident, TokenType.IDENT)
                 self.tokens.append(Token(tok_type, ident, start_line, start_col))
             elif ch == "+" and self.peek(1) == "+":
-                self.advance(); self.advance()
-                self.tokens.append(Token(TokenType.PLUS, "++", start_line, start_col))
+                self.error("'++' is not supported; use 'x = x + 1' instead")
             elif ch == "+":
                 self.advance()
                 self.tokens.append(Token(TokenType.PLUS, "+", start_line, start_col))
+            elif ch == "-" and self.peek(1) == "-":
+                self.error("'--' is not supported; use 'x = x - 1' instead")
             elif ch == "-" and self.peek(1) == ">":
                 self.advance(); self.advance()
                 self.tokens.append(Token(TokenType.ARROW, "->", start_line, start_col))
@@ -225,12 +238,18 @@ class Lexer:
             elif ch == "!":
                 self.advance()
                 self.tokens.append(Token(TokenType.BANG, "!", start_line, start_col))
+            elif ch == "<" and self.peek(1) == "<":
+                self.advance(); self.advance()
+                self.tokens.append(Token(TokenType.LSHIFT, "<<", start_line, start_col))
             elif ch == "<" and self.peek(1) == "=":
                 self.advance(); self.advance()
                 self.tokens.append(Token(TokenType.LE, "<=", start_line, start_col))
             elif ch == "<":
                 self.advance()
                 self.tokens.append(Token(TokenType.LT, "<", start_line, start_col))
+            elif ch == ">" and self.peek(1) == ">":
+                self.advance(); self.advance()
+                self.tokens.append(Token(TokenType.RSHIFT, ">>", start_line, start_col))
             elif ch == ">" and self.peek(1) == "=":
                 self.advance(); self.advance()
                 self.tokens.append(Token(TokenType.GE, ">=", start_line, start_col))
@@ -246,6 +265,15 @@ class Lexer:
             elif ch == "|" and self.peek(1) == "|":
                 self.advance(); self.advance()
                 self.tokens.append(Token(TokenType.OROR, "||", start_line, start_col))
+            elif ch == "|":
+                self.advance()
+                self.tokens.append(Token(TokenType.PIPE, "|", start_line, start_col))
+            elif ch == "^":
+                self.advance()
+                self.tokens.append(Token(TokenType.CARET, "^", start_line, start_col))
+            elif ch == "~":
+                self.advance()
+                self.tokens.append(Token(TokenType.TILDE, "~", start_line, start_col))
             elif ch == "." and self.peek(1) == "." and self.peek(2) == ".":
                 self.advance(); self.advance(); self.advance()
                 self.tokens.append(Token(TokenType.ELLIPSIS, "...", start_line, start_col))

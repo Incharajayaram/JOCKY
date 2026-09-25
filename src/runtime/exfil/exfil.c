@@ -17,6 +17,7 @@
 #ifdef _WIN32
 
 #include "jocky_rt.h"
+#include "jocky_internal.h"
 #include <windows.h>
 #include <winhttp.h>
 #include <windns.h>
@@ -24,17 +25,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-
-/* ── Static helpers ─────────────────────────────────────────────────── */
-
-/* Fill buf with len random bytes via advapi32!SystemFunction036. */
-static bool gen_random(uint8_t* buf, size_t len)
-{
-    typedef BOOLEAN (WINAPI* pfn_t)(PVOID, ULONG);
-    pfn_t fn = (pfn_t)GetProcAddress(GetModuleHandleA("advapi32.dll"),
-                                      "SystemFunction036");
-    return fn && fn(buf, (ULONG)len);
-}
 
 /* RFC 4648 base32 (uppercase).  out must hold ceil(in_len*8/5)+1 bytes. */
 static size_t b32_encode(const uint8_t* in, size_t in_len, char* out)

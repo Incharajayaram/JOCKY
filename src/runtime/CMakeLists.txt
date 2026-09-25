@@ -6,6 +6,7 @@ set(CMAKE_C_STANDARD 11)
 # Runtime source files
 set(RUNTIME_SOURCES
     init/anti_analysis.c
+    util/mem.c
     evasion/unhook.c
     evasion/syscalls.c
     evasion/stack_spoof.c

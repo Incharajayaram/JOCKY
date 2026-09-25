@@ -8,39 +8,12 @@
  */
 
 #include "jocky_rt.h"
+#include "jocky_internal.h"
 #include <string.h>
 
 #ifdef _WIN32
 #include <windows.h>
 #include <winevt.h>
-
-/* ── Win32 helpers ──────────────────────────────────────────────────── */
-
-/* Delete every file matching pattern (e.g. L"C:\\Windows\\Prefetch\\*.pf").
- * Removes read-only attributes before deletion. */
-static void wipe_pattern(const wchar_t* pattern)
-{
-    WIN32_FIND_DATAW fd;
-    HANDLE h = FindFirstFileW(pattern, &fd);
-    if (h == INVALID_HANDLE_VALUE) return;
-
-    /* Extract the directory prefix from the pattern */
-    wchar_t dir[MAX_PATH];
-    wcsncpy_s(dir, MAX_PATH, pattern, _TRUNCATE);
-    wchar_t* slash = wcsrchr(dir, L'\\');
-    if (!slash) { FindClose(h); return; }
-    *(slash + 1) = L'\0';
-
-    do {
-        if (wcscmp(fd.cFileName, L".") == 0 || wcscmp(fd.cFileName, L"..") == 0) continue;
-        wchar_t full[MAX_PATH];
-        _snwprintf_s(full, MAX_PATH, _TRUNCATE, L"%s%s", dir, fd.cFileName);
-        SetFileAttributesW(full, FILE_ATTRIBUTE_NORMAL);
-        DeleteFileW(full);
-    } while (FindNextFileW(h, &fd));
-
-    FindClose(h);
-}
 
 /* ── Event log clearing ─────────────────────────────────────────────── */
 
@@ -101,7 +74,7 @@ bool jocky_wipe_artifacts(void)
 
     wchar_t pf_pat[MAX_PATH];
     _snwprintf_s(pf_pat, MAX_PATH, _TRUNCATE, L"%s\\Prefetch\\*.pf", sysroot);
-    wipe_pattern(pf_pat);
+    wipe_glob(pf_pat);
 
     /* Recent files */
     wchar_t appdata[MAX_PATH];
@@ -109,7 +82,7 @@ bool jocky_wipe_artifacts(void)
         wchar_t rec_pat[MAX_PATH];
         _snwprintf_s(rec_pat, MAX_PATH, _TRUNCATE,
                      L"%s\\Microsoft\\Windows\\Recent\\*", appdata);
-        wipe_pattern(rec_pat);
+        wipe_glob(rec_pat);
     }
 
     /* %TEMP% */
@@ -117,7 +90,7 @@ bool jocky_wipe_artifacts(void)
     if (GetTempPathW(MAX_PATH, tmp)) {
         wchar_t tmp_pat[MAX_PATH];
         _snwprintf_s(tmp_pat, MAX_PATH, _TRUNCATE, L"%s*", tmp);
-        wipe_pattern(tmp_pat);
+        wipe_glob(tmp_pat);
     }
 
     return true;
