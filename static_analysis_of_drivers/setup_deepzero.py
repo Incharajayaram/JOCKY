@@ -101,8 +101,11 @@ def main():
         else:
             zip_path = tool_dir / "ghidra.zip"
             print(f"[*] downloading {GHIDRA_URL}")
-            subprocess.run(["powershell", "-NoProfile", "-Command",
-                            f"Invoke-WebRequest -Uri '{GHIDRA_URL}' -OutFile '{zip_path}'"], check=True)
+            if os.name == "nt":
+                subprocess.run(["powershell", "-NoProfile", "-Command",
+                                f"Invoke-WebRequest -Uri '{GHIDRA_URL}' -OutFile '{zip_path}'"], check=True)
+            else:
+                subprocess.run(["wget", "-O", str(zip_path), GHIDRA_URL], check=True)
             print("[*] extracting (this takes a while)")
             with zipfile.ZipFile(zip_path) as zf:
                 zf.extractall(tool_dir)
@@ -121,8 +124,11 @@ def main():
         else:
             jdk_zip = tool_dir / "jdk.zip"
             print(f"[*] downloading JDK 17 from {ADOPTIUM_API}")
-            subprocess.run(["powershell", "-NoProfile", "-Command",
-                            f"Invoke-WebRequest -Uri '{ADOPTIUM_API}' -OutFile '{jdk_zip}'"], check=True)
+            if os.name == "nt":
+                subprocess.run(["powershell", "-NoProfile", "-Command",
+                                f"Invoke-WebRequest -Uri '{ADOPTIUM_API}' -OutFile '{jdk_zip}'"], check=True)
+            else:
+                subprocess.run(["wget", "-O", str(jdk_zip), ADOPTIUM_API], check=True)
             with zipfile.ZipFile(jdk_zip) as zf:
                 zf.extractall(tool_dir)
             jdk_zip.unlink(missing_ok=True)
