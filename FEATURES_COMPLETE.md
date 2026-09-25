@@ -63,7 +63,7 @@
 - ⏳ **Generics/templates** – polymorphic functions/types
 - ⏳ **Macros** – compile-time meta-programming
 - ⏳ **Closures/lambdas** – anonymous functions
-- ⏳ **Type aliases** – `type T = U;`
+- ✅ **Type aliases** – `type T = U;` (IMPLEMENTED)
 
 ---
 
@@ -541,7 +541,7 @@
 
 | Category | Implemented | Partial | Pending | Priority |
 |---|---|---|---|---|
-| **Language** | 13/20 | 2 | 5 | High |
+| **Language** | 14/20 | 2 | 4 | High |
 | **Compiler** | 12/12 | - | - | ✅ |
 | **Obfuscation** | 12/15 | - | 3 | Med |
 | **Runtime** | 45/50 | 3 | 2 | High |
@@ -554,7 +554,7 @@
 | **Documentation** | 12/12 | - | - | ✅ |
 | **Tooling** | 8/10 | - | 2 | Low |
 
-**Overall: 84/129 features (65% complete)** ⬆️ +5 this sprint (structs, enums, arrays)
+**Overall: 85/129 features (66% complete)** ⬆️ +6 this session (structs, enums, arrays, type aliases)
 
 ---
 
