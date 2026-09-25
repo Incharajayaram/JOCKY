@@ -1,0 +1,52 @@
+enum Status {
+    OK = 0,
+    Error = 1,
+    Pending = 2
+};
+
+fn describe_status(s: Status) -> i32 {
+    match s {
+        OK => 100,
+        Error => 200,
+        Pending => 300
+    }
+}
+
+enum HttpCode {
+    Success = 200,
+    NotFound = 404,
+    ServerError = 500
+};
+
+fn check_http(code: i32) -> string {
+    match code {
+        200 => "OK",
+        404 => "Not Found",
+        500 => "Server Error",
+        _ => "Unknown"
+    }
+}
+
+fn is_even(n: i32) -> bool {
+    match n {
+        0 => true,
+        1 => false,
+        2 => true,
+        3 => false,
+        _ => false
+    }
+}
+
+fn classify_bool(b: bool) -> i32 {
+    match b {
+        true => 1,
+        false => 0
+    }
+}
+
+
+fn main() -> i32 {
+    let ok_status: Status = OK;
+    let result: i32 = describe_status(ok_status);
+    return result;
+}
