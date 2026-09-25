@@ -7,14 +7,20 @@ class TypeError(Exception):
 class TypeChecker:
     def __init__(self):
         self.functions: Dict[str, (List[JType], JType)] = {}
+        self.structs: Dict[str, StructDef] = {}  # struct_name -> StructDef
+        self.enums: Dict[str, EnumDef] = {}      # enum_name -> EnumDef
         self.locals: Dict[str, JType] = {}
         self.current_ret: JType = JType("void")
         self.loop_depth: int = 0
 
     def check(self, prog: Program):
-        # First pass: collect function signatures
+        # First pass: collect struct/enum and function signatures
         for decl in prog.decls:
-            if isinstance(decl, FuncDecl):
+            if isinstance(decl, StructDef):
+                self.structs[decl.name] = decl
+            elif isinstance(decl, EnumDef):
+                self.enums[decl.name] = decl
+            elif isinstance(decl, FuncDecl):
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, False)
             elif isinstance(decl, FFIDecl):
@@ -190,9 +196,48 @@ class TypeChecker:
             it = self.typeof(expr.index)
             if not self.is_numeric(it):
                 raise TypeError("Index must be numeric")
-            if bt.is_pointer or bt.name == "string":
+            if bt.is_array:
+                # Indexing into array returns element type (non-array)
+                return JType(bt.name, is_pointer=False, is_array=False, array_size=0)
+            elif bt.is_pointer or bt.name == "string":
                 return JType(bt.name, is_pointer=False)
             raise TypeError(f"Cannot index type {bt}")
+        elif isinstance(expr, FieldAccessExpr):
+            obj_type = self.typeof(expr.object)
+            if obj_type.name not in self.structs:
+                raise TypeError(f"Cannot access field on non-struct type: {obj_type}")
+            struct_def = self.structs[obj_type.name]
+            for field in struct_def.fields:
+                if field.name == expr.field:
+                    return field.type
+            raise TypeError(f"Struct {obj_type.name} has no field {expr.field}")
+        elif isinstance(expr, ArrayLiteralExpr):
+            if len(expr.elements) == 0:
+                # Empty array - type hint required
+                if type_hint is None or not type_hint.is_array:
+                    raise TypeError("Empty array requires type hint")
+                return type_hint
+            # Get type from first element
+            elem_type = self.typeof(expr.elements[0])
+            # Verify all elements have same type
+            for e in expr.elements[1:]:
+                et = self.typeof(e)
+                if not self.types_equal(elem_type, et):
+                    raise TypeError(f"Array element type mismatch: {elem_type} vs {et}")
+            # Return array type
+            return JType(elem_type.name, is_array=True, array_size=len(expr.elements))
+        elif isinstance(expr, StructLiteralExpr):
+            if expr.struct_type not in self.structs:
+                raise TypeError(f"Unknown struct type: {expr.struct_type}")
+            struct_def = self.structs[expr.struct_type]
+            # Verify all fields are present and have correct types
+            for field in struct_def.fields:
+                if field.name not in expr.fields:
+                    raise TypeError(f"Missing field {field.name} in {expr.struct_type} initialization")
+                val_type = self.typeof(expr.fields[field.name])
+                if not self.types_equal(val_type, field.type):
+                    raise TypeError(f"Field {field.name}: expected {field.type}, got {val_type}")
+            return JType(expr.struct_type, is_pointer=False)
         else:
             raise TypeError(f"Unknown expression type: {type(expr).__name__}")
 
@@ -200,10 +245,26 @@ class TypeChecker:
         return t.name in ("i8", "i32", "i64") and not t.is_pointer
 
     def types_equal(self, a: JType, b: JType) -> bool:
-        if a.name == b.name and a.is_pointer == b.is_pointer:
-            return True
-        # null literal (i8*) is compatible with any other pointer type
-        if a.is_pointer and b.is_pointer:
-            if a.name == "i8" or b.name == "i8":
-                return True
-        return False
+        # Check basic type equality
+        if a.name != b.name:
+            # null literal (i8*) is compatible with any other pointer type
+            if a.is_pointer and b.is_pointer:
+                if a.name == "i8" or b.name == "i8":
+                    return True
+            return False
+
+        # Check pointer
+        if a.is_pointer != b.is_pointer:
+            return False
+
+        # Check array
+        if a.is_array != b.is_array:
+            return False
+
+        # If both are arrays, sizes must match (or one is 0 = unspecified)
+        if a.is_array and b.is_array:
+            if a.array_size != 0 and b.array_size != 0:
+                if a.array_size != b.array_size:
+                    return False
+
+        return True
