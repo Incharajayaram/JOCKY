@@ -244,7 +244,48 @@ def main():
     log(f"[*] After dedup: {len(new_candidates)} candidates")
 
     # ------------------------------------------------------------------
-    # 6. Generate report
+    # 6. Write new candidate driver files (per-driver format)
+    # ------------------------------------------------------------------
+    new_files_written = 0
+    if args.commit:  # Only write candidate files when explicitly committing
+        for c in new_candidates[:5]:  # Only top 5 to avoid spam
+            driver_file = DRIVERS_DIR / f"{c['name']}.json"
+            if driver_file.exists():
+                continue
+            driver_data = {
+                "name": c["name"],
+                "family": "unknown",
+                "sha256": c["sha256"],
+                "size": "unknown",
+                "arch": "x64",
+                "signed": True,
+                "company": c["company"],
+                "description": c["description"],
+                "evasion_score": 5.0,
+                "device_paths": {"primary": "", "aliases": []},
+                "service_name": c["name"].replace(".sys", ""),
+                "init_sequence": ["create_service", "start_service", "open_device"],
+                "capabilities": [],
+                "ioctl_map": {},
+                "limitations": ["Requires Administrator", "Not yet tested - candidate only"],
+                "dependencies": [],
+                "blocklist_status": {"microsoft_blocked": False, "filename_rule": False},
+                "tested": False,
+                "test_results": {},
+                "source": f"LOLDrivers/{c['lol_id']}",
+                "candidate": True,
+            }
+            driver_file.write_text(json.dumps(driver_data, indent=2), encoding="utf-8")
+            new_files_written += 1
+            log(f"[+] Wrote new candidate file: {driver_file}")
+    else:
+        log("[*] Skipping candidate file write (use --commit to persist)")
+
+    if new_files_written > 0:
+        log(f"[*] Wrote {new_files_written} new candidate files to {DRIVERS_DIR}")
+
+    # ------------------------------------------------------------------
+    # 7. Generate report
     # ------------------------------------------------------------------
     report_lines = [
         "# BYOVD Driver Manifest Update Report\n",
@@ -287,7 +328,12 @@ def main():
     # ------------------------------------------------------------------
     if args.commit and (blocked_drivers or new_candidates):
         log("[*] Committing changes...")
-        subprocess.run(["git", "add", "-A"], cwd=PROJECT_ROOT)
+        # Only add relevant files, not repo_cache or other untracked stuff
+        subprocess.run(["git", "add", 
+                        "src/runtime/byovd/drivers/",
+                        "src/runtime/byovd/driver_manifest.json",
+                        "pipeline_scripts/driver_update_report.md"],
+                       cwd=PROJECT_ROOT)
         msg = f"Auto-update BYOVD driver manifest\n\n"
         if blocked_drivers:
             msg += f"BLOCKED: {len(blocked_drivers)} drivers now on Microsoft blocklist:\n"
