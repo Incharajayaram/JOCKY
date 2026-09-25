@@ -115,6 +115,7 @@ class ArrayType:
 class EnumVariant:
     name: str
     value: Optional[int] = None
+    fields: Optional[List['StructField']] = None  # For tagged unions
 
 @dataclass
 class EnumDef:
@@ -260,8 +261,9 @@ class LiteralPattern(Pattern):
 
 @dataclass
 class VariantPattern(Pattern):
-    """Match an enum variant: EnumName"""
+    """Match an enum variant: EnumName or EnumName(x, y, ...)"""
     name: str
+    bindings: Optional[List[str]] = None  # For tagged union field bindings
 
 @dataclass
 class MatchArm:
@@ -274,3 +276,9 @@ class MatchExpr:
     """Match expression: match expr { pattern => body, ... }"""
     scrutinee: Any  # The expression being matched
     arms: List[MatchArm]
+
+@dataclass
+class VariantConstructor:
+    """Construct a tagged union variant: Ok(value) or Error(code, msg)"""
+    variant_name: str
+    args: List[Any]  # Arguments for variant fields
