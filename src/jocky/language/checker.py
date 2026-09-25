@@ -1,7 +1,8 @@
 from .ast import *
+from .errors import TypeError as BaseTypeError, SourceRange
 from typing import Dict, Any, Optional, List, Tuple
 
-class TypeError(Exception):
+class TypeError(BaseTypeError):
     pass
 
 class TypeChecker:
