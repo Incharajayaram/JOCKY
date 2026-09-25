@@ -197,7 +197,7 @@ class TypeChecker:
             raise TypeError(f"Unknown expression type: {type(expr).__name__}")
 
     def is_numeric(self, t: JType) -> bool:
-        return t.name in ("i8", "i32", "i64")
+        return t.name in ("i8", "i32", "i64") and not t.is_pointer
 
     def types_equal(self, a: JType, b: JType) -> bool:
         if a.name == b.name and a.is_pointer == b.is_pointer:

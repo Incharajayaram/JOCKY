@@ -358,7 +358,7 @@ class CodeGen:
         raise CodeGenError(f"Cannot cast {from_t} to {to_t}")
 
     def is_numeric(self, t: JType) -> bool:
-        return t.name in ("i8", "i32", "i64")
+        return t.name in ("i8", "i32", "i64") and not t.is_pointer
 
     def infer_type(self, expr: Any) -> JType:
         if isinstance(expr, IntLiteral):
