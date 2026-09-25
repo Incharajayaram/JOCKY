@@ -1322,7 +1322,7 @@ fn main() -> void {
 
 ---
 
-## 13  Cleanup / Anti-Forensics  *(Windows only unless noted)*
+## 14  Cleanup / Anti-Forensics  *(Windows only unless noted)*
 
 Five targeted cleanup functions plus an orchestrator.  All require
 Administrator-level privileges.  Call after payload execution, before exit.
@@ -1446,7 +1446,128 @@ fn main() -> void {
 
 ---
 
-## 13  Memory Allocators
+## 15  Module Loading  *(Linux & Windows)*
+
+Cross-platform dynamic library loading for runtime symbol resolution.
+
+### `jocky_module_load(path) -> void*`
+
+Load a shared library (.so on Linux, .dll on Windows) at runtime.
+
+- **On Linux**: Uses `dlopen(path, RTLD_LAZY | RTLD_LOCAL)`
+- **On Windows**: Uses `LoadLibraryA(path)`
+
+Returns an opaque module handle for use with other `jocky_module_*` functions.
+Returns `null` on failure.
+
+```jky
+ffi jocky_module_load(i8*) -> i8*;
+
+fn main() -> i32 {
+    // Load libc on Linux
+    let libc: i8* = jocky_module_load("/lib/x86_64-linux-gnu/libc.so.6");
+    if libc == null { return -1; }
+    
+    // ... use symbols from libc ...
+    
+    jocky_module_unload(libc);
+    return 0;
+}
+```
+
+### `jocky_module_unload(handle) -> bool`
+
+Unload a previously loaded module. Returns `true` on success, `false` on failure.
+
+```jky
+ffi jocky_module_unload(i8*) -> bool;
+```
+
+### `jocky_module_symbol(handle, symbol_name) -> void*`
+
+Resolve a symbol (function or variable) from a loaded module.
+
+Returns a pointer to the symbol, or `null` if not found.
+
+```jky
+ffi jocky_module_symbol(i8*, i8*) -> i8*;
+
+fn main() -> i32 {
+    let libc: i8* = jocky_module_load("/lib/x86_64-linux-gnu/libc.so.6");
+    if libc == null { return -1; }
+    
+    // Get the printf function pointer
+    let printf_ptr: i8* = jocky_module_symbol(libc, "printf");
+    if printf_ptr == null { return -1; }
+    
+    // Call via function pointer (requires FFI wrapper for actual calls)
+    return 0;
+}
+```
+
+### `jocky_module_get_symbol(path, symbol_name) -> void*`
+
+Convenience function combining `jocky_module_load` + `jocky_module_symbol`.
+
+Loads a module and resolves a symbol in one call. Module remains loaded—call
+`jocky_module_unload` when done. Returns `null` on any failure.
+
+```jky
+ffi jocky_module_get_symbol(i8*, i8*) -> i8*;
+
+fn main() -> i32 {
+    let printf_ptr: i8* = jocky_module_get_symbol(
+        "/lib/x86_64-linux-gnu/libc.so.6", 
+        "printf"
+    );
+    if printf_ptr == null { return -1; }
+    return 0;
+}
+```
+
+### `jocky_module_has_symbol(handle, symbol_name) -> bool`
+
+Check if a symbol exists in a loaded module without resolving it.
+
+Useful for feature detection. Returns `true` if the symbol exists, `false` otherwise.
+
+```jky
+ffi jocky_module_has_symbol(i8*, i8*) -> bool;
+
+fn main() -> i32 {
+    let libc: i8* = jocky_module_load("/lib/x86_64-linux-gnu/libc.so.6");
+    
+    // Check for specific glibc version features
+    let has_getrandom: bool = jocky_module_has_symbol(libc, "getrandom");
+    
+    jocky_module_unload(libc);
+    return has_getrandom ? 0 : 1;
+}
+```
+
+### `jocky_module_base(path) -> i64`  *(Linux only)*
+
+Get the base address of a loaded module by parsing `/proc/self/maps`.
+
+Useful for calculating offsets from a module's base address. On Windows or if
+the module is not loaded, returns `0`.
+
+```jky
+ffi jocky_module_base(i8*) -> i64;
+
+fn main() -> i32 {
+    // Get the base address of libc for ASLR calculation
+    let base: i64 = jocky_module_base("/lib/x86_64-linux-gnu/libc.so.6");
+    if base == 0 { return -1; }
+    
+    // Now can calculate offsets: libc_func_addr = base + offset_from_binary
+    return 0;
+}
+```
+
+---
+
+## 16  Memory Allocators
 
 These wrappers let Jocky code allocate heap memory without calling `malloc`
 directly.  `jocky_byovd_new` / `jocky_byovd_destroy` are opaque-handle
