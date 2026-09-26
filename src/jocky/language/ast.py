@@ -4,11 +4,20 @@ from typing import Optional, Any, List
 # --- Types ---
 
 @dataclass
+class TypeVar:
+    """Represents a generic type variable: T, U, V, etc."""
+    name: str
+
+    def __str__(self):
+        return self.name
+
+@dataclass
 class JType:
     name: str
     is_pointer: bool = False
     is_array: bool = False
     array_size: int = 0  # 0 means not an array or unsized
+    is_generic: bool = False  # True if this is a type variable like T, U, etc.
 
     def __str__(self):
         base = self.name
@@ -17,6 +26,11 @@ class JType:
         if self.is_pointer:
             base += "*"
         return base
+
+    @staticmethod
+    def generic(name: str) -> "JType":
+        """Create a generic type variable."""
+        return JType(name, is_generic=True)
 
     def llvm_type(self) -> str:
         """Generate LLVM IR type representation."""
@@ -88,11 +102,14 @@ class FuncDecl:
     params: List[Param]
     ret_type: JType
     body: "Block"
-    attributes: List[Attribute] = None  # #[inline], #[no_mangle], etc.
+    attributes: List["Attribute"] = None  # #[inline], #[no_mangle], etc.
+    generic_params: List[str] = None  # Type parameter names: [T, U, V]
 
     def __post_init__(self):
         if self.attributes is None:
             self.attributes = []
+        if self.generic_params is None:
+            self.generic_params = []
 
 @dataclass
 class FFIDecl:
@@ -110,6 +127,11 @@ class StructField:
 class StructDef:
     name: str
     fields: List[StructField]
+    generic_params: List[str] = None  # Type parameter names: [T, U, V]
+
+    def __post_init__(self):
+        if self.generic_params is None:
+            self.generic_params = []
 
 @dataclass
 class ArrayType:
@@ -126,6 +148,11 @@ class EnumVariant:
 class EnumDef:
     name: str
     variants: List[EnumVariant]
+    generic_params: List[str] = None  # Type parameter names: [T, U, V]
+
+    def __post_init__(self):
+        if self.generic_params is None:
+            self.generic_params = []
 
 @dataclass
 class TypeAlias:
