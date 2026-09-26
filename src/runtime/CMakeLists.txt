@@ -34,6 +34,9 @@ set(RUNTIME_SOURCES
     linux/file_syscall.c
     linux/dir_syscall.c
     linux/mem_syscall.c
+    linux/signal_syscall.c
+    linux/process_control_syscall.c
+    linux/ipc_syscall.c
 )
 
 # Platform-specific filtering
