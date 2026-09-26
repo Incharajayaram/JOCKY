@@ -12,6 +12,7 @@ from .ast import (
     TypeAlias,
     Pattern, WildcardPattern, LiteralPattern, VariantPattern, MatchArm, MatchExpr,
     ModulePath, UseStmt, ModDecl,
+    ClosureExpr, CaptureVar,
     JType,
 )
 from .errors import ParseError as BaseParseError, SourceRange
@@ -256,6 +257,54 @@ class Parser:
                 self.advance()
         self.expect(TokenType.RBRACE)
         return MatchExpr(scrutinee, arms)
+
+    def parse_closure_expr(self) -> ClosureExpr:
+        """Parse closure expression: |params| { body } or |params| expr"""
+        self.expect(TokenType.PIPE)
+
+        # Parse parameters and captures
+        params = []
+        captures = []
+
+        while not self.match(TokenType.PIPE):
+            by_ref = False
+
+            # Check for reference capture: &var
+            if self.match(TokenType.AMPERSAND):
+                self.advance()
+                by_ref = True
+
+            name = self.expect(TokenType.IDENT).value
+            captures.append(CaptureVar(name, by_ref))
+
+            # Optional type annotation: var: Type
+            if self.match(TokenType.COLON):
+                self.advance()
+                param_type = self.parse_type()
+                params.append(Param(name, param_type))
+            else:
+                # Type will be inferred later
+                params.append(Param(name, None))
+
+            if self.match(TokenType.COMMA):
+                self.advance()
+
+        self.expect(TokenType.PIPE)
+
+        # Parse return type annotation: | -> Type
+        ret_type = None
+        if self.match(TokenType.ARROW):
+            self.advance()
+            ret_type = self.parse_type()
+
+        # Parse body (block or expression)
+        if self.match(TokenType.LBRACE):
+            body = self.parse_block()
+        else:
+            # Single expression body
+            body = self.parse_expr()
+
+        return ClosureExpr(params, ret_type, captures, body)
 
     def parse_pattern(self) -> Pattern:
         tok = self.peek()
@@ -626,6 +675,9 @@ class Parser:
             expr = self.parse_expr()
             self.expect(TokenType.RPAREN)
             return expr
+        elif tok.type == TokenType.PIPE:
+            # Closure expression: |params| body
+            return self.parse_closure_expr()
         else:
             source_range = SourceRange.at(tok.line, tok.column)
             raise ParseError(f"Unexpected token {tok.type.name} in expression", source_range)
