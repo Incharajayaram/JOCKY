@@ -1,3 +1,4 @@
+#include "forensic_types.h"
 // jocky_forensics_rt.c - JOCKY Forensic Runtime
 // Implements the FFI functions called from .jky scripts
 // This code is compiled and linked with the JOCKY output

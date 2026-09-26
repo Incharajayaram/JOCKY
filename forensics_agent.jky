@@ -1,27 +1,38 @@
-ffi jocky_collect_system_info() -> i32;
-ffi jocky_enum_processes() -> i32;
-ffi jocky_enum_network() -> i32;
-ffi jocky_check_persistence() -> i32;
+/**
+ * JOCKY Defensive Forensic Agent
+ * 
+ * New defensive forensic agent using the plugin-based pipeline.
+ * Runs as Analyst role - collection, parsing, analysis, reporting only.
+ */
+
+ffi jocky_forensic_collect() -> i32;
+ffi jocky_forensic_analyze() -> i32;
+ffi jocky_forensic_report() -> i32;
 ffi printf(fmt: string, ...) -> i32;
 
 fn main() -> i32 {
-    printf("JOCKY Forensic Agent v1.0\n");
-    printf("===========================\n\n");
+    printf("JOCKY Defensive Forensic Agent v2.0\n");
+    printf("====================================\n\n");
+    printf("Role: Analyst (Defensive Forensics Only)\n");
+    printf("Capabilities: Collection, Parsing, Analysis, Reporting\n\n");
     
-    printf("[Phase 1/4] Collecting system info...\n");
-    jocky_collect_system_info();
+    printf("[Phase 1/4] Collecting evidence...\n");
+    jocky_forensic_collect();
     
-    printf("\n[Phase 2/4] Enumerating processes...\n");
-    jocky_enum_processes();
+    printf("\n[Phase 2/4] Parsing artifacts...\n");
+    jocky_forensic_analyze();
     
-    printf("\n[Phase 3/4] Checking network state...\n");
-    jocky_enum_network();
+    printf("\n[Phase 3/4] Running analysis (timeline, IOCs, correlation)...\n");
+    // Analysis happens in the background
     
-    printf("\n[Phase 4/4] Checking persistence mechanisms...\n");
-    jocky_check_persistence();
+    printf("\n[Phase 4/4] Generating reports...\n");
+    jocky_forensic_report();
     
-    printf("\n===========================\n");
-    printf("Forensic collection complete.\n");
+    printf("\n====================================\n");
+    printf("Defensive forensic collection complete.\n");
+    printf("Reports written to /var/jocky/forensics/reports/\n");
+    printf("Audit log: /var/jocky/forensics/audit/audit.jsonl\n");
+    printf("Provenance: /var/jocky/forensics/provenance.json\n");
     
     return 0;
 }
