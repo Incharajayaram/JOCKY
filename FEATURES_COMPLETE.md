@@ -437,11 +437,172 @@
   - ✅ Key/value counting
   - Status: Windows-only with Linux stubs
 
+### Runtime Features (Tier 1.5 - LINUX RUNTIME LIBRARY)
+
+**Process & Execution**
+- [ ] **Process enumeration** – jocky_enum_processes()
+  - [ ] List all running processes with PID/name
+  - [ ] Get parent PID and command line
+  - [ ] Memory and CPU usage stats
+  - [ ] Status: Cross-platform stubs (Linux /proc, Windows WTS API)
+
+- [ ] **Module enumeration** – jocky_enum_modules()
+  - [ ] List loaded shared libraries/DLLs
+  - [ ] Get module base address and size
+  - [ ] Symbol resolution (dlsym on Linux)
+  - [ ] Get executable path
+
+- [ ] **Thread enumeration** – jocky_enum_threads()
+  - [ ] List threads in current/target process
+  - [ ] Get thread state and stack info
+  - [ ] Thread priority management
+
+- [ ] **System information** – jocky_sysinfo_*()
+  - [ ] jocky_sysinfo_cpu() – cores, brand, features
+  - [ ] jocky_sysinfo_memory() – total/free/available
+  - [ ] jocky_sysinfo_uptime() – system uptime
+  - [ ] jocky_sysinfo_hostname() – machine name
+  - [ ] jocky_sysinfo_osversion() – kernel/distro info
+  - [ ] jocky_sysinfo_arch() – x86_64/i386/ARM
+
+**File System**
+- [ ] **Path resolution** – jocky_realpath(), jocky_abspath()
+  - [ ] Resolve symlinks and relative paths
+  - [ ] Get executable directory
+  - [ ] Get temp directory
+  - [ ] Get home directory
+
+- [ ] **Directory operations** – jocky_mkdir(), jocky_rmdir(), jocky_chdir()
+  - [ ] Create/remove directories
+  - [ ] Change working directory
+  - [ ] Directory traversal
+  - [ ] File listing with patterns
+
+- [ ] **File attributes** – jocky_getattr(), jocky_setattr()
+  - [ ] Get/set file permissions (mode)
+  - [ ] Get/set modification time
+  - [ ] Check file type (regular, directory, symlink)
+  - [ ] Get file stats (size, inode, owner)
+
+**Memory Management**
+- [ ] **Memory mapping** – jocky_mmap(), jocky_munmap()
+  - [ ] Allocate mapped memory (anonymous + file-backed)
+  - [ ] Configure protection (PROT_READ/WRITE/EXEC)
+  - [ ] Synchronization (msync)
+  - [ ] Advice (MADV_SEQUENTIAL, etc.)
+
+- [ ] **Memory protection** – jocky_mprotect()
+  - [ ] Change protection on memory ranges
+  - [ ] Lock pages in memory (mlockall)
+  - [ ] Zero memory securely
+
+- [ ] **Memory information** – jocky_get_pagesize(), jocky_get_meminfo()
+  - [ ] Page size detection
+  - [ ] Available memory statistics
+  - [ ] Memory mapping introspection
+
+**Process/Thread Control**
+- [ ] **Execution control** – jocky_fork(), jocky_exec()
+  - [ ] Fork with close-on-exec flags
+  - [ ] Execute programs (execve family)
+  - [ ] Wait for process completion
+  - [ ] Get exit status
+
+- [ ] **Signal handling** – jocky_signal(), jocky_sigaction()
+  - [ ] Register signal handlers
+  - [ ] Block/unblock signals
+  - [ ] Send signals to processes
+  - [ ] Handle SIGCHLD for cleanup
+
+- [ ] **Capabilities** – jocky_getcap(), jocky_setcap() (Linux CAP_* only)
+  - [ ] Query current capabilities
+  - [ ] Drop unnecessary capabilities
+  - [ ] Effective/permitted/inheritable sets
+
+**IPC (Inter-Process Communication)**
+- [ ] **Named pipes (FIFOs)** – jocky_mkfifo(), jocky_pipe()
+  - [ ] Create and use pipes
+  - [ ] Non-blocking I/O
+  - [ ] Select/poll for data
+
+- [ ] **Unix sockets** – jocky_unix_socket(), jocky_unix_connect()
+  - [ ] Stream sockets (SOCK_STREAM)
+  - [ ] Datagram sockets (SOCK_DGRAM)
+  - [ ] Abstract namespace sockets
+  - [ ] Socket pair (socketpair)
+
+- [ ] **Shared memory** – jocky_shm_open(), jocky_shm_write()
+  - [ ] Create/access POSIX shared memory
+  - [ ] Memory-mapped IPC
+  - [ ] Semaphore-based synchronization
+
+**Environment & Configuration**
+- [ ] **Environment variables** – jocky_getenv(), jocky_setenv()
+  - [ ] Query environment variables
+  - [ ] Modify environment (child-safe)
+  - [ ] Enumerate all variables
+
+- [ ] **User/Group info** – jocky_getuid(), jocky_getgid()
+  - [ ] Get current UID/GID
+  - [ ] Get username/group name
+  - [ ] User home directory lookup
+  - [ ] Group membership checking
+
+- [ ] **Working directory** – jocky_cwd(), jocky_chdir()
+  - [ ] Get/set working directory
+  - [ ] Directory change notification
+
+**System Calls**
+- [ ] **Direct syscall wrapper** – jocky_syscall()
+  - [ ] Generic syscall invocation
+  - [ ] 6+ argument support
+  - [ ] Error handling (negative = error)
+
+- [ ] **Time functions** – jocky_clock_gettime(), jocky_getrusage()
+  - [ ] High-resolution time (CLOCK_MONOTONIC)
+  - [ ] CPU time tracking
+  - [ ] Process resource usage
+
+**Utility Functions**
+- [ ] **String utilities** – jocky_strcpy_safe(), jocky_strlen()
+  - [ ] Safe string operations
+  - [ ] Path parsing utilities
+  - [ ] Argument parsing
+
+- [ ] **Error handling** – jocky_strerror(), jocky_errno()
+  - [ ] Convert errno to string
+  - [ ] Error code standardization
+  - [ ] Last error tracking
+
 ### Runtime Features (Tier 2 - MEDIUM PRIORITY)
-- [ ] **Thread pool** – jocky_threadpool_create/destroy/submit
-- [ ] **Network primitives** – sockets, TCP/UDP (Windows & Linux)
-- [ ] **Crypto library** – AES, RSA, ECDH beyond RC4/XOR
-- [ ] **Compression** – zlib integration for data exfil
+- ✅ **Thread pool** – jocky_threadpool_create/destroy/submit (COMPLETED)
+  - ✅ Cross-platform (Windows ThreadPool, Linux pthreads)
+  - ✅ Work queue with dynamic threads
+  - ✅ 10/10 tests passing
+  - Status: Production-ready
+
+- ✅ **Network primitives** – sockets, TCP/UDP (Windows & Linux) (COMPLETED)
+  - ✅ Socket creation (AF_INET/AF_INET6, SOCK_STREAM/SOCK_DGRAM)
+  - ✅ Connection operations (bind, listen, accept, connect)
+  - ✅ Data transfer (send, recv, sendto, recvfrom)
+  - ✅ Socket options and utilities
+  - ✅ 9/9 tests passing
+  - Status: Production-ready
+
+- ✅ **Crypto library** – AES, RSA, ECDH (COMPLETED)
+  - ✅ AES encryption (128/192/256-bit keys)
+  - ✅ RSA encryption/signing (2048-4096 bits)
+  - ✅ ECDH key exchange (P-256/P-384/P-521)
+  - ✅ PEM key export
+  - ✅ 8/8 tests passing
+  - Status: Production-ready
+
+- ✅ **Compression** – zlib/deflate integration (COMPLETED)
+  - ✅ Single-pass compression/decompression
+  - ✅ Streaming compress/decompress
+  - ✅ Multiple compression levels
+  - ✅ 7/7 tests passing
+  - Status: Production-ready
 
 ### Anti-Analysis
 - [ ] **Anti-IDA** – Prologue recognition, dynamic import resolution
