@@ -1,12 +1,13 @@
 from .ast import *
 from .errors import TypeError as BaseTypeError, SourceRange
 from typing import Dict, Any, Optional, List, Tuple
+from jocky.core.modules import Module, ModuleRegistry, get_registry
 
 class TypeError(BaseTypeError):
     pass
 
 class TypeChecker:
-    def __init__(self):
+    def __init__(self, module_registry: Optional[ModuleRegistry] = None):
         self.functions: Dict[str, (List[JType], JType)] = {}
         self.structs: Dict[str, StructDef] = {}  # struct_name -> StructDef
         self.enums: Dict[str, EnumDef] = {}      # enum_name -> EnumDef
@@ -15,7 +16,19 @@ class TypeChecker:
         self.current_ret: JType = JType("void")
         self.loop_depth: int = 0
 
+        # Module support
+        self.module_registry = module_registry or get_registry()
+        self.current_module: Optional[Module] = None
+        self.visible_symbols: Dict[str, Any] = {}  # Imported symbols
+
     def check(self, prog: Program):
+        # Phase 0: Process modules and imports
+        for decl in prog.decls:
+            if isinstance(decl, ModDecl):
+                self.process_module_decl(decl)
+            elif isinstance(decl, UseStmt):
+                self.process_use_stmt(decl)
+
         # First pass: collect type aliases, struct/enum and function signatures
         for decl in prog.decls:
             if isinstance(decl, UseStmt):
@@ -54,6 +67,57 @@ class TypeChecker:
                 array_size=t.array_size or resolved.array_size
             )
         return t
+
+    def process_module_decl(self, mod_decl: ModDecl):
+        """Process a module declaration."""
+        module = Module(mod_decl.name)
+        self.module_registry.register_module(module)
+
+        # Process declarations within the module
+        old_module = self.current_module
+        self.current_module = module
+
+        for item in mod_decl.items:
+            if isinstance(item, FuncDecl):
+                ptypes = [p.type for p in item.params]
+                module.add_symbol(item.name, (ptypes, item.ret_type, False), public=True)
+            elif isinstance(item, StructDef):
+                module.add_symbol(item.name, item, public=True)
+            elif isinstance(item, EnumDef):
+                module.add_symbol(item.name, item, public=True)
+
+        self.current_module = old_module
+
+    def process_use_stmt(self, use_stmt: UseStmt):
+        """Process an import statement."""
+        # Resolve the module path
+        module_path = use_stmt.module_path
+
+        # Try to find the module
+        module_name = str(module_path)
+        target_module = self.module_registry.get_module(module_name)
+
+        if target_module is None:
+            raise TypeError(f"Cannot find module: {module_name}")
+
+        # Import symbols
+        if use_stmt.all:
+            # Import all public symbols
+            for name, symbol in target_module.symbols.items():
+                if symbol.public:
+                    self.visible_symbols[name] = symbol
+        else:
+            # Import specific symbol
+            symbol_name = use_stmt.symbol
+            symbol = target_module.get_symbol(symbol_name)
+
+            if symbol is None:
+                raise TypeError(f"Cannot find symbol '{symbol_name}' in module {module_name}")
+
+            if not symbol.public:
+                raise TypeError(f"Cannot access private symbol '{symbol_name}' from module {module_name}")
+
+            self.visible_symbols[symbol_name] = symbol
 
     def check_func(self, decl: FuncDecl):
         old_locals = self.locals
@@ -193,9 +257,15 @@ class TypeChecker:
             else:
                 raise TypeError(f"Unknown unary op: {expr.op}")
         elif isinstance(expr, CallExpr):
-            if expr.name not in self.functions:
+            # Check in functions first, then visible imports
+            if expr.name in self.functions:
+                sig = self.functions[expr.name]
+            elif expr.name in self.visible_symbols:
+                symbol = self.visible_symbols[expr.name]
+                sig = symbol.type_info
+            else:
                 raise TypeError(f"Undefined function: {expr.name}")
-            sig = self.functions[expr.name]
+
             if len(sig) == 3:
                 ptypes, ret, is_variadic = sig
             else:

@@ -27,6 +27,8 @@ class TokenType(Enum):
     ENUM = auto()
     TYPE = auto()
     MATCH = auto()
+    MOD = auto()
+    USE = auto()
     ARROW_FAT = auto()  # =>
 
     # Types
@@ -97,6 +99,8 @@ KEYWORDS = {
     "enum": TokenType.ENUM,
     "type": TokenType.TYPE,
     "match": TokenType.MATCH,
+    "mod": TokenType.MOD,
+    "use": TokenType.USE,
     "i8": TokenType.I8,
     "i32": TokenType.I32,
     "i64": TokenType.I64,
