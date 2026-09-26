@@ -1,0 +1,61 @@
+enum Color {
+    Red = 0,
+    Green = 1,
+    Blue = 2,
+    Yellow = 3
+};
+
+fn color_name(c: Color) -> string {
+    match c {
+        Red => "Red",
+        Green => "Green",
+        Blue => "Blue",
+        Yellow => "Yellow"
+    }
+}
+
+fn is_primary(c: Color) -> bool {
+    match c {
+        Red => true,
+        Green => true,
+        Blue => true,
+        Yellow => false
+    }
+}
+
+enum Result {
+    Success = 0,
+    Failure = 1
+};
+
+fn get_result_code(r: Result) -> i32 {
+    match r {
+        Success => 0,
+        Failure => 1
+    }
+}
+
+enum Direction {
+    North = 0,
+    South = 1,
+    East = 2,
+    West = 3
+};
+
+fn opposite(d: Direction) -> Direction {
+    match d {
+        North => South,
+        South => North,
+        East => West,
+        West => East
+    }
+}
+
+fn main() -> i32 {
+    let col: Color = Red;
+    let res: Result = Success;
+    let dir: Direction = North;
+
+    let name_result: i32 = 0;
+    return name_result;
+}
