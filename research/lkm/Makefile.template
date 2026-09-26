@@ -1,0 +1,29 @@
+# Makefile for kernel module
+# Usage: make -C /lib/modules/$(uname -r)/build M=$(pwd) modules
+#        make -C /lib/modules/$(uname -r)/build M=$(pwd) clean
+
+obj-m += kernel_evasion.o
+kernel_evasion-objs := main.o ftrace_hooks.o ebpf_hooks.o
+
+# Compilation flags
+ccflags-y := -std=gnu99 -Wall -Wextra
+ccflags-y += -fno-strict-aliasing
+ccflags-y += -DDEBUG
+
+all:
+	make -C /lib/modules/$(uname -r)/build M=$(CURDIR) modules
+
+clean:
+	make -C /lib/modules/$(uname -r)/build M=$(CURDIR) clean
+
+# Load/unload targets (requires root)
+load: all
+	insmod kernel_evasion.ko
+
+unload:
+	rmmod kernel_evasion || true
+
+reload: unload load
+
+info:
+	modinfo kernel_evasion.ko
