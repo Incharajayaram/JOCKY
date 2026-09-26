@@ -122,6 +122,8 @@ class Parser:
     def parse_func_decl(self) -> FuncDecl:
         self.expect(TokenType.FN)
         name = self.expect(TokenType.IDENT).value
+        # Parse generic parameters: <T, U, V>
+        generic_params = self.parse_generic_params()
         self.expect(TokenType.LPAREN)
         params = self.parse_params()
         self.expect(TokenType.RPAREN)
@@ -130,7 +132,7 @@ class Parser:
             self.advance()
             ret_type = self.parse_type()
         body = self.parse_block()
-        return FuncDecl(name, params, ret_type, body)
+        return FuncDecl(name, params, ret_type, body, generic_params=generic_params)
 
     def parse_ffi_decl(self) -> FFIDecl:
         self.expect(TokenType.FFI)
@@ -143,9 +145,30 @@ class Parser:
         self.expect(TokenType.SEMICOLON)
         return FFIDecl(name, params, ret_type, variadic)
 
+    def parse_generic_params(self) -> List[str]:
+        """Parse generic type parameters: <T, U, V>
+        Returns empty list if no generics present."""
+        if not self.match(TokenType.LT):
+            return []
+
+        self.advance()  # consume <
+        params = []
+        while not self.match(TokenType.GT):
+            param_name = self.expect(TokenType.IDENT).value
+            params.append(param_name)
+            if self.match(TokenType.COMMA):
+                self.advance()
+            elif not self.match(TokenType.GT):
+                raise ParseError(f"Expected '>' or ',' in generic parameters at line {self.peek().line}")
+
+        self.expect(TokenType.GT)
+        return params
+
     def parse_struct_decl(self) -> StructDef:
         self.expect(TokenType.STRUCT)
         name = self.expect(TokenType.IDENT).value
+        # Parse generic parameters: <T, U, V>
+        generic_params = self.parse_generic_params()
         self.expect(TokenType.LBRACE)
         fields = []
         while not self.match(TokenType.RBRACE):
@@ -157,11 +180,13 @@ class Parser:
                 self.advance()
         self.expect(TokenType.RBRACE)
         self.expect(TokenType.SEMICOLON)
-        return StructDef(name, fields)
+        return StructDef(name, fields, generic_params=generic_params)
 
     def parse_enum_decl(self) -> EnumDef:
         self.expect(TokenType.ENUM)
         name = self.expect(TokenType.IDENT).value
+        # Parse generic parameters: <T, U, V>
+        generic_params = self.parse_generic_params()
         self.expect(TokenType.LBRACE)
         variants = []
         while not self.match(TokenType.RBRACE):
@@ -191,7 +216,7 @@ class Parser:
                 self.advance()
         self.expect(TokenType.RBRACE)
         self.expect(TokenType.SEMICOLON)
-        return EnumDef(name, variants)
+        return EnumDef(name, variants, generic_params=generic_params)
 
     def parse_type_alias(self) -> TypeAlias:
         self.expect(TokenType.TYPE)
