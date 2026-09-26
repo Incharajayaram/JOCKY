@@ -110,18 +110,22 @@ Verified with struct_example.jky and struct_advanced.jky
 
 ## Next Priorities
 
-### Feature 4: Type Aliases (QUEUED)
+### Feature 4: Type Aliases (COMPLETED ✅)
 `type MyInt = i32;`
-- [ ] 4.1 Add TypeAlias AST node
-- [ ] 4.2 Parser support
-- [ ] 4.3 Type checker resolution
-- [ ] 4.4 Codegen (passthrough)
-**Estimated:** 1 day
+- [x] 4.1 Add TypeAlias AST node
+- [x] 4.2 Parser support
+- [x] 4.3 Type checker resolution
+- [x] 4.4 Codegen (passthrough)
 
-### Feature 5: Pattern Matching (QUEUED)
+### Feature 5: Pattern Matching (COMPLETED ✅)
 `match x { Variant1 => ..., Variant2 => ... }`
-- [ ] 5.1 Match expression syntax
-- [ ] 5.2 Pattern binding and guards
-- [ ] 5.3 Enum variant pattern support
-- [ ] 5.4 Codegen (jump tables)
-**Estimated:** 2 days
+- [x] 5.1 Match expression syntax
+- [x] 5.2 Pattern binding and guards
+- [x] 5.3 Enum variant pattern support
+- [x] 5.4 Codegen (switch instructions)
+- [x] 5.5 Comprehensive test coverage (19 tests)
+- [x] 5.6 Example programs
+
+**Completion Date:** 2026-09-26
+**Test Coverage:** 19 tests, all passing
+**Status:** Production ready

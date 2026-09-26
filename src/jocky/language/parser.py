@@ -15,9 +15,10 @@ from .ast import (
     UseStmt,
     JType,
 )
+from .errors import ParseError as BaseParseError, SourceRange
 from typing import Optional, Any, List
 
-class ParseError(Exception):
+class ParseError(BaseParseError):
     pass
 
 class Parser:
@@ -38,7 +39,11 @@ class Parser:
     def expect(self, ttype: TokenType, msg: str = "") -> Token:
         tok = self.peek()
         if tok.type != ttype:
-            raise ParseError(f"Expected {ttype.name}, got {tok.type.name} ({tok.value}) at line {tok.line}{': ' + msg if msg else ''}")
+            source_range = SourceRange.at(tok.line, tok.column)
+            error_msg = f"Expected {ttype.name}, got {tok.type.name} ({tok.value})"
+            if msg:
+                error_msg += f": {msg}"
+            raise ParseError(error_msg, source_range)
         return self.advance()
 
     def match(self, *types: TokenType) -> bool:
@@ -69,7 +74,8 @@ class Parser:
             name = self.advance().value
             t = JType(name)
         else:
-            raise ParseError(f"Expected type, got {tok.type.name} at line {tok.line}")
+            source_range = SourceRange.at(tok.line, tok.column)
+            raise ParseError(f"Expected type, got {tok.type.name}", source_range)
 
         # Array type
         if self.match(TokenType.LBRACKET):
@@ -107,7 +113,9 @@ class Parser:
         elif self.match(TokenType.TYPE):
             return self.parse_type_alias()
         else:
-            raise ParseError(f"Unexpected token {self.peek().type.name} at line {self.peek().line}; expected use, fn, ffi, struct, enum, or type")
+            tok = self.peek()
+            source_range = SourceRange.at(tok.line, tok.column)
+            raise ParseError(f"Unexpected token {tok.type.name}; expected use, fn, ffi, struct, enum, or type", source_range)
 
     def parse_func_decl(self) -> FuncDecl:
         self.expect(TokenType.FN)
@@ -264,7 +272,8 @@ class Parser:
             self.advance()
             return LiteralPattern(BoolLiteral(False))
         else:
-            raise ParseError(f"Expected pattern, got {tok.type.name} at line {tok.line}")
+            source_range = SourceRange.at(tok.line, tok.column)
+            raise ParseError(f"Expected pattern, got {tok.type.name}", source_range)
 
     def parse_params(self) -> List[Param]:
         params, _ = self.parse_params_variadic()
@@ -540,7 +549,9 @@ class Parser:
                 if isinstance(node, VarRef):
                     node = CallExpr(node.name, args)
                 else:
-                    raise ParseError(f"Cannot call non-identifier at line {self.peek().line}")
+                    tok = self.peek()
+                    source_range = SourceRange.at(tok.line, tok.column)
+                    raise ParseError("Cannot call non-identifier", source_range)
             elif self.match(TokenType.LBRACKET):
                 self.advance()
                 idx = self.parse_expr()
@@ -619,7 +630,8 @@ class Parser:
             self.expect(TokenType.RPAREN)
             return expr
         else:
-            raise ParseError(f"Unexpected token {tok.type.name} ({tok.value}) in expression at line {tok.line}")
+            source_range = SourceRange.at(tok.line, tok.column)
+            raise ParseError(f"Unexpected token {tok.type.name} in expression", source_range)
 
 def parse_source(source: str) -> Program:
     lexer = Lexer(source)
