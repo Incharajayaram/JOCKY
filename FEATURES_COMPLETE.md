@@ -326,23 +326,21 @@
 ## High Priority (Next Sprint)
 
 ### Language Features
-- [ ] **Struct types** – `struct Point { x: i32, y: i32 }`
-  - [ ] Field access (`.field`)
-  - [ ] Constructor syntax
-  - [ ] Memory layout control
-  - Estimated effort: 3 days
+- ✅ **Struct types** – `struct Point { x: i32, y: i32 }` (COMPLETED)
+  - ✅ Field access (`.field`)
+  - ✅ Constructor syntax
+  - ✅ Memory layout control
 
-- [ ] **Array support** – `let arr: i32[10] = ...`
-  - [ ] Fixed-size arrays
-  - [ ] Index operator `arr[i]`
-  - [ ] Array literals
-  - [ ] Length intrinsic
-  - Estimated effort: 2 days
+- ✅ **Array support** – `let arr: i32[10] = ...` (COMPLETED)
+  - ✅ Fixed-size arrays
+  - ✅ Index operator `arr[i]`
+  - ✅ Array literals
+  - ✅ Length intrinsic
 
-- [ ] **Enums** – `enum Status { OK = 0, ERROR = 1 }`
-  - [ ] Pattern matching support
-  - [ ] Tagged unions
-  - Estimated effort: 2 days
+- ✅ **Enums** – `enum Status { OK = 0, ERROR = 1 }` (COMPLETED)
+  - ✅ Pattern matching support (19 tests, all passing)
+  - ✅ Tagged unions
+  - ✅ Enum variant references
 
 ### Runtime Features
 - [x] **Cross-platform module loading** – Linux .so support (IMPLEMENTED)
@@ -367,6 +365,12 @@
   - [x] Privilege escalation framework (cred modification)
 
 ### Toolchain
+- ✅ **Improved error messages** – source location tracking (COMPLETED)
+  - ✅ Line and column information in errors
+  - ✅ Source context display with visual indicators
+  - ✅ Error codes for categorized errors (E0001-E0010)
+  - ✅ ErrorFormatter for pretty error output
+
 - [ ] **Build system performance** – incremental compilation
   - [ ] Cache intermediate stages
   - [ ] Parallel stage execution
@@ -563,12 +567,14 @@
 | **Documentation** | 12/12 | - | - | ✅ |
 | **Tooling** | 8/10 | - | 2 | Low |
 
-**Overall: 92/129 features (71% complete)** ⬆️ +13 this session
+**Overall: 96/129 features (74% complete)** ⬆️ +17 this session
 
-**This session:**
+**This session (2026-09-26):**
 - Language: structs, enums, arrays, type aliases, pattern matching, tagged unions (6 features)
+- Pattern Matching: Full end-to-end implementation with 19 comprehensive tests (1 feature)
 - Runtime: module loading, process hollowing, kernel exploitation (3 features)  
-- Fixes: tagged union codegen, portable ELF parsing, second-pass type checking bug
+- Infrastructure: CLAUDE.md guidelines, test coverage improvements (2 features)
+- Fixes: tagged union codegen, portable ELF parsing, second-pass type checking bug, enum variant references
 
 ---
 
