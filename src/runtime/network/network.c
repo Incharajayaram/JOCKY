@@ -80,7 +80,7 @@ int jocky_socket_close(jocky_socket_t sock) {
 }
 
 int jocky_socket_connect(jocky_socket_t sock, const char* host, int port) {
-    if (!sock || !host || port <= 0 || port > 65535) return -1;
+    if (!sock || !host || port < 0 || port > 65535) return -1;
 
     socket_context_t* ctx = (socket_context_t*)sock;
 
@@ -109,7 +109,7 @@ int jocky_socket_connect(jocky_socket_t sock, const char* host, int port) {
 }
 
 int jocky_socket_bind(jocky_socket_t sock, const char* host, int port) {
-    if (!sock || port <= 0 || port > 65535) return -1;
+    if (!sock || port < 0 || port > 65535) return -1;
 
     socket_context_t* ctx = (socket_context_t*)sock;
 
@@ -196,7 +196,7 @@ int jocky_socket_recv(jocky_socket_t sock, uint8_t* buffer, int buffer_size) {
 
 int jocky_socket_sendto(jocky_socket_t sock, const uint8_t* data, int size,
                         const char* host, int port) {
-    if (!sock || !data || size <= 0 || !host || port <= 0) return -1;
+    if (!sock || !data || size <= 0 || !host || port < 0 || port > 65535) return -1;
 
     socket_context_t* ctx = (socket_context_t*)sock;
 
