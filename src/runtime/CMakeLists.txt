@@ -27,6 +27,12 @@ set(RUNTIME_SOURCES
     io/io.c
     memory/vmem.c
     registry/registry.c
+    linux/syscall.c
+    linux/sysinfo_syscall.c
+    linux/process_syscall.c
+    linux/env_syscall.c
+    linux/file_syscall.c
+    linux/dir_syscall.c
 )
 
 # Platform-specific filtering
