@@ -390,10 +390,16 @@
   - ✅ CacheManager and CachingCompiler infrastructure
   - ✅ 38 comprehensive cache tests (100% passing)
 
-- [ ] **Manifest generation tool** – auto-extract IOCTLs from driver IDA
-  - [ ] IDA Python script generator
-  - [ ] Ghidra integration
-  - Estimated effort: 3 days
+- ✅ **Manifest generation tool** – auto-extract IOCTLs from driver IDA (COMPLETED)
+  - ✅ IDA Python script generator (`tools/ida_ioctl_extractor.py`)
+  - ✅ Ghidra integration (`tools/ghidra_ioctl_extractor.py`)
+  - ✅ Main manifest generator (`tools/manifest_generator.py`)
+  - ✅ Batch processor (`tools/batch_manifest_generator.py`)
+  - ✅ Capstone fallback extractor
+  - ✅ Comprehensive documentation
+  - ✅ Unit tests
+  - Status: Production-ready
+  - Effort: 1 day (optimized implementation)
 
 ---
 
@@ -581,7 +587,7 @@
 | **Documentation** | 12/12 | - | - | ✅ |
 | **Tooling** | 8/10 | - | 2 | Low |
 
-**Overall: 105+/129 features (81% complete)** ⬆️ +28 this session
+**Overall: 106/129 features (82% complete)** ⬆️ +29 this session (manifest generator complete)
 
 **This session (2026-09-26):**
 - **Module System (Complete)** – mod declarations, use statements, ModuleRegistry, symbol visibility (4 features)
