@@ -24,6 +24,9 @@ set(RUNTIME_SOURCES
     cleanup/logs.c
     cleanup/forensics.c
     pack/stub_loader.c
+    io/io.c
+    memory/vmem.c
+    registry/registry.c
 )
 
 # Platform-specific filtering
@@ -42,6 +45,7 @@ if(NOT WIN32)
         exfil/lsass_dump.c
         cleanup/forensics.c
         pack/stub_loader.c
+        registry/registry.c
     )
 endif()
 

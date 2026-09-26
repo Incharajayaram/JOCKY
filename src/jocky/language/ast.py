@@ -88,6 +88,11 @@ class FuncDecl:
     params: List[Param]
     ret_type: JType
     body: "Block"
+    attributes: List[Attribute] = None  # #[inline], #[no_mangle], etc.
+
+    def __post_init__(self):
+        if self.attributes is None:
+            self.attributes = []
 
 @dataclass
 class FFIDecl:
@@ -322,3 +327,26 @@ class ModDecl:
     name: str
     items: List[Any]  # Functions, structs, enums, other modules
     public: bool = False  # pub mod vs private mod
+
+
+@dataclass
+class Attribute:
+    """Function/type attribute: #[inline], #[no_mangle], #[packed]"""
+    name: str
+    args: Optional[List[Any]] = None  # Arguments to attribute (e.g., #[packed(2)])
+
+
+@dataclass
+class ClosureExpr:
+    """Closure/lambda expression: |args| -> type { body }"""
+    params: List[Param]
+    ret_type: Optional[JType]
+    captures: List[str]  # Variables captured from outer scope
+    body: Any  # Expression or Block
+
+
+@dataclass
+class CaptureVar:
+    """Captured variable in closure: var or ref var"""
+    name: str
+    by_ref: bool = False  # True for &var (reference), False for var (value)

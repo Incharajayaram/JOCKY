@@ -390,10 +390,16 @@
   - ✅ CacheManager and CachingCompiler infrastructure
   - ✅ 38 comprehensive cache tests (100% passing)
 
-- [ ] **Manifest generation tool** – auto-extract IOCTLs from driver IDA
-  - [ ] IDA Python script generator
-  - [ ] Ghidra integration
-  - Estimated effort: 3 days
+- ✅ **Manifest generation tool** – auto-extract IOCTLs from driver IDA (COMPLETED)
+  - ✅ IDA Python script generator (`tools/ida_ioctl_extractor.py`)
+  - ✅ Ghidra integration (`tools/ghidra_ioctl_extractor.py`)
+  - ✅ Main manifest generator (`tools/manifest_generator.py`)
+  - ✅ Batch processor (`tools/batch_manifest_generator.py`)
+  - ✅ Capstone fallback extractor
+  - ✅ Comprehensive documentation
+  - ✅ Unit tests
+  - Status: Production-ready
+  - Effort: 1 day (optimized implementation)
 
 ---
 
@@ -402,14 +408,37 @@
 ### Language Features
 - [ ] **Generics/Polymorphism** – `fn max<T>(a: T, b: T) -> T`
 - [ ] **Closures/Lambdas** – Anonymous functions with capture
-- [ ] **Module system** – `mod foo { ... }`, `use foo::bar;`
 - [ ] **Attributes/Decorators** – `#[inline]`, `#[no_mangle]`
 
-### Runtime Features
-- [ ] **VirtualAlloc/VirtualFree wrappers** – jocky_valloc, jocky_vfree
+### Runtime Features (Tier 1 - HIGH IMPACT)
+- ✅ **VirtualAlloc/VirtualFree wrappers** – jocky_valloc, jocky_vfree (COMPLETED)
+  - ✅ Memory allocation (COMMIT, RESERVE)
+  - ✅ Memory protection (PAGE_*)
+  - ✅ Memory querying (VirtualQuery equivalent)
+  - ✅ Executable memory allocation
+  - ✅ Secure memory wipe
+  - ✅ Instruction cache flushing
+  - Status: Cross-platform (Windows VirtualAlloc, Linux mmap)
+
+- ✅ **File I/O API** – jocky_fopen, jocky_fread, jocky_fwrite (COMPLETED)
+  - ✅ File open/close/read/write
+  - ✅ Seek and tell operations
+  - ✅ File size and existence checks
+  - ✅ File deletion and renaming
+  - ✅ Atomic writes
+  - ✅ Bulk file reading
+  - Status: Cross-platform (Windows CreateFile, Linux open/read/write)
+
+- ✅ **Registry API** – jocky_reg_open, jocky_reg_query, jocky_reg_set (COMPLETED)
+  - ✅ Key open/create/close
+  - ✅ Value read/write/delete
+  - ✅ Registry enumeration
+  - ✅ Typed accessors (DWORD, string, binary)
+  - ✅ Key/value counting
+  - Status: Windows-only with Linux stubs
+
+### Runtime Features (Tier 2 - MEDIUM PRIORITY)
 - [ ] **Thread pool** – jocky_threadpool_create/destroy/submit
-- [ ] **File I/O API** – jocky_fopen, jocky_fread, jocky_fwrite
-- [ ] **Registry API** – jocky_reg_open, jocky_reg_query, jocky_reg_set
 - [ ] **Network primitives** – sockets, TCP/UDP (Windows & Linux)
 - [ ] **Crypto library** – AES, RSA, ECDH beyond RC4/XOR
 - [ ] **Compression** – zlib integration for data exfil
@@ -581,7 +610,9 @@
 | **Documentation** | 12/12 | - | - | ✅ |
 | **Tooling** | 8/10 | - | 2 | Low |
 
-**Overall: 105+/129 features (81% complete)** ⬆️ +28 this session
+**Overall: 109/129 features (84% complete)** ⬆️ +32 this session
+- Manifest generator: +1 feature (complete tool suite)
+- Tier 1 Runtime APIs: +3 features (File I/O, VirtualAlloc, Registry)
 
 **This session (2026-09-26):**
 - **Module System (Complete)** – mod declarations, use statements, ModuleRegistry, symbol visibility (4 features)
