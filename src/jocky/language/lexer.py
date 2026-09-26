@@ -77,6 +77,8 @@ class TokenType(Enum):
     COMMA = auto()
     DOT = auto()
     COLONCOLON = auto()  # ::
+    HASH = auto()  # #
+    AT = auto()  # @
 
     EOF = auto()
 
@@ -334,6 +336,12 @@ class Lexer:
             elif ch == ",":
                 self.advance()
                 self.tokens.append(Token(TokenType.COMMA, ",", start_line, start_col))
+            elif ch == "#":
+                self.advance()
+                self.tokens.append(Token(TokenType.HASH, "#", start_line, start_col))
+            elif ch == "@":
+                self.advance()
+                self.tokens.append(Token(TokenType.AT, "@", start_line, start_col))
             else:
                 self.error(f"Unexpected character '{ch}'")
 
