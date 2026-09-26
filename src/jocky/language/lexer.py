@@ -28,7 +28,6 @@ class TokenType(Enum):
     TYPE = auto()
     MATCH = auto()
     MOD = auto()
-    USE = auto()
     ARROW_FAT = auto()  # =>
 
     # Types
