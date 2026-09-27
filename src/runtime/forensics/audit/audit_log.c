@@ -1,6 +1,4 @@
 #include "forensic_types.h"
-#include "forensic_types.h"
-#include "forensic_types.h"
 /**
  * Audit Log Implementation
  */
@@ -42,6 +40,78 @@ void forensic_audit_compute_entry_hash(const forensic_audit_entry_t* entry,
 }
 
 /* ============================================================================
+ * JSON String Extraction Helper
+ * ============================================================================ */
+
+static bool extract_json_string(const char* json, const char* key, char* output, size_t output_size) {
+    // Find the key
+    size_t key_len = strlen(key);
+    const char* p = json;
+    while ((p = strstr(p, key)) != NULL) {
+        // Check if it's a JSON key (preceded by " or { or , and followed by ":")
+        if (p > json) {
+            char prev = *(p - 1);
+            if (prev != '"' && prev != '{' && prev != ',') {
+                p++;
+                continue;
+            }
+        }
+        p += key_len;
+        // Find the colon
+        while (*p && *p != ':') p++;
+        if (!*p) continue;
+        p++; // skip colon
+        // Skip whitespace
+        while (*p && (*p == ' ' || *p == '\t')) p++;
+        // Expect opening quote
+        if (*p != '"') continue;
+        p++;
+        // Extract value until unescaped quote
+        char* out = output;
+        size_t remaining = output_size - 1;
+        while (*p && *p != '"' && remaining > 0) {
+            if (*p == '\\' && *(p + 1)) {
+                // Handle escape sequences
+                p++;
+                switch (*p) {
+                    case '"': *out++ = '"'; break;
+                    case '\\': *out++ = '\\'; break;
+                    case '/': *out++ = '/'; break;
+                    case 'b': *out++ = '\b'; break;
+                    case 'f': *out++ = '\f'; break;
+                    case 'n': *out++ = '\n'; break;
+                    case 'r': *out++ = '\r'; break;
+                    case 't': *out++ = '\t'; break;
+                    case 'u': // Unicode - skip for now
+                        p += 4;
+                        continue;
+                    default: *out++ = *p; break;
+                }
+            } else {
+                *out++ = *p;
+            }
+            p++;
+            remaining--;
+        }
+        *out = '\0';
+        return true;
+    }
+    return false;
+}
+
+static bool extract_json_number(const char* json, const char* key, unsigned long* output) {
+    const char* p = strstr(json, key);
+    if (!p) return false;
+    p += strlen(key);
+    while (*p && *p != ':') p++;
+    if (!*p) return false;
+    p++; // skip colon
+    while (*p && (*p == ' ' || *p == '\t')) p++;
+    *output = strtoul(p, NULL, 10);
+    return true;
+}
+
+/* ============================================================================
  * Audit Log
  * ============================================================================ */
 
@@ -52,6 +122,7 @@ forensic_audit_log_t* forensic_audit_log_open(const char* path) {
     if (!log) return NULL;
     
     strncpy(log->path, path, sizeof(log->path) - 1);
+    log->path[sizeof(log->path) - 1] = '\0';
     
     // Open in append mode
     log->file = fopen(path, "a+");
@@ -67,19 +138,22 @@ forensic_audit_log_t* forensic_audit_log_open(const char* path) {
     bool has_entries = false;
     
     while (fgets(line, sizeof(line), log->file)) {
-        // Parse JSON line
-        // Simplified - in production use proper JSON parser
-        if (strstr(line, "\"index\"")) {
+        // Parse JSON line - extract index and entry_hash
+        unsigned long idx;
+        char hash[128];
+        if (extract_json_number(line, "\"index\"", &idx) &&
+            extract_json_string(line, "\"entry_hash\"", hash, sizeof(hash))) {
             has_entries = true;
-            // Extract index and entry_hash (simplified)
-            sscanf(line, "{\"index\":%lu,\"entry_hash\":\"%127[^\"]",
-                   &last_entry.index, last_entry.entry_hash);
+            last_entry.index = idx;
+            strncpy(last_entry.entry_hash, hash, sizeof(last_entry.entry_hash) - 1);
+            last_entry.entry_hash[sizeof(last_entry.entry_hash) - 1] = '\0';
         }
     }
     
     if (has_entries) {
         log->next_index = last_entry.index + 1;
         strncpy(log->last_hash, last_entry.entry_hash, sizeof(log->last_hash) - 1);
+        log->last_hash[sizeof(log->last_hash) - 1] = '\0';
     } else {
         log->next_index = 0;
         log->last_hash[0] = '\0';
@@ -114,13 +188,19 @@ int forensic_audit_log_append(forensic_audit_log_t* log,
     strftime(entry.timestamp, sizeof(entry.timestamp), "%Y-%m-%dT%H:%M:%SZ", tm_info);
     
     strncpy(entry.actor, actor, sizeof(entry.actor) - 1);
+    entry.actor[sizeof(entry.actor) - 1] = '\0';
     strncpy(entry.action, action, sizeof(entry.action) - 1);
+    entry.action[sizeof(entry.action) - 1] = '\0';
     strncpy(entry.input_hash, input_hash ? input_hash : "", sizeof(entry.input_hash) - 1);
+    entry.input_hash[sizeof(entry.input_hash) - 1] = '\0';
     strncpy(entry.output_hash, output_hash ? output_hash : "", sizeof(entry.output_hash) - 1);
+    entry.output_hash[sizeof(entry.output_hash) - 1] = '\0';
     strncpy(entry.prev_entry_hash, log->last_hash, sizeof(entry.prev_entry_hash) - 1);
+    entry.prev_entry_hash[sizeof(entry.prev_entry_hash) - 1] = '\0';
     
     // Compute entry hash
     forensic_audit_compute_entry_hash(&entry, entry.entry_hash, sizeof(entry.entry_hash));
+    entry.entry_hash[sizeof(entry.entry_hash) - 1] = '\0';
     
     // Write as JSON line
     fprintf(log->file,
@@ -135,6 +215,7 @@ int forensic_audit_log_append(forensic_audit_log_t* log,
     
     // Update last hash
     strncpy(log->last_hash, entry.entry_hash, sizeof(log->last_hash) - 1);
+    log->last_hash[sizeof(log->last_hash) - 1] = '\0';
     
     return 0;
 }
@@ -156,72 +237,15 @@ int forensic_audit_log_verify(const forensic_audit_log_t* log) {
         
         forensic_audit_entry_t entry = {0};
         
-        // Simplified JSON parsing
-        char* idx = strstr(line, "\"index\":");
-        if (idx) entry.index = strtoul(idx + 8, NULL, 10);
-        
-        char* ts = strstr(line, "\"timestamp\":\"");
-        if (ts) {
-            ts += 13;
-            char* end = strchr(ts, '"');
-            if (end && (size_t)(end - ts) < sizeof(entry.timestamp)) {
-                strncpy(entry.timestamp, ts, end - ts);
-            }
-        }
-        
-        char* act = strstr(line, "\"actor\":\"");
-        if (act) {
-            act += 9;
-            char* end = strchr(act, '"');
-            if (end && (size_t)(end - act) < sizeof(entry.actor)) {
-                strncpy(entry.actor, act, end - act);
-            }
-        }
-        
-        char* action = strstr(line, "\"action\":\"");
-        if (action) {
-            action += 10;
-            char* end = strchr(action, '"');
-            if (end && (size_t)(end - action) < sizeof(entry.action)) {
-                strncpy(entry.action, action, end - action);
-            }
-        }
-        
-        char* in_hash = strstr(line, "\"input_hash\":\"");
-        if (in_hash) {
-            in_hash += 14;
-            char* end = strchr(in_hash, '"');
-            if (end && (size_t)(end - in_hash) < sizeof(entry.input_hash)) {
-                strncpy(entry.input_hash, in_hash, end - in_hash);
-            }
-        }
-        
-        char* out_hash = strstr(line, "\"output_hash\":\"");
-        if (out_hash) {
-            out_hash += 15;
-            char* end = strchr(out_hash, '"');
-            if (end && (size_t)(end - out_hash) < sizeof(entry.output_hash)) {
-                strncpy(entry.output_hash, out_hash, end - out_hash);
-            }
-        }
-        
-        char* prev_hash = strstr(line, "\"prev_entry_hash\":\"");
-        if (prev_hash) {
-            prev_hash += 19;
-            char* end = strchr(prev_hash, '"');
-            if (end && (size_t)(end - prev_hash) < sizeof(entry.prev_entry_hash)) {
-                strncpy(entry.prev_entry_hash, prev_hash, end - prev_hash);
-            }
-        }
-        
-        char* entry_hash = strstr(line, "\"entry_hash\":\"");
-        if (entry_hash) {
-            entry_hash += 14;
-            char* end = strchr(entry_hash, '"');
-            if (end && (size_t)(end - entry_hash) < sizeof(entry.entry_hash)) {
-                strncpy(entry.entry_hash, entry_hash, end - entry_hash);
-            }
-        }
+        // Parse JSON line using robust extraction
+        extract_json_number(line, "\"index\"", &entry.index);
+        extract_json_string(line, "\"timestamp\"", entry.timestamp, sizeof(entry.timestamp));
+        extract_json_string(line, "\"actor\"", entry.actor, sizeof(entry.actor));
+        extract_json_string(line, "\"action\"", entry.action, sizeof(entry.action));
+        extract_json_string(line, "\"input_hash\"", entry.input_hash, sizeof(entry.input_hash));
+        extract_json_string(line, "\"output_hash\"", entry.output_hash, sizeof(entry.output_hash));
+        extract_json_string(line, "\"prev_entry_hash\"", entry.prev_entry_hash, sizeof(entry.prev_entry_hash));
+        extract_json_string(line, "\"entry_hash\"", entry.entry_hash, sizeof(entry.entry_hash));
         
         // Verify prev_entry_hash matches previous entry's hash
         if (!first) {
@@ -235,7 +259,8 @@ int forensic_audit_log_verify(const forensic_audit_log_t* log) {
         char computed_hash[128];
         forensic_audit_compute_entry_hash(&entry, computed_hash, sizeof(computed_hash));
         if (strcmp(entry.entry_hash, computed_hash) != 0) {
-            fprintf(stderr, "[audit_log] Line %zu: entry_hash mismatch\n", line_num);
+            fprintf(stderr, "[audit_log] Line %zu: entry_hash mismatch (stored=%s, computed=%s)\n", 
+                    line_num, entry.entry_hash, computed_hash);
             errors++;
         }
         
