@@ -1,10 +1,55 @@
 from .ast import *
 from .errors import TypeError as BaseTypeError, SourceRange
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, Set
 from jocky.core.modules import Module, ModuleRegistry, get_registry
 
 class TypeError(BaseTypeError):
     pass
+
+class GenericContext:
+    """Tracks type variable bindings during generic function/struct checking."""
+    def __init__(self, parent: Optional['GenericContext'] = None):
+        self.bindings: Dict[str, JType] = {}  # T -> i32, U -> string, etc.
+        self.parent = parent
+
+    def bind(self, name: str, jtype: JType):
+        """Bind a type variable to a concrete type."""
+        self.bindings[name] = jtype
+
+    def lookup(self, name: str) -> Optional[JType]:
+        """Look up a type variable."""
+        if name in self.bindings:
+            return self.bindings[name]
+        if self.parent:
+            return self.parent.lookup(name)
+        return None
+
+    def child(self) -> 'GenericContext':
+        """Create a child context for nested scopes."""
+        return GenericContext(parent=self)
+
+class Monomorphization:
+    """Represents a generic function/struct instantiation."""
+    def __init__(self, base_name: str, type_bindings: Dict[str, JType]):
+        self.base_name = base_name
+        self.type_bindings = type_bindings
+        self.mangled_name = self._mangle()
+
+    def _mangle(self) -> str:
+        """Generate a unique mangled name for this instantiation."""
+        if not self.type_bindings:
+            return self.base_name
+        type_names = [self.type_bindings[k].name for k in sorted(self.type_bindings.keys())]
+        return f"{self.base_name}_{'_'.join(type_names)}"
+
+    def __hash__(self):
+        items = tuple(sorted((k, v.name) for k, v in self.type_bindings.items()))
+        return hash((self.base_name, items))
+
+    def __eq__(self, other):
+        return isinstance(other, Monomorphization) and \
+               self.base_name == other.base_name and \
+               self.type_bindings == other.type_bindings
 
 class TypeChecker:
     def __init__(self, module_registry: Optional[ModuleRegistry] = None):
@@ -15,6 +60,10 @@ class TypeChecker:
         self.locals: Dict[str, JType] = {}
         self.current_ret: JType = JType("void")
         self.loop_depth: int = 0
+
+        # Generics support
+        self.generic_context: GenericContext = GenericContext()
+        self.monomorphizations: Set[Monomorphization] = set()
 
         # Module support
         self.module_registry = module_registry or get_registry()
@@ -67,6 +116,35 @@ class TypeChecker:
                 array_size=t.array_size or resolved.array_size
             )
         return t
+
+    def substitute_type(self, jtype: JType, context: GenericContext = None) -> JType:
+        """Substitute type variables with concrete types using generic context."""
+        if context is None:
+            context = self.generic_context
+
+        if jtype.is_generic:
+            # This is a type variable like T, U, etc.
+            concrete = context.lookup(jtype.name)
+            if concrete:
+                # Preserve pointer and array flags
+                return JType(
+                    concrete.name,
+                    is_pointer=jtype.is_pointer or concrete.is_pointer,
+                    is_array=jtype.is_array or concrete.is_array,
+                    array_size=jtype.array_size or concrete.array_size,
+                    is_generic=False
+                )
+        return jtype
+
+    def resolve_generic_call(self, base_name: str, type_args: List[JType]) -> str:
+        """Generate mangled name for a generic function call.
+
+        Example: max<i32> -> max_i32
+        """
+        if not type_args:
+            return base_name
+        type_names = [t.name for t in type_args]
+        return f"{base_name}_{'_'.join(type_names)}"
 
     def process_module_decl(self, mod_decl: ModDecl):
         """Process a module declaration."""
