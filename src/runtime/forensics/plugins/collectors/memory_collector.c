@@ -71,7 +71,10 @@ static void parse_proc_maps(pid_t pid, forensic_artifact_list_t* list) {
     if (!f) return;
     
     char line[1024];
-    while (fgets(line, sizeof(line), f)) {
+    int region_count = 0;
+    const int MAX_REGIONS_PER_PROCESS = 500; // Limit per process
+    
+    while (fgets(line, sizeof(line), f) && region_count < MAX_REGIONS_PER_PROCESS) {
         unsigned long start, end;
         char perms[16];
         unsigned long offset;
@@ -84,6 +87,9 @@ static void parse_proc_maps(pid_t pid, forensic_artifact_list_t* list) {
             continue;
         }
         
+        // Skip anonymous mappings without path if desired
+        // (Keep for now - they can be suspicious: heap, stack, RWX)
+        
         char start_addr[32], end_addr[32];
         snprintf(start_addr, sizeof(start_addr), "%lx", start);
         snprintf(end_addr, sizeof(end_addr), "%lx", end);
@@ -93,9 +99,51 @@ static void parse_proc_maps(pid_t pid, forensic_artifact_list_t* list) {
         );
         if (artifact) {
             forensic_artifact_list_add(list, artifact);
+            region_count++;
         }
     }
     fclose(f);
+}
+
+static bool should_skip_process(const char* comm) {
+    // Extended skip list for kernel and system processes
+    static const char* skip_patterns[] = {
+        // Kernel threads
+        "kthreadd", "ksoftirqd", "kworker", "migration", "rcu",
+        "kcompactd", "kswapd", "khugepaged", "kintegrityd", "kblockd",
+        "kmdflush", "kdevtmpfs", "kpsmoused", "kdmflush", "kioctx",
+        "kseriod", "khungtaskd", "kfreezer", "kclock", "ktimersoftd",
+        "watchdog", "bioset", "crypto", "kstriped", "kmpathd", "kdmremove",
+        "kvmstat", "kvmpt", "kvmio", "kvmclock", "kvm-irqfd", "kvm-vcpu",
+        
+        // Init/system processes
+        "systemd", "systemd-journal", "systemd-udevd", "systemd-logind",
+        "systemd-resolved", "systemd-timesyncd", "systemd-networkd",
+        "systemd-machined", "systemd-coredump", "systemd-tmpfiles",
+        "init", "runit", "runsvdir", "runsv", "svlogd", "s6-supervise",
+        
+        // Shells (usually not interesting for memory forensics)
+        "bash", "sh", "zsh", "fish", "dash", "ash", "tcsh", "csh",
+        
+        // SSH/login (usually not interesting)
+        "sshd", "login", "agetty", "mingetty", "systemd-logind",
+        
+        // Container/virtualization
+        "containerd", "dockerd", "containerd-shim", "runc", "crio",
+        
+        // Monitoring/telemetry (usually noise)
+        "telegraf", "collectd", "prometheus", "node_exporter",
+        "datadog", "newrelic", "instana", "elastic",
+        
+        NULL
+    };
+    
+    for (int i = 0; skip_patterns[i]; i++) {
+        if (strstr(comm, skip_patterns[i])) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static void collect_process_memory(pid_t pid, forensic_artifact_list_t* list) {
@@ -112,19 +160,14 @@ static void collect_process_memory(pid_t pid, forensic_artifact_list_t* list) {
     fclose(f);
     comm[strcspn(comm, "\n")] = '\0';
     
-    const char* skip[] = {
-        "kthreadd", "ksoftirqd", "kworker", "migration", "rcu",
-        "systemd", "init", "bash", "sh", "sshd", "login",
-        NULL
-    };
-    bool should_skip = false;
-    for (int i = 0; skip[i]; i++) {
-        if (strstr(comm, skip[i])) {
-            should_skip = true;
-            break;
-        }
-    }
-    if (should_skip) return;
+    if (should_skip_process(comm)) return;
+    
+    // Also skip kernel threads (no cmdline)
+    char cmdline_path[256];
+    snprintf(cmdline_path, sizeof(cmdline_path), "/proc/%d/cmdline", pid);
+    FILE* cf = fopen(cmdline_path, "r");
+    if (!cf) return; // Kernel thread - no cmdline
+    fclose(cf);
     
     parse_proc_maps(pid, list);
 }
