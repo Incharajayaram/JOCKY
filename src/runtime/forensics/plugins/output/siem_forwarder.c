@@ -2,8 +2,8 @@
 /**
  * SIEM Forwarder Output Plugin
  * 
- * Forwards analysis results to SIEM via HTTP (Splunk HEC, Elastic, etc.)
- * Uses raw sockets for HTTP POST - no external dependencies.
+ * Forwards analysis results to SIEM via HTTP/HTTPS (Splunk HEC, Elastic, etc.)
+ * Uses OpenSSL for HTTPS support.
  */
 
 #include "forensic_types.h"
@@ -17,15 +17,57 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 /* ============================================================================
- * HTTP Helper Functions
+ * Global OpenSSL Context
  * ============================================================================ */
+
+static SSL_CTX* g_ssl_ctx = NULL;
+
+static void init_openssl(void) {
+    if (g_ssl_ctx) return;
+    SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
+    g_ssl_ctx = SSL_CTX_new(TLS_client_method());
+    if (!g_ssl_ctx) {
+        fprintf(stderr, "[siem_forwarder] Failed to create SSL context\n");
+    }
+}
+
+static void cleanup_openssl(void) {
+    if (g_ssl_ctx) {
+        SSL_CTX_free(g_ssl_ctx);
+        g_ssl_ctx = NULL;
+    }
+    EVP_cleanup();
+}
+
+/* ============================================================================
+ * HTTP/HTTPS Helper Functions
+ * ============================================================================ */
+
+static int http_send_request(int sockfd, SSL* ssl, const char* request) {
+    if (ssl) {
+        return SSL_write(ssl, request, strlen(request));
+    }
+    return send(sockfd, request, strlen(request), 0);
+}
+
+static int http_recv_response(int sockfd, SSL* ssl, char* buffer, size_t buf_size) {
+    if (ssl) {
+        return SSL_read(ssl, buffer, buf_size - 1);
+    }
+    return recv(sockfd, buffer, buf_size - 1, 0);
+}
 
 static int http_post(const char* url, const char* payload, int timeout_sec) {
     // Parse URL: http(s)://host:port/path
     char proto[16], host[256], path[512];
     int port = 80;
+    bool use_tls = false;
     
     if (sscanf(url, "%15[^:]://%255[^/]/%511s", proto, host, path) != 3) {
         if (sscanf(url, "%15[^:]://%255[^/]", proto, host) != 2) {
@@ -34,13 +76,11 @@ static int http_post(const char* url, const char* payload, int timeout_sec) {
         }
         strcpy(path, "/");
     } else {
-        // Prepend / to path
         char full_path[512];
         snprintf(full_path, sizeof(full_path), "/%s", path);
         strcpy(path, full_path);
     }
     
-    // Check for port in host
     char* colon = strchr(host, ':');
     if (colon) {
         *colon = '\0';
@@ -48,9 +88,8 @@ static int http_post(const char* url, const char* payload, int timeout_sec) {
     }
     
     if (strcasecmp(proto, "https") == 0) {
-        port = 443;
-        fprintf(stderr, "[siem_forwarder] HTTPS not supported, use HTTP or add TLS library\n");
-        return -1;
+        use_tls = true;
+        if (port == 80) port = 443;
     }
     
     // Resolve host
@@ -84,6 +123,36 @@ static int http_post(const char* url, const char* payload, int timeout_sec) {
         return -1;
     }
     
+    // Setup TLS if needed
+    SSL* ssl = NULL;
+    if (use_tls) {
+        init_openssl();
+        if (!g_ssl_ctx) {
+            close(sockfd);
+            return -1;
+        }
+        ssl = SSL_new(g_ssl_ctx);
+        if (!ssl) {
+            fprintf(stderr, "[siem_forwarder] SSL_new failed\n");
+            close(sockfd);
+            return -1;
+        }
+        SSL_set_fd(ssl, sockfd);
+        // Set hostname for SNI
+        SSL_set_tlsext_host_name(ssl, host);
+        
+        int ret = SSL_connect(ssl);
+        if (ret != 1) {
+            int err = SSL_get_error(ssl, ret);
+            fprintf(stderr, "[siem_forwarder] SSL_connect failed: %d\n", err);
+            ERR_print_errors_fp(stderr);
+            SSL_free(ssl);
+            close(sockfd);
+            return -1;
+        }
+        printf("[siem_forwarder] TLS connection established to %s\n", host);
+    }
+    
     // Build HTTP request
     char request[4096];
     int payload_len = strlen(payload);
@@ -98,15 +167,17 @@ static int http_post(const char* url, const char* payload, int timeout_sec) {
         path, host, payload_len, payload);
     
     // Send request
-    if (send(sockfd, request, strlen(request), 0) < 0) {
-        fprintf(stderr, "[siem_forwarder] Send failed: %s\n", strerror(errno));
+    int sent = http_send_request(sockfd, ssl, request);
+    if (sent <= 0) {
+        fprintf(stderr, "[siem_forwarder] Send failed\n");
+        if (ssl) SSL_free(ssl);
         close(sockfd);
         return -1;
     }
     
-    // Read response (just to verify connection worked)
-    char response[1024];
-    int bytes = recv(sockfd, response, sizeof(response) - 1, 0);
+    // Read response
+    char response[2048];
+    int bytes = http_recv_response(sockfd, ssl, response, sizeof(response));
     if (bytes > 0) {
         response[bytes] = '\0';
         if (strstr(response, "200") || strstr(response, "201") || strstr(response, "202")) {
@@ -116,6 +187,10 @@ static int http_post(const char* url, const char* payload, int timeout_sec) {
         }
     }
     
+    if (ssl) {
+        SSL_shutdown(ssl);
+        SSL_free(ssl);
+    }
     close(sockfd);
     return 0;
 }
@@ -137,7 +212,8 @@ static char* build_json_payload(const forensic_timeline_t* timeline,
 
 static int siem_forwarder_init(void* config) {
     (void)config;
-    printf("[siem_forwarder] Initialized (HTTP socket client)\n");
+    init_openssl();
+    printf("[siem_forwarder] Initialized (HTTP/HTTPS with OpenSSL)\n");
     return 0;
 }
 
@@ -164,6 +240,7 @@ static int siem_forwarder_generate(const forensic_timeline_t* timeline,
 }
 
 static void siem_forwarder_cleanup(void) {
+    cleanup_openssl();
     printf("[siem_forwarder] Cleanup\n");
 }
 
@@ -179,7 +256,7 @@ static const char* siem_capabilities[] = {
 forensic_output_plugin_t siem_forwarder_plugin = {
     .name = "siem_forwarder",
     .version = "1.0.0",
-    .description = "Forwards forensic results to SIEM via HTTP POST (Splunk HEC, Elastic, etc.)",
+    .description = "Forwards forensic results to SIEM via HTTP/HTTPS POST (Splunk HEC, Elastic, etc.)",
     .init = siem_forwarder_init,
     .generate = siem_forwarder_generate,
     .cleanup = siem_forwarder_cleanup,
