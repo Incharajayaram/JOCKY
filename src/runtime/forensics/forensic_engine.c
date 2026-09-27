@@ -21,6 +21,7 @@ extern forensic_data_source_plugin_t registry_collector_plugin;
 extern forensic_data_source_plugin_t memory_collector_plugin;
 extern forensic_data_source_plugin_t evtx_collector_plugin;
 extern forensic_data_source_plugin_t prefetch_collector_plugin;
+extern forensic_data_source_plugin_t mft_collector_plugin;
 
 extern forensic_artifact_parser_plugin_t pe_parser_plugin;
 extern forensic_artifact_parser_plugin_t registry_parser_plugin;
@@ -101,6 +102,7 @@ int forensic_engine_register_default_plugins(forensic_engine_t* engine) {
     forensic_plugin_registry_register_collector(engine->registry, &memory_collector_plugin);
     forensic_plugin_registry_register_collector(engine->registry, &evtx_collector_plugin);
     forensic_plugin_registry_register_collector(engine->registry, &prefetch_collector_plugin);
+    forensic_plugin_registry_register_collector(engine->registry, &mft_collector_plugin);
     
     forensic_plugin_registry_register_parser(engine->registry, &pe_parser_plugin);
     forensic_plugin_registry_register_parser(engine->registry, &registry_parser_plugin);
