@@ -52,3 +52,4 @@ test_forensics/output/
 test_forensics/index.json
 test_forensics/audit/audit.jsonl
 build_forensics/
+test_forensics/
