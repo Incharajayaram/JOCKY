@@ -179,6 +179,8 @@ forensic_artifact_list_t* forensic_artifact_list_create(size_t capacity);
 void forensic_artifact_list_destroy(forensic_artifact_list_t* list);
 int forensic_artifact_list_add(forensic_artifact_list_t* list,
                                 const forensic_artifact_t* artifact);
+int forensic_artifact_list_add_deep(forensic_artifact_list_t* list,
+                                     const forensic_artifact_t* artifact);
 
 forensic_bytes_t forensic_bytes_create(const void* data, size_t len);
 void forensic_bytes_destroy(forensic_bytes_t* bytes);

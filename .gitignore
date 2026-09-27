@@ -47,3 +47,8 @@ static_analysis_of_drivers/deepzero_toolchain/DeepZero/
 static_analysis_of_drivers/deepzero_toolchain/venv/
 static_analysis_of_drivers/deepzero_toolchain/tools/
 static_analysis_of_drivers/deepzero_toolchain/.env
+test_forensics/evidence/
+test_forensics/output/
+test_forensics/index.json
+test_forensics/audit/audit.jsonl
+build_forensics/

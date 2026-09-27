@@ -27,14 +27,14 @@ static int registry_collector_init(void* config) {
 }
 
 static forensic_artifact_t* create_registry_artifact(const char* key_path,
-                                                      const char* value_name,
-                                                      const char* value_data,
-                                                      const char* type) {
+                                                       const char* value_name,
+                                                       const char* value_data,
+                                                       const char* type) {
     forensic_artifact_t* artifact = calloc(1, sizeof(forensic_artifact_t));
     if (!artifact) return NULL;
     
-    artifact->plugin_name = "registry_collector";
-    artifact->artifact_type = "registry";
+    artifact->plugin_name = strdup("registry_collector");
+    artifact->artifact_type = strdup("registry");
     
     time_t now = time(NULL);
     char timestamp[64];
@@ -93,10 +93,6 @@ static void collect_systemd_services(forensic_artifact_list_t* list) {
             );
             if (artifact) {
                 forensic_artifact_list_add(list, artifact);
-                free(artifact->timestamp);
-                forensic_bytes_destroy(&artifact->raw);
-                forensic_metadata_destroy(&artifact->metadata);
-                free(artifact);
             }
         }
         closedir(dir);
@@ -137,10 +133,6 @@ static void collect_cron_jobs(forensic_artifact_list_t* list) {
                 );
                 if (artifact) {
                     forensic_artifact_list_add(list, artifact);
-                    free(artifact->timestamp);
-                    forensic_bytes_destroy(&artifact->raw);
-                    forensic_metadata_destroy(&artifact->metadata);
-                    free(artifact);
                 }
             }
             fclose(f);
@@ -164,10 +156,6 @@ static void collect_cron_jobs(forensic_artifact_list_t* list) {
                 );
                 if (artifact) {
                     forensic_artifact_list_add(list, artifact);
-                    free(artifact->timestamp);
-                    forensic_bytes_destroy(&artifact->raw);
-                    forensic_metadata_destroy(&artifact->metadata);
-                    free(artifact);
                 }
             }
             pclose(f);
@@ -190,10 +178,6 @@ static void collect_shell_configs(forensic_artifact_list_t* list) {
             );
             if (artifact) {
                 forensic_artifact_list_add(list, artifact);
-                free(artifact->timestamp);
-                forensic_bytes_destroy(&artifact->raw);
-                forensic_metadata_destroy(&artifact->metadata);
-                free(artifact);
             }
         }
     }
@@ -214,10 +198,6 @@ static void collect_shell_configs(forensic_artifact_list_t* list) {
                 );
                 if (artifact) {
                     forensic_artifact_list_add(list, artifact);
-                    free(artifact->timestamp);
-                    forensic_bytes_destroy(&artifact->raw);
-                    forensic_metadata_destroy(&artifact->metadata);
-                    free(artifact);
                 }
             }
         }
@@ -239,10 +219,6 @@ static void collect_init_scripts(forensic_artifact_list_t* list) {
             );
             if (artifact) {
                 forensic_artifact_list_add(list, artifact);
-                free(artifact->timestamp);
-                forensic_bytes_destroy(&artifact->raw);
-                forensic_metadata_destroy(&artifact->metadata);
-                free(artifact);
             }
         }
         closedir(dir);
@@ -267,10 +243,6 @@ static forensic_artifact_list_t* registry_collector_collect(const char* target, 
         );
         if (artifact) {
             forensic_artifact_list_add(list, artifact);
-            free(artifact->timestamp);
-            forensic_bytes_destroy(&artifact->raw);
-            forensic_metadata_destroy(&artifact->metadata);
-            free(artifact);
         }
     }
     

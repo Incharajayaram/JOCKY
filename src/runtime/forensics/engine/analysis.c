@@ -114,7 +114,16 @@ int forensic_analysis_build_timeline(const forensic_parsed_artifact_list_t* pars
     for (size_t i = 0; i < parsed->count; i++) {
         const forensic_parsed_artifact_t* art = &parsed->items[i];
         for (size_t j = 0; j < art->timeline_count; j++) {
-            timeline->items[idx++] = art->timeline_events[j];
+            const forensic_event_t* src = &art->timeline_events[j];
+            forensic_event_t* dst = &timeline->items[idx++];
+            dst->event_type = src->event_type ? strdup(src->event_type) : NULL;
+            dst->timestamp = src->timestamp ? strdup(src->timestamp) : NULL;
+            dst->source_plugin = src->source_plugin ? strdup(src->source_plugin) : NULL;
+            dst->description = src->description ? strdup(src->description) : NULL;
+            dst->details = forensic_metadata_create(src->details.capacity);
+            for (size_t k = 0; k < src->details.count; k++) {
+                forensic_metadata_add(&dst->details, src->details.items[k].key, src->details.items[k].value);
+            }
         }
     }
     timeline->count = idx;

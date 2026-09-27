@@ -33,9 +33,9 @@ static int json_output_generate(const forensic_timeline_t* timeline,
                                  const forensic_ioc_list_t* iocs,
                                  const forensic_metadata_t* provenance,
                                  void* config) {
-    (void)config;
-    
-    const char* output_path = config ? (const char*)config : "forensic_report.json";
+    const char* output_dir = config ? (const char*)config : ".";
+    char output_path[512];
+    snprintf(output_path, sizeof(output_path), "%s/forensic_report.json", output_dir);
     FILE* f = fopen(output_path, "w");
     if (!f) {
         fprintf(stderr, "[json_output] Failed to open output file: %s\n", output_path);

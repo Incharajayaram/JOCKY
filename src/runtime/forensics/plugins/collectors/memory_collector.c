@@ -26,15 +26,15 @@ static int memory_collector_init(void* config) {
 }
 
 static forensic_artifact_t* create_memory_artifact(pid_t pid,
-                                                    const char* start_addr,
-                                                    const char* end_addr,
-                                                    const char* perms,
-                                                    const char* path) {
+                                                     const char* start_addr,
+                                                     const char* end_addr,
+                                                     const char* perms,
+                                                     const char* path) {
     forensic_artifact_t* artifact = calloc(1, sizeof(forensic_artifact_t));
     if (!artifact) return NULL;
     
-    artifact->plugin_name = "memory_collector";
-    artifact->artifact_type = "memory_region";
+    artifact->plugin_name = strdup("memory_collector");
+    artifact->artifact_type = strdup("memory_region");
     
     time_t now = time(NULL);
     char timestamp[64];
@@ -93,10 +93,6 @@ static void parse_proc_maps(pid_t pid, forensic_artifact_list_t* list) {
         );
         if (artifact) {
             forensic_artifact_list_add(list, artifact);
-            free(artifact->timestamp);
-            forensic_bytes_destroy(&artifact->raw);
-            forensic_metadata_destroy(&artifact->metadata);
-            free(artifact);
         }
     }
     fclose(f);

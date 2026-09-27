@@ -80,8 +80,8 @@ static void collect_files_recursive(const char* dirpath, forensic_artifact_list_
                 }
                 
                 forensic_artifact_t artifact = {0};
-                artifact.plugin_name = "file_collector";
-                artifact.artifact_type = "file";
+                artifact.plugin_name = strdup("file_collector");
+                artifact.artifact_type = strdup("file");
                 
                 time_t now = time(NULL);
                 char timestamp[64];

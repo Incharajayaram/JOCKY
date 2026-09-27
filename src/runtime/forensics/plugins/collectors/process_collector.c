@@ -143,8 +143,8 @@ static forensic_artifact_list_t* process_collector_collect(const char* target, v
         if (name) forensic_metadata_add(&meta, "name", name);
         
         forensic_artifact_t artifact = {0};
-        artifact.plugin_name = "process_collector";
-        artifact.artifact_type = "process";
+        artifact.plugin_name = strdup("process_collector");
+        artifact.artifact_type = strdup("process");
         
         time_t now = time(NULL);
         char timestamp[64];

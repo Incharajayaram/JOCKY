@@ -28,7 +28,9 @@ static int sigma_output_generate(const forensic_timeline_t* timeline,
     (void)timeline;
     (void)provenance;
     
-    const char* output_path = config ? (const char*)config : "forensic_rules.sigma.yaml";
+    const char* output_dir = config ? (const char*)config : ".";
+    char output_path[512];
+    snprintf(output_path, sizeof(output_path), "%s/forensic_rules.sigma.yaml", output_dir);
     FILE* f = fopen(output_path, "w");
     if (!f) {
         fprintf(stderr, "[sigma_output] Failed to open output file: %s\n", output_path);

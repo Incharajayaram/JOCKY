@@ -134,8 +134,8 @@ static void collect_dns_cache(forensic_artifact_list_t* list) {
             forensic_metadata_add(&meta, "content", line);
             
             forensic_artifact_t artifact = {0};
-            artifact.plugin_name = "network_collector";
-            artifact.artifact_type = "dns_cache";
+            artifact.plugin_name = strdup("network_collector");
+            artifact.artifact_type = strdup("dns_cache");
             time_t now = time(NULL);
             char timestamp[64];
             strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
@@ -174,9 +174,9 @@ static forensic_artifact_list_t* network_collector_collect(const char* target, v
                 forensic_metadata_add(&meta, "mac", hw);
                 forensic_metadata_add(&meta, "interface", dev);
                 
-                forensic_artifact_t artifact = {0};
-                artifact.plugin_name = "network_collector";
-                artifact.artifact_type = "arp_entry";
+forensic_artifact_t artifact = {0};
+            artifact.plugin_name = strdup("network_collector");
+            artifact.artifact_type = strdup("arp_entry");
                 time_t now = time(NULL);
                 char timestamp[64];
                 strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));

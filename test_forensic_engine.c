@@ -17,7 +17,8 @@ int main(int argc, char** argv) {
     config.audit_log_path = "./test_forensics/audit/audit.jsonl";
     config.operator_role = ROLE_ANALYST;
     config.enable_sandbox = true;
-    config.enable_siem = false;
+    config.enable_siem = true;
+    config.siem_endpoint = "http://httpbin.org/post";
     
     forensic_engine_t* engine = forensic_engine_create(&config);
     if (!engine) {
@@ -31,9 +32,12 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    forensic_analysis_result_t* result = calloc(1, sizeof(forensic_analysis_result_t));
-    result->timeline = calloc(1, sizeof(forensic_timeline_t));
-    result->iocs = calloc(1, sizeof(forensic_ioc_list_t));
+    forensic_analysis_result_t* result = forensic_analysis_create();
+    if (!result) {
+        fprintf(stderr, "Failed to create analysis result\n");
+        forensic_engine_destroy(engine);
+        return 1;
+    }
     
     int ret = forensic_engine_run_full_pipeline(engine, "local", result);
     

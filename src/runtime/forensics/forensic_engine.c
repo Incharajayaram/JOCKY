@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <sys/stat.h>
 
 /* ============================================================================
  * Default Plugins Registration
@@ -25,6 +26,11 @@ extern forensic_artifact_parser_plugin_t evtx_parser_plugin;
 extern forensic_artifact_parser_plugin_t prefetch_parser_plugin;
 extern forensic_artifact_parser_plugin_t mft_parser_plugin;
 extern forensic_artifact_parser_plugin_t network_parser_plugin;
+extern forensic_artifact_parser_plugin_t process_parser_plugin;
+extern forensic_artifact_parser_plugin_t file_parser_plugin;
+extern forensic_artifact_parser_plugin_t dns_parser_plugin;
+extern forensic_artifact_parser_plugin_t arp_parser_plugin;
+extern forensic_artifact_parser_plugin_t memory_parser_plugin;
 
 extern forensic_output_plugin_t json_output_plugin;
 extern forensic_output_plugin_t stix_output_plugin;
@@ -98,6 +104,11 @@ int forensic_engine_register_default_plugins(forensic_engine_t* engine) {
     forensic_plugin_registry_register_parser(engine->registry, &prefetch_parser_plugin);
     forensic_plugin_registry_register_parser(engine->registry, &mft_parser_plugin);
     forensic_plugin_registry_register_parser(engine->registry, &network_parser_plugin);
+    forensic_plugin_registry_register_parser(engine->registry, &process_parser_plugin);
+    forensic_plugin_registry_register_parser(engine->registry, &file_parser_plugin);
+    forensic_plugin_registry_register_parser(engine->registry, &dns_parser_plugin);
+    forensic_plugin_registry_register_parser(engine->registry, &arp_parser_plugin);
+    forensic_plugin_registry_register_parser(engine->registry, &memory_parser_plugin);
     
     forensic_plugin_registry_register_output(engine->registry, &json_output_plugin);
     forensic_plugin_registry_register_output(engine->registry, &stix_output_plugin);
@@ -171,7 +182,7 @@ int forensic_engine_run_collection(forensic_engine_t* engine,
         
         if (artifacts) {
             for (size_t j = 0; j < artifacts->count; j++) {
-                forensic_artifact_list_add(all_artifacts, &artifacts->items[j]);
+                forensic_artifact_list_add_deep(all_artifacts, &artifacts->items[j]);
             }
             forensic_artifact_list_destroy(artifacts);
         }
@@ -259,7 +270,7 @@ int forensic_engine_run_analysis(forensic_engine_t* engine,
  * ============================================================================ */
 
 int forensic_engine_generate_outputs(forensic_engine_t* engine,
-                                      const forensic_analysis_result_t* result) {
+                                       const forensic_analysis_result_t* result) {
     if (!engine || !result) return -1;
     
     printf("[forensic_engine] Generating outputs...\n");
@@ -268,6 +279,13 @@ int forensic_engine_generate_outputs(forensic_engine_t* engine,
     
     forensic_metadata_t prov_meta = forensic_metadata_create(16);
     forensic_metadata_add(&prov_meta, "engine", "JOCKY Forensic Engine");
+    
+    // Create output directory path
+    char output_dir[512];
+    snprintf(output_dir, sizeof(output_dir), "%s/output", engine->config.evidence_base_path);
+    
+    // Create output directory
+    mkdir(output_dir, 0755);
     
     for (size_t i = 0; i < engine->registry->output_count; i++) {
         forensic_output_plugin_t* output = engine->registry->outputs[i];
@@ -278,8 +296,14 @@ int forensic_engine_generate_outputs(forensic_engine_t* engine,
         
         forensic_audit_log_append(engine->audit_log, "output", output->name, "", "");
         
-        output->generate(result->timeline, result->iocs, &prov_meta,
-                        (void*)engine->config.siem_endpoint);
+        // Pass output directory for file-based outputs, endpoint for SIEM
+        if (strcmp(output->name, "siem_forwarder") == 0) {
+            output->generate(result->timeline, result->iocs, &prov_meta,
+                            (void*)engine->config.siem_endpoint);
+        } else {
+            output->generate(result->timeline, result->iocs, &prov_meta,
+                            (void*)output_dir);
+        }
     }
     
     forensic_metadata_destroy(&prov_meta);
