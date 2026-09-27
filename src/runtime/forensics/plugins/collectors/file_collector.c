@@ -73,19 +73,56 @@ static void collect_files_recursive(const char* dirpath, forensic_artifact_list_
                 snprintf(mtime_str, sizeof(mtime_str), "%ld", (long)st.st_mtime);
                 forensic_metadata_add(&meta, "mtime", mtime_str);
                 
+                time_t now = time(NULL);
+                char timestamp[64];
+                strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
+                
                 char* hash = get_file_hash(fullpath);
                 if (hash) {
                     forensic_metadata_add(&meta, "hash", hash);
                     free(hash);
                 }
                 
+                // Add PE/ELF file artifact for executable files
+                bool is_exec = is_executable(fullpath);
+                if (is_exec) {
+                    forensic_metadata_t pe_meta = forensic_metadata_create(16);
+                    forensic_metadata_add(&pe_meta, "size", size_str);
+                    forensic_metadata_add(&pe_meta, "mtime", mtime_str);
+                    if (hash) forensic_metadata_add(&pe_meta, "hash", hash);
+                    forensic_metadata_add(&pe_meta, "path", fullpath);
+                    
+                    // Read file content for PE parsing
+                    FILE* pf = fopen(fullpath, "rb");
+                    forensic_bytes_t pe_raw = {0};
+                    if (pf) {
+                        fseek(pf, 0, SEEK_END);
+                        long flen = ftell(pf);
+                        fseek(pf, 0, SEEK_SET);
+                        if (flen > 0 && flen < 100 * 1024 * 1024) { // Limit to 100MB
+                            char* fbuf = malloc(flen);
+                            if (fbuf) {
+                                size_t fr = fread(fbuf, 1, flen, pf);
+                                pe_raw = forensic_bytes_create(fbuf, fr);
+                                free(fbuf);
+                            }
+                        }
+                        fclose(pf);
+                    }
+                    
+                    forensic_artifact_t pe_artifact = {0};
+                    pe_artifact.plugin_name = strdup("file_collector");
+                    pe_artifact.artifact_type = strdup("pe_file");
+                    pe_artifact.timestamp = strdup(timestamp);
+                    pe_artifact.raw = pe_raw;
+                    pe_artifact.metadata = pe_meta;
+                    
+                    forensic_artifact_list_add(list, &pe_artifact);
+                }
+                
                 forensic_artifact_t artifact = {0};
                 artifact.plugin_name = strdup("file_collector");
                 artifact.artifact_type = strdup("file");
-                
-                time_t now = time(NULL);
-                char timestamp[64];
-                strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
                 artifact.timestamp = strdup(timestamp);
                 artifact.raw = forensic_bytes_create(fullpath, strlen(fullpath));
                 artifact.metadata = meta;

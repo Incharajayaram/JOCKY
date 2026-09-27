@@ -169,7 +169,7 @@ static forensic_parsed_artifact_t* parse_pe(const forensic_bytes_t* data, void* 
     
     const DOS_HEADER* dos = (const DOS_HEADER*)data->data;
     if (dos->e_magic != 0x5A4D) { // MZ
-        fprintf(stderr, "[pe_parser] Not a valid PE file (no MZ signature)\n");
+        // Not a PE file (could be ELF on Linux)
         return NULL;
     }
     
