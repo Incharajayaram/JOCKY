@@ -16,6 +16,7 @@ SRCS=(
     "src/runtime/forensics/plugins/collectors/evtx_collector.c"
     "src/runtime/forensics/plugins/collectors/prefetch_collector.c"
     "src/runtime/forensics/plugins/collectors/mft_collector.c"
+    "src/runtime/forensics/plugins/collectors/usnjrnl_collector.c"
     "src/runtime/forensics/plugins/parsers/pe_parser.c"
     "src/runtime/forensics/plugins/parsers/registry_parser.c"
     "src/runtime/forensics/plugins/parsers/evtx_parser.c"
