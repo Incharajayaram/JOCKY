@@ -61,6 +61,39 @@ typedef struct {
     uint32_t AddressOfEntryPoint;
     uint32_t BaseOfCode;
     uint32_t BaseOfData;
+    uint32_t ImageBase;
+    uint32_t SectionAlignment;
+    uint32_t FileAlignment;
+    uint16_t MajorOperatingSystemVersion;
+    uint16_t MinorOperatingSystemVersion;
+    uint16_t MajorImageVersion;
+    uint16_t MinorImageVersion;
+    uint16_t MajorSubsystemVersion;
+    uint16_t MinorSubsystemVersion;
+    uint32_t Win32VersionValue;
+    uint32_t SizeOfImage;
+    uint32_t SizeOfHeaders;
+    uint32_t CheckSum;
+    uint16_t Subsystem;
+    uint16_t DllCharacteristics;
+    uint32_t SizeOfStackReserve;
+    uint32_t SizeOfStackCommit;
+    uint32_t SizeOfHeapReserve;
+    uint32_t SizeOfHeapCommit;
+    uint32_t LoaderFlags;
+    uint32_t NumberOfRvaAndSizes;
+    // DataDirectory[16] follows
+} OPTIONAL_HEADER32;
+
+typedef struct {
+    uint16_t Magic;
+    uint8_t MajorLinkerVersion;
+    uint8_t MinorLinkerVersion;
+    uint32_t SizeOfCode;
+    uint32_t SizeOfInitializedData;
+    uint32_t SizeOfUninitializedData;
+    uint32_t AddressOfEntryPoint;
+    uint32_t BaseOfCode;
     uint64_t ImageBase;
     uint32_t SectionAlignment;
     uint32_t FileAlignment;
@@ -184,12 +217,48 @@ static forensic_parsed_artifact_t* parse_pe(const forensic_bytes_t* data, void* 
         return NULL;
     }
     
-    bool is64 = (coff->SizeOfOptionalHeader == sizeof(OPTIONAL_HEADER64));
-    if (!is64) {
-        fprintf(stderr, "[pe_parser] 32-bit PE not fully supported\n");
+    // Check optional header magic to determine PE32 vs PE32+
+    const uint16_t* magic_ptr = (const uint16_t*)(data->data + dos->e_lfanew + sizeof(COFF_HEADER));
+    uint16_t magic = *magic_ptr;
+    bool is64 = (magic == 0x20B); // PE32+ (0x20B) vs PE32 (0x10B)
+    
+    const char* pe_format = is64 ? "PE32+" : "PE32";
+    
+    // Get pointers to optional header fields based on format
+    uint32_t address_of_entry_point;
+    uint64_t image_base;
+    uint16_t subsystem;
+    uint16_t dll_characteristics;
+    uint32_t num_rva_and_sizes;
+    const DATA_DIRECTORY* data_dir;
+    const SECTION_HEADER* sections;
+    
+    if (is64) {
+        const OPTIONAL_HEADER64* opt64 = (const OPTIONAL_HEADER64*)(coff + 1);
+        address_of_entry_point = opt64->AddressOfEntryPoint;
+        image_base = opt64->ImageBase;
+        subsystem = opt64->Subsystem;
+        dll_characteristics = opt64->DllCharacteristics;
+        num_rva_and_sizes = opt64->NumberOfRvaAndSizes;
+        data_dir = (const DATA_DIRECTORY*)((const uint8_t*)opt64 + sizeof(OPTIONAL_HEADER64));
+        sections = (const SECTION_HEADER*)((const uint8_t*)opt64 + coff->SizeOfOptionalHeader);
+    } else {
+        const OPTIONAL_HEADER32* opt32 = (const OPTIONAL_HEADER32*)(coff + 1);
+        address_of_entry_point = opt32->AddressOfEntryPoint;
+        image_base = opt32->ImageBase;
+        subsystem = opt32->Subsystem;
+        dll_characteristics = opt32->DllCharacteristics;
+        num_rva_and_sizes = opt32->NumberOfRvaAndSizes;
+        data_dir = (const DATA_DIRECTORY*)((const uint8_t*)opt32 + sizeof(OPTIONAL_HEADER32));
+        sections = (const SECTION_HEADER*)((const uint8_t*)opt32 + coff->SizeOfOptionalHeader);
     }
     
-    const OPTIONAL_HEADER64* opt = (const OPTIONAL_HEADER64*)(coff + 1);
+    // Verify we have enough data for sections
+    size_t sections_offset = (const uint8_t*)sections - (const uint8_t*)data->data;
+    if (data->len < sections_offset + coff->NumberOfSections * sizeof(SECTION_HEADER)) {
+        fprintf(stderr, "[pe_parser] Data too small for section headers\n");
+        return NULL;
+    }
     
     // Create parsed artifact
     forensic_parsed_artifact_t* artifact = forensic_parsed_artifact_create("pe_file", "pe_parser");
@@ -201,14 +270,15 @@ static forensic_parsed_artifact_t* parse_pe(const forensic_bytes_t* data, void* 
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", gmtime(&compile_time));
     forensic_metadata_add(&artifact->parsed_data, "compile_timestamp", timestamp);
     forensic_metadata_add(&artifact->parsed_data, "machine", get_machine_name(coff->Machine));
-    forensic_metadata_add(&artifact->parsed_data, "subsystem", get_subsystem_name(opt->Subsystem));
+    forensic_metadata_add(&artifact->parsed_data, "pe_format", pe_format);
+    forensic_metadata_add(&artifact->parsed_data, "subsystem", get_subsystem_name(subsystem));
     
     char entry_str[32];
-    snprintf(entry_str, sizeof(entry_str), "0x%lx", (unsigned long)opt->AddressOfEntryPoint);
+    snprintf(entry_str, sizeof(entry_str), "0x%x", address_of_entry_point);
     forensic_metadata_add(&artifact->parsed_data, "entry_point", entry_str);
     
     char base_str[32];
-    snprintf(base_str, sizeof(base_str), "0x%lx", (unsigned long)opt->ImageBase);
+    snprintf(base_str, sizeof(base_str), "0x%lx", (unsigned long)image_base);
     forensic_metadata_add(&artifact->parsed_data, "image_base", base_str);
     
     char sections_str[32];
@@ -216,8 +286,6 @@ static forensic_parsed_artifact_t* parse_pe(const forensic_bytes_t* data, void* 
     forensic_metadata_add(&artifact->parsed_data, "num_sections", sections_str);
     
     // Parse sections
-    const SECTION_HEADER* sections = (const SECTION_HEADER*)(data->data + dos->e_lfanew + sizeof(COFF_HEADER) + coff->SizeOfOptionalHeader);
-    
     for (int i = 0; i < coff->NumberOfSections; i++) {
         const SECTION_HEADER* sec = &sections[i];
         char sec_name[9];
@@ -257,9 +325,9 @@ static forensic_parsed_artifact_t* parse_pe(const forensic_bytes_t* data, void* 
     artifact->timeline_events[artifact->timeline_count++] = *evt;
     free(evt);
     
-    printf("[pe_parser] Parsed PE: %d sections, %s, %s\n",
+    printf("[pe_parser] Parsed PE: %d sections, %s, %s, %s\n",
            coff->NumberOfSections, get_machine_name(coff->Machine),
-           get_subsystem_name(opt->Subsystem));
+           pe_format, get_subsystem_name(subsystem));
     
     return artifact;
 }
