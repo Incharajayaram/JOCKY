@@ -51,7 +51,7 @@ gcc -std=c99 -O2 -g \
     $INCLUDES \
     "${SRCS[@]}" \
     -o build_forensics/forensic_test \
-    -lpthread -lm -lssl -lcrypto
+    -lpthread -lm -lz -lssl -lcrypto
 
 if [ $? -eq 0 ]; then
     echo "Build successful: build_forensics/forensic_test"
