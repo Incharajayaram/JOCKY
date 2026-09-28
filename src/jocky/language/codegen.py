@@ -92,6 +92,10 @@ class CodeGen:
 
     def emit_struct_def(self, struct_def: StructDef):
         """Emit LLVM struct type definition."""
+        if struct_def.attributes:
+            attr_strs = [f"{attr.name}" + (f"({','.join(map(str, attr.args))})" if attr.args else "") for attr in struct_def.attributes]
+            self.emit(f"; struct attributes: [{', '.join(attr_strs)}]")
+
         field_types = ", ".join(self.llvm_type(f.type) for f in struct_def.fields)
         self.emit(f"%{struct_def.name} = type {{ {field_types} }}")
 
@@ -122,6 +126,31 @@ class CodeGen:
                 array_size=t.array_size or resolved.array_size
             )
         return t
+
+    def get_attribute_flags(self, attributes: List[Any]) -> str:
+        """Generate LLVM attribute string from attributes."""
+        if not attributes:
+            return ""
+
+        flags = []
+        for attr in attributes:
+            if attr.name == 'inline':
+                if attr.args and attr.args[0] == 'never':
+                    flags.append('noinline')
+                elif attr.args and attr.args[0] == 'always':
+                    flags.append('alwaysinline')
+                else:
+                    flags.append('inlinehint')
+            elif attr.name == 'no_mangle':
+                pass
+            elif attr.name == 'cold':
+                flags.append('cold')
+            elif attr.name == 'hot':
+                flags.append('hot')
+            elif attr.name == 'obfuscate':
+                pass
+
+        return " ".join(flags)
 
     def collect_lets(self, stmts: List[Any]) -> List[Tuple[str, JType]]:
         """Walk statement list recursively and collect (name, type) for every LetStmt."""
@@ -154,6 +183,10 @@ class CodeGen:
         self.locals = {}
         self.loop_stack = []
         self.current_block = "entry"
+
+        if decl.attributes:
+            attr_strs = [f"{attr.name}" + (f"({','.join(map(str, attr.args))})" if attr.args else "") for attr in decl.attributes]
+            self.emit(f"; attributes: [{', '.join(attr_strs)}]")
 
         params = ", ".join(f"{self.llvm_type(p.type)} %{p.name}" for p in decl.params)
         ret = self.llvm_type(decl.ret_type)
@@ -700,17 +733,46 @@ class CodeGen:
     def emit_closure(self, expr: ClosureExpr) -> Tuple[str, JType]:
         """Emit LLVM code for closure/lambda expression.
 
-        For now, we handle non-capturing closures by generating an anonymous function.
-        Capturing closures would need environment structs.
+        For capturing closures, generates an environment struct to hold captured variables,
+        and modifies the closure function to accept an environment pointer as first parameter.
         """
         # Generate unique function name for this closure
         closure_name = f"__closure_{self.label_counter}"
         self.label_counter += 1
 
-        # Build function signature
-        param_types = [p.type for p in expr.params]
-        param_list = ", ".join(f"{self.llvm_type(pt)} %{p.name}" for pt, p in zip(param_types, [p.name for p in expr.params]))
         ret_type = expr.ret_type if expr.ret_type else JType("void")
+
+        # Check if this closure captures variables
+        has_captures = len(expr.captures) > 0
+        env_struct_name = None
+        capture_types = {}
+
+        if has_captures:
+            env_struct_name = f"{closure_name}_env"
+
+            # Collect types of captured variables from outer scope
+            for capture_name in expr.captures:
+                if capture_name in self.locals:
+                    _, capture_type = self.locals[capture_name]
+                    capture_types[capture_name] = capture_type
+                else:
+                    raise CodeGenError(f"Captured variable '{capture_name}' not found in scope")
+
+            # Emit environment struct type definition
+            field_types = ", ".join(self.llvm_type(capture_types[cap]) for cap in expr.captures)
+            self.emit(f"%{env_struct_name} = type {{ {field_types} }}")
+
+        # Build function signature with environment pointer if needed
+        param_types = [p.type for p in expr.params]
+        if has_captures:
+            env_param = f"%{env_struct_name}* %__env"
+            param_list_items = [env_param]
+            param_list_items.extend(f"{self.llvm_type(pt)} %{p.name}"
+                                   for pt, p in zip(param_types, [p.name for p in expr.params]))
+            param_list = ", ".join(param_list_items)
+        else:
+            param_list = ", ".join(f"{self.llvm_type(pt)} %{p.name}"
+                                  for pt, p in zip(param_types, [p.name for p in expr.params]))
 
         # Save current function state
         old_func = self.current_func
@@ -721,6 +783,19 @@ class CodeGen:
         self.current_func = closure_name
         self.locals = {}
         self.reg_counter = 0
+
+        # If capturing, load captured variables from environment struct
+        if has_captures:
+            for i, capture_name in enumerate(expr.captures):
+                capture_type = capture_types[capture_name]
+                # Get pointer to struct field
+                gep_reg = self.next_reg()
+                self.emit(f"  {gep_reg} = getelementptr %{env_struct_name}, %{env_struct_name}* %__env, i32 0, i32 {i}")
+                # Load value from field
+                load_reg = self.next_reg()
+                self.emit(f"  {load_reg} = load {self.llvm_type(capture_type)}, {self.llvm_type(capture_type)}* {gep_reg}")
+                # Store in local variable
+                self.locals[capture_name] = (load_reg, capture_type)
 
         # Add parameters to locals
         for param in expr.params:
@@ -751,8 +826,11 @@ class CodeGen:
         self.reg_counter = old_reg_counter
         self.label_counter = old_label_counter
 
-        # Return function pointer
+        # Return function pointer with environment info
         func_ptr_type = JType("fn", is_pointer=True)
+        if has_captures:
+            func_ptr_type.env_struct = env_struct_name
+            func_ptr_type.captures = expr.captures
         return (f"@{closure_name}", func_ptr_type)
 
     def emit_call(self, expr: CallExpr) -> Tuple[str, JType]:
