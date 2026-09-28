@@ -4,6 +4,8 @@
  * Authorized: Red Hat + IIT Bombay Cyber Security Team
  */
 
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +14,7 @@
 #include <sched.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <dirent.h>
 
 typedef struct {
     pid_t target_pid;

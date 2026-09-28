@@ -12,6 +12,7 @@
 #include <sys/ptrace.h>
 #include <sys/user.h>
 #include <sys/wait.h>
+#include <linux/ptrace.h>
 
 typedef struct {
     unsigned long original_syscall;
@@ -64,8 +65,15 @@ int jocky_syscall_trace_enable(syscall_interception_context_t* ctx)
         return -1;
     }
 
-    if (ptrace(PTRACE_SETOPTIONS, ctx->target_pid, NULL,
-               PTRACE_O_TRACESYSCALLS) < 0) {
+    /* Note: PTRACE_O_TRACESYSCALLS may not be available on all systems */
+    long options = 0;
+    #ifdef PTRACE_O_TRACESYSCALLS
+    options = PTRACE_O_TRACESYSCALLS;
+    #else
+    options = (1 << 7);  /* PTRACE_O_TRACESYSCALLS = 128 */
+    #endif
+
+    if (ptrace(PTRACE_SETOPTIONS, ctx->target_pid, NULL, options) < 0) {
         fprintf(stderr, "[!] Failed to set trace options\n");
         ptrace(PTRACE_DETACH, ctx->target_pid, NULL, NULL);
         return -1;
