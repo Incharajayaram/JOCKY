@@ -131,6 +131,11 @@ class FFIDecl:
     params: List[Param]
     ret_type: JType
     variadic: bool = False
+    attributes: List[Attribute] = None  # #[no_mangle], etc.
+
+    def __post_init__(self):
+        if self.attributes is None:
+            self.attributes = []
 
 @dataclass
 class StructField:
@@ -141,11 +146,11 @@ class StructField:
 class StructDef:
     name: str
     fields: List[StructField]
-    generic_params: List[str] = None  # Type parameter names: [T, U, V]
+    attributes: List[Attribute] = None  # #[packed], #[repr], etc.
 
     def __post_init__(self):
-        if self.generic_params is None:
-            self.generic_params = []
+        if self.attributes is None:
+            self.attributes = []
 
 @dataclass
 class ArrayType:
@@ -162,11 +167,11 @@ class EnumVariant:
 class EnumDef:
     name: str
     variants: List[EnumVariant]
-    generic_params: List[str] = None  # Type parameter names: [T, U, V]
+    attributes: List[Attribute] = None  # #[repr], etc.
 
     def __post_init__(self):
-        if self.generic_params is None:
-            self.generic_params = []
+        if self.attributes is None:
+            self.attributes = []
 
 @dataclass
 class TypeAlias:
@@ -395,13 +400,6 @@ class ModDecl:
     name: str
     items: List[Any]  # Functions, structs, enums, other modules
     public: bool = False  # pub mod vs private mod
-
-
-@dataclass
-class Attribute:
-    """Function/type attribute: #[inline], #[no_mangle], #[packed]"""
-    name: str
-    args: Optional[List[Any]] = None  # Arguments to attribute (e.g., #[packed(2)])
 
 
 @dataclass
