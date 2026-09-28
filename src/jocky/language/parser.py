@@ -528,8 +528,11 @@ class Parser:
             self.expect(TokenType.SEMICOLON)
             return AssignStmt(expr, rhs)
         # Match expressions consume their own braces, so no semicolon needed
-        if not isinstance(expr, MatchExpr):
+        # Also allow last expression in block to omit semicolon
+        if not isinstance(expr, MatchExpr) and not self.match(TokenType.RBRACE):
             self.expect(TokenType.SEMICOLON)
+        elif isinstance(expr, MatchExpr):
+            pass  # MatchExpr already consumed its braces
         return ExprStmt(expr)
 
     # ---- Expression parsing with precedence climbing ----
@@ -736,6 +739,24 @@ class Parser:
         elif tok.type == TokenType.PIPE:
             # Closure expression: |params| body
             return self.parse_closure_expr()
+        elif tok.type == TokenType.OROR:
+            # Handle || as closure with no parameters
+            # Need to manually parse since tokenizer gives us OROR not two PIPEs
+            self.advance()  # consume ||
+
+            # Parse return type annotation if present: | -> Type
+            ret_type = None
+            if self.match(TokenType.ARROW):
+                self.advance()
+                ret_type = self.parse_type()
+
+            # Parse body (block or expression)
+            if self.match(TokenType.LBRACE):
+                body = self.parse_block()
+            else:
+                body = self.parse_expr()
+
+            return ClosureExpr([], ret_type, [], body)
         else:
             source_range = SourceRange.at(tok.line, tok.column)
             raise ParseError(f"Unexpected token {tok.type.name} in expression", source_range)
