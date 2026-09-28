@@ -1,0 +1,55 @@
+# Maintainer: Deval Gupta <deval@awesomesleep.in>
+pkgname=jocky
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="JOCKY - Obfuscating C++ compiler with advanced evasion techniques"
+arch=('x86_64')
+url="https://github.com/devalgupta/JOCKY"
+license=('MIT')
+depends=('llvm' 'python' 'gcc')
+makedepends=('cmake' 'base-devel' 'llvm-libs')
+optdepends=('python-pyyaml: YAML support'
+            'python-rich: Rich terminal output'
+            'python-click: CLI framework support')
+provides=('jocky')
+conflicts=()
+source=("$pkgname-$pkgver.tar.gz::https://github.com/devalgupta/JOCKY/archive/v$pkgver.tar.gz")
+sha256sums=('0d1c95f68cd12d75a3dd3fa5a5b7e4d3a2b8c9f1e2d3c4b5a6f7e8d9c0a1b2c')
+
+build() {
+    cd "$pkgname-$pkgver"
+
+    cmake -B build -S . \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_CXX_STANDARD=17 \
+        -DCMAKE_CXX_STANDARD_REQUIRED=ON
+
+    cmake --build build --parallel $(nproc)
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+
+    # Install C++ compiler binary
+    install -Dm755 build/jockyc "$pkgdir/usr/bin/jockyc"
+
+    # Install Python CLI wrapper
+    install -Dm755 src/jocky/cli.py "$pkgdir/usr/lib/jocky/cli.py"
+
+    # Install Python modules
+    install -Dm644 src/jocky/*.py "$pkgdir/usr/lib/jocky/"
+
+    # Install Python script entry point
+    mkdir -p "$pkgdir/usr/bin"
+    cat > "$pkgdir/usr/bin/jocky" <<'EOF'
+#!/bin/bash
+export PYTHONPATH=/usr/lib/jocky:$PYTHONPATH
+exec python /usr/lib/jocky/cli.py "$@"
+EOF
+    chmod +x "$pkgdir/usr/bin/jocky"
+
+    # Install documentation
+    install -Dm644 README.md "$pkgdir/usr/share/doc/jocky/README.md"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/jocky/LICENSE"
+}
