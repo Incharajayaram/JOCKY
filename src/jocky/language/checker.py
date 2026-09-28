@@ -549,6 +549,47 @@ class TypeChecker:
                         raise TypeError(f"Match arm {i} type {arm_type} doesn't match first arm type {first_type}")
                 return first_type
             return JType("void")
+        elif isinstance(expr, ClosureExpr):
+            # Type check closure/lambda
+            # Save current locals
+            saved_locals = self.locals.copy()
+
+            # Register closure parameters as locals
+            param_types = []
+            for param in expr.params:
+                if param.type is None:
+                    # Type will be inferred from context - for now, assume i32
+                    param.type = JType("i32")
+                param_types.append(param.type)
+                self.locals[param.name] = param.type
+
+            # Type check closure body
+            if isinstance(expr.body, Block):
+                body_type = JType("void")
+                for stmt in expr.body.stmts:
+                    if isinstance(stmt, ReturnStmt):
+                        if stmt.value:
+                            body_type = self.typeof(stmt.value)
+                        else:
+                            body_type = JType("void")
+                    elif isinstance(stmt, ExprStmt):
+                        body_type = self.typeof(stmt.expr)
+            else:
+                # Single expression body
+                body_type = self.typeof(expr.body)
+
+            # Determine return type
+            if expr.ret_type is None:
+                ret_type = body_type
+            else:
+                ret_type = expr.ret_type
+
+            # Restore locals
+            self.locals = saved_locals
+
+            # Return a function pointer type (represented as i8* for now)
+            # A proper implementation would have a distinct function type
+            return JType("i8", is_pointer=True)
         else:
             raise TypeError(f"Unknown expression type: {type(expr).__name__}")
 
