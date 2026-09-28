@@ -50,7 +50,7 @@ class Parser:
     def match(self, *types: TokenType) -> bool:
         return self.peek().type in types
 
-    def parse_type(self) -> JType:
+    def parse_type(self, allow_type_vars: bool = False) -> JType:
         tok = self.peek()
         if tok.type == TokenType.I8:
             self.advance()
@@ -71,9 +71,11 @@ class Parser:
             self.advance()
             t = JType("string")
         elif tok.type == TokenType.IDENT:
-            # User-defined type (struct or enum)
+            # Could be user-defined type or type variable
             name = self.advance().value
-            t = JType(name)
+            # Type variables are single uppercase letters (T, U, V, etc.)
+            is_type_var = allow_type_vars and name[0].isupper() and len(name) == 1
+            t = JType(name, is_type_var=is_type_var, type_var_name=name if is_type_var else None)
         else:
             source_range = SourceRange.at(tok.line, tok.column)
             raise ParseError(f"Expected type, got {tok.type.name}", source_range)
@@ -85,12 +87,12 @@ class Parser:
             if self.match(TokenType.NUMBER):
                 size = self.advance().value
             self.expect(TokenType.RBRACKET)
-            t = JType(t.name, is_array=True, array_size=size)
+            t = JType(t.name, is_array=True, array_size=size, is_type_var=t.is_type_var, type_var_name=t.type_var_name)
 
         # Pointer type
         while self.match(TokenType.STAR):
             self.advance()
-            t = JType(t.name, is_pointer=True, is_array=t.is_array, array_size=t.array_size)
+            t = JType(t.name, is_pointer=True, is_array=t.is_array, array_size=t.array_size, is_type_var=t.is_type_var, type_var_name=t.type_var_name)
 
         return t
 
@@ -167,15 +169,27 @@ class Parser:
     def parse_func_decl_with_attributes(self, attributes: List[Attribute]) -> FuncDecl:
         self.expect(TokenType.FN)
         name = self.expect(TokenType.IDENT).value
+
+        # Parse optional type parameters: <T, U, V>
+        type_params = []
+        if self.match(TokenType.LT):
+            self.advance()
+            while not self.match(TokenType.GT):
+                param_name = self.expect(TokenType.IDENT).value
+                type_params.append(param_name)
+                if self.match(TokenType.COMMA):
+                    self.advance()
+            self.expect(TokenType.GT)
+
         self.expect(TokenType.LPAREN)
-        params = self.parse_params()
+        params = self.parse_params(allow_type_vars=len(type_params) > 0)
         self.expect(TokenType.RPAREN)
         ret_type = JType("void")
         if self.match(TokenType.ARROW):
             self.advance()
-            ret_type = self.parse_type()
+            ret_type = self.parse_type(allow_type_vars=len(type_params) > 0)
         body = self.parse_block()
-        return FuncDecl(name, params, ret_type, body, attributes)
+        return FuncDecl(name, params, ret_type, body, attributes, type_params=type_params if type_params else None)
 
     def parse_func_decl(self) -> FuncDecl:
         return self.parse_func_decl_with_attributes([])
@@ -530,11 +544,11 @@ class Parser:
             source_range = SourceRange.at(tok.line, tok.column)
             raise ParseError(f"Expected pattern, got {tok.type.name}", source_range)
 
-    def parse_params(self) -> List[Param]:
-        params, _ = self.parse_params_variadic()
+    def parse_params(self, allow_type_vars: bool = False) -> List[Param]:
+        params, _ = self.parse_params_variadic(allow_type_vars)
         return params
 
-    def parse_params_variadic(self) -> (List[Param], bool):
+    def parse_params_variadic(self, allow_type_vars: bool = False) -> (List[Param], bool):
         params = []
         variadic = False
         if self.match(TokenType.RPAREN):
@@ -546,7 +560,7 @@ class Parser:
                 break
             name = self.expect(TokenType.IDENT).value
             self.expect(TokenType.COLON)
-            ptype = self.parse_type()
+            ptype = self.parse_type(allow_type_vars)
             params.append(Param(name, ptype))
             if self.match(TokenType.COMMA):
                 self.advance()
