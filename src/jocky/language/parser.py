@@ -315,6 +315,46 @@ class Parser:
         self.expect(TokenType.RBRACE)
         return MatchExpr(scrutinee, arms)
 
+    def parse_closure_or_expr_block(self) -> Block:
+        """Parse block allowing implicit return (last expr without semicolon)."""
+        self.expect(TokenType.LBRACE)
+        stmts = []
+        while not self.match(TokenType.RBRACE):
+            if self.match(TokenType.LET):
+                stmts.append(self.parse_let_stmt())
+            elif self.match(TokenType.IF):
+                stmts.append(self.parse_if_stmt())
+            elif self.match(TokenType.WHILE):
+                stmts.append(self.parse_while_stmt())
+            elif self.match(TokenType.FOR):
+                stmts.append(self.parse_for_stmt())
+            elif self.match(TokenType.RETURN):
+                stmts.append(self.parse_return_stmt())
+            elif self.match(TokenType.BREAK):
+                self.advance()
+                self.expect(TokenType.SEMICOLON)
+                stmts.append(BreakStmt())
+            elif self.match(TokenType.CONTINUE):
+                self.advance()
+                self.expect(TokenType.SEMICOLON)
+                stmts.append(ContinueStmt())
+            else:
+                # Expression statement - might be implicit return if last
+                expr = self.parse_expr()
+                if self.match(TokenType.SEMICOLON):
+                    # Explicit semicolon - this is a statement
+                    self.advance()
+                    stmts.append(ExprStmt(expr))
+                elif self.match(TokenType.RBRACE):
+                    # No semicolon before closing brace - implicit return expression
+                    stmts.append(expr)
+                    break
+                else:
+                    # No semicolon and not at closing brace - error
+                    self.expect(TokenType.SEMICOLON)
+        self.expect(TokenType.RBRACE)
+        return Block(stmts)
+
     def parse_closure_expr(self) -> ClosureExpr:
         """Parse closure expression: |params| { body } or |params| expr"""
         self.expect(TokenType.PIPE)
@@ -407,6 +447,9 @@ class Parser:
                 elif isinstance(stmt, ReturnStmt):
                     if stmt.value:
                         free_vars.update(self.collect_free_variables(stmt.value, bound_vars))
+                else:
+                    # Raw expression (implicit return)
+                    free_vars.update(self.collect_free_variables(stmt, bound_vars))
         elif isinstance(expr, MatchExpr):
             free_vars.update(self.collect_free_variables(expr.scrutinee, bound_vars))
             for arm in expr.arms:
@@ -512,10 +555,42 @@ class Parser:
         return params, variadic
 
     def parse_block(self) -> Block:
+        """Parse block with implicit returns (last expr without semicolon)."""
         self.expect(TokenType.LBRACE)
         stmts = []
         while not self.match(TokenType.RBRACE):
-            stmts.append(self.parse_stmt())
+            if self.match(TokenType.LET):
+                stmts.append(self.parse_let_stmt())
+            elif self.match(TokenType.IF):
+                stmts.append(self.parse_if_stmt())
+            elif self.match(TokenType.WHILE):
+                stmts.append(self.parse_while_stmt())
+            elif self.match(TokenType.FOR):
+                stmts.append(self.parse_for_stmt())
+            elif self.match(TokenType.RETURN):
+                stmts.append(self.parse_return_stmt())
+            elif self.match(TokenType.BREAK):
+                self.advance()
+                self.expect(TokenType.SEMICOLON)
+                stmts.append(BreakStmt())
+            elif self.match(TokenType.CONTINUE):
+                self.advance()
+                self.expect(TokenType.SEMICOLON)
+                stmts.append(ContinueStmt())
+            else:
+                # Expression statement - might be implicit return if last
+                expr = self.parse_expr()
+                if self.match(TokenType.SEMICOLON):
+                    # Explicit semicolon - this is a statement
+                    self.advance()
+                    stmts.append(ExprStmt(expr))
+                elif self.match(TokenType.RBRACE):
+                    # No semicolon before closing brace - implicit return expression
+                    stmts.append(expr)
+                    break
+                else:
+                    # No semicolon and not at closing brace - error
+                    self.expect(TokenType.SEMICOLON)
         self.expect(TokenType.RBRACE)
         return Block(stmts)
 

@@ -228,8 +228,27 @@ class CodeGen:
         return last.startswith("ret ") or last.startswith("br ")
 
     def emit_block(self, block: Block):
-        for stmt in block.stmts:
-            self.emit_stmt(stmt)
+        for i, stmt in enumerate(block.stmts):
+            is_last = (i == len(block.stmts) - 1)
+            # Check if last statement is a raw expression (implicit return)
+            if is_last and not isinstance(stmt, (ExprStmt, LetStmt, AssignStmt, IfStmt, WhileStmt, ForStmt, ReturnStmt, BreakStmt, ContinueStmt)):
+                # This is an implicit return expression
+                val, vtype = self.emit_expr(stmt)
+                # If in a typed function, return the value; otherwise just evaluate
+                if self.current_func and hasattr(self, 'current_func'):
+                    # Try to get the function's return type
+                    if self.current_func in self.functions:
+                        func_sig = self.functions[self.current_func]
+                        if len(func_sig) >= 2:
+                            ret_type = self.resolve_type_alias(func_sig[1])
+                            if ret_type.name != "void":
+                                self.emit(f"  ret {self.llvm_type(ret_type)} {val}")
+                            else:
+                                self.emit("  ret void")
+                        else:
+                            self.emit(f"  ret {self.llvm_type(vtype)} {val}")
+            else:
+                self.emit_stmt(stmt)
 
     def emit_stmt(self, stmt: Any):
         if isinstance(stmt, LetStmt):
@@ -501,6 +520,10 @@ class CodeGen:
                     elif isinstance(stmt, ReturnStmt) and stmt.value:
                         return self.infer_type(stmt.value)
             return JType("void")
+        elif isinstance(expr, ClosureExpr):
+            # Closure type is function pointer
+            ret_type = expr.ret_type if expr.ret_type else JType("void")
+            return JType("fn", is_pointer=True)
         raise CodeGenError(f"Cannot infer type for {type(expr).__name__}")
 
     def emit_expr(self, expr: Any) -> Tuple[str, JType]:
@@ -767,12 +790,12 @@ class CodeGen:
         if has_captures:
             env_param = f"%{env_struct_name}* %__env"
             param_list_items = [env_param]
-            param_list_items.extend(f"{self.llvm_type(pt)} %{p.name}"
-                                   for pt, p in zip(param_types, [p.name for p in expr.params]))
+            param_list_items.extend(f"{self.llvm_type(pt)} %{pname}"
+                                   for pt, pname in zip(param_types, [p.name for p in expr.params]))
             param_list = ", ".join(param_list_items)
         else:
-            param_list = ", ".join(f"{self.llvm_type(pt)} %{p.name}"
-                                  for pt, p in zip(param_types, [p.name for p in expr.params]))
+            param_list = ", ".join(f"{self.llvm_type(pt)} %{pname}"
+                                  for pt, pname in zip(param_types, [p.name for p in expr.params]))
 
         # Save current function state
         old_func = self.current_func
@@ -807,8 +830,18 @@ class CodeGen:
 
         # Emit body
         if isinstance(expr.body, Block):
-            for stmt in expr.body.stmts:
-                self.emit_stmt(stmt)
+            for i, stmt in enumerate(expr.body.stmts):
+                is_last = (i == len(expr.body.stmts) - 1)
+                # Check if last statement is a raw expression (implicit return)
+                if is_last and not isinstance(stmt, (ExprStmt, LetStmt, AssignStmt, IfStmt, WhileStmt, ForStmt, ReturnStmt, BreakStmt, ContinueStmt)):
+                    # This is an implicit return expression
+                    val, _ = self.emit_expr(stmt)
+                    if ret_type.name != "void":
+                        self.emit(f"  ret {self.llvm_type(ret_type)} {val}")
+                    else:
+                        self.emit("  ret void")
+                else:
+                    self.emit_stmt(stmt)
         else:
             # Expression body
             val, _ = self.emit_expr(expr.body)
