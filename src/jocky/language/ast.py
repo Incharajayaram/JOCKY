@@ -17,6 +17,8 @@ class JType:
     is_pointer: bool = False
     is_array: bool = False
     array_size: int = 0  # 0 means not an array or unsized
+    is_type_var: bool = False  # True for type variables like T, U
+    type_var_name: Optional[str] = None  # Name of the type variable if is_type_var
     is_generic: bool = False  # True if this is a type variable like T, U, etc.
 
     def __str__(self):
@@ -91,6 +93,14 @@ class JType:
 
 # --- AST Nodes ---
 
+    def __post_init__(self):
+        if self.is_generic and not self.is_type_var:
+            self.is_type_var = True
+            if not self.type_var_name:
+                self.type_var_name = self.name
+        elif self.is_type_var and not self.is_generic:
+            self.is_generic = True
+
 @dataclass
 class Attribute:
     """Function/type attribute: #[name(args)]"""
@@ -116,14 +126,22 @@ class FuncDecl:
     params: List[Param]
     ret_type: JType
     body: "Block"
-    attributes: List["Attribute"] = None  # #[inline], #[no_mangle], etc.
+    attributes: List[Attribute] = None  # #[inline], #[no_mangle], etc.
+    type_params: Optional[List[str]] = None  # Generic type parameters: ['T', 'U']
+    is_generic: bool = False  # True if this function has type parameters
     generic_params: List[str] = None  # Type parameter names: [T, U, V]
 
     def __post_init__(self):
         if self.attributes is None:
             self.attributes = []
+        if self.type_params is None:
+            self.type_params = []
+        self.is_generic = len(self.type_params) > 0
         if self.generic_params is None:
-            self.generic_params = []
+            self.generic_params = list(self.type_params)
+        elif not self.type_params:
+            self.type_params = list(self.generic_params)
+            self.is_generic = len(self.type_params) > 0
 
 @dataclass
 class FFIDecl:
