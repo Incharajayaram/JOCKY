@@ -1,0 +1,275 @@
+# JOCKY BYOVD Driver Manifest - JSON Schema
+# Machine-readable format for compiler integration
+
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-09-25T21:30:00Z",
+  
+  "drivers": [
+    {
+      "name": "rtkiow10x64.sys",
+      "family": "realtek_io",
+      "sha256": "32e1a8513eee746d17eb5402fb9d8ff9507fb6e1238e7ff06f7a5c50ff3df993",
+      "size": 56304,
+      "arch": "x64",
+      "signed": true,
+      "company": "Realtek",
+      "evasion_score": 9.5,
+      "device_path": "\\\\.\\RTCore64",
+      "device_aliases": ["\\\\.\\RTCore64", "\\\\.\\rtkiow10x64"],
+      "service_name": "rtkiow10x64",
+      "init_sequence": ["create_service", "start_service", "open_device"],
+      "capabilities": ["arb_physical_read", "arb_physical_write", "msr_read", "msr_write", "port_read", "port_write"],
+      "ioctl_map": {
+        "map_physical":    { "code": "0x82000000", "in_size": 24, "out_size": 24, "capability": "arb_physical_read" },
+        "unmap_physical":  { "code": "0x82000004", "in_size": 24, "out_size": 0,  "capability": "cleanup" },
+        "read_msr":        { "code": "0x82000008", "in_size": 16, "out_size": 16, "capability": "msr_read" },
+        "write_msr":       { "code": "0x8200000C", "in_size": 16, "out_size": 0,  "capability": "msr_write" }
+      },
+      "blocklist_status": { "microsoft_blocked": false, "filename_rule": false },
+      "tested": true,
+      "test_results": { "loaded": true, "blocked_by_defender": false, "device_found": "\\\\.\\RTCore64" },
+      "limitations": ["Requires Administrator", "Needs Realtek hardware recommended"],
+      "dependencies": []
+    },
+    {
+      "name": "AMDRyzenMasterDriver.sys",
+      "family": "amd_ryzen_master",
+      "sha256": "a13054f349b7baa8c8a3fcbd31789807a493cc52224bbff5e412eb2bd52a6433",
+      "size": 70432,
+      "arch": "x64",
+      "signed": true,
+      "company": "Advanced Micro Devices",
+      "evasion_score": 8.5,
+      "device_path": "\\\\.\\AMDRyzenMasterDriver",
+      "device_aliases": ["\\\\.\\AMDRyzenMasterDriver", "\\\\.\\AMDRyzenMaster"],
+      "service_name": "AMDRyzenMasterDriver",
+      "init_sequence": ["create_service", "start_service", "open_device"],
+      "capabilities": ["arb_physical_read", "arb_physical_write", "msr_read", "msr_write", "pci_config_read", "pci_config_write"],
+      "ioctl_map": {
+        "map_physical":   { "code": "0x81000000", "in_size": 24, "out_size": 24, "capability": "arb_physical_read" },
+        "unmap_physical": { "code": "0x81000004", "in_size": 24, "out_size": 0,  "capability": "cleanup" },
+        "read_msr":       { "code": "0x81000008", "in_size": 16, "out_size": 16, "capability": "msr_read" },
+        "write_msr":      { "code": "0x8100000C", "in_size": 16, "out_size": 0,  "capability": "msr_write" }
+      },
+      "blocklist_status": { "microsoft_blocked": false, "filename_rule": false },
+      "tested": true,
+      "test_results": { "loaded": true, "blocked_by_defender": false, "device_found": "\\\\.\\AMDRyzenMasterDriver" },
+      "limitations": ["Requires Administrator", "Requires AMD CPU"],
+      "dependencies": ["AMD CPU"]
+    },
+    {
+      "name": "nvflsh64.sys",
+      "family": "nvidia_flash",
+      "sha256": "a899b659b08fbae30b182443be8ffb6a6471c1d0497b52293061754886a937a3",
+      "size": 15648,
+      "arch": "x64",
+      "signed": true,
+      "company": "NVIDIA Corporation",
+      "evasion_score": 8.0,
+      "device_path": "\\\\.\\nvflsh64",
+      "device_aliases": ["\\\\.\\nvflsh64", "\\\\.\\NVIDIAFlash"],
+      "service_name": "nvflsh64",
+      "init_sequence": ["create_service", "start_service", "open_device"],
+      "capabilities": ["arb_physical_read", "arb_physical_write", "port_read", "port_write"],
+      "ioctl_map": {
+        "map_physical": { "code": "0x80002000", "in_size": 24, "out_size": 24, "capability": "arb_physical_read" },
+        "read_port":    { "code": "0x80002010", "in_size": 8,  "out_size": 8,  "capability": "port_read" },
+        "write_port":   { "code": "0x80002014", "in_size": 8,  "out_size": 0,  "capability": "port_write" }
+      },
+      "blocklist_status": { "microsoft_blocked": false, "filename_rule": false },
+      "tested": true,
+      "test_results": { "loaded": true, "blocked_by_defender": false },
+      "limitations": ["Requires Administrator", "NVIDIA GPU recommended"],
+      "dependencies": ["NVIDIA GPU"]
+    },
+    {
+      "name": "speedfan.sys",
+      "family": "speedfan",
+      "sha256": "22be050955347661685a4343c51f11c7811674e030386d2264cd12ecbf544b7c",
+      "size": 14104,
+      "arch": "x64",
+      "signed": true,
+      "company": "Windows (R) Server 2003 DDK provider",
+      "evasion_score": 7.5,
+      "device_path": "\\\\.\\speedfan",
+      "device_aliases": ["\\\\.\\speedfan", "\\\\.\\SpeedFan"],
+      "service_name": "speedfan",
+      "init_sequence": ["create_service", "start_service", "open_device"],
+      "capabilities": ["arb_physical_read", "arb_physical_write", "port_read", "port_write", "msr_read"],
+      "ioctl_map": {
+        "map_physical": { "code": "0x80002000", "in_size": 24, "out_size": 24, "capability": "arb_physical_read" },
+        "read_msr":     { "code": "0x80002008", "in_size": 16, "out_size": 16, "capability": "msr_read" },
+        "read_port":    { "code": "0x80002010", "in_size": 8,  "out_size": 8,  "capability": "port_read" }
+      },
+      "blocklist_status": { "microsoft_blocked": false, "filename_rule": false },
+      "tested": true,
+      "test_results": { "loaded": true, "blocked_by_defender": false },
+      "limitations": ["Requires Administrator", "Old driver (2008), may trigger SmartScreen"],
+      "dependencies": []
+    },
+    {
+      "name": "zam64.sys",
+      "family": "zemana",
+      "sha256": "543991ca8d1c65113dff039b85ae3f9a87f503daec30f46929fd454bc57e5a91",
+      "size": 203680,
+      "arch": "x64",
+      "signed": true,
+      "company": "Zemana Ltd.",
+      "evasion_score": 6.5,
+      "device_path": "\\\\.\\zamguard64",
+      "device_aliases": ["\\\\.\\zamguard64", "\\\\.\\zamguard", "\\\\.\\zam64"],
+      "service_name": "zam64",
+      "init_sequence": ["create_service", "start_service", "open_device"],
+      "capabilities": ["arb_physical_read", "arb_physical_write", "process_kill", "registry_write"],
+      "ioctl_map": {
+        "map_physical": { "code": "0x83002000", "in_size": 24, "out_size": 24, "capability": "arb_physical_read" },
+        "process_kill": { "code": "0x83002020", "in_size": 8,  "out_size": 0,  "capability": "process_kill" }
+      },
+      "blocklist_status": { "microsoft_blocked": false, "filename_rule": false },
+      "tested": true,
+      "test_results": { "loaded": true, "blocked_by_defender": false },
+      "limitations": ["Requires Administrator", "Large driver (203KB), more conspicuous"],
+      "dependencies": []
+    },
+    {
+      "name": "iQVW64.SYS",
+      "family": "intel_net_diag",
+      "sha256": "37c637a74bf20d7630281581a8fae124200920df11ad7cd68c14c26cc12c5ec9",
+      "size": 58520,
+      "arch": "x64",
+      "signed": true,
+      "company": "Intel Corporation",
+      "evasion_score": 8.0,
+      "device_path": "\\\\.\\Nal",
+      "device_aliases": ["\\\\.\\Nal", "\\\\.\\NalDrv", "\\\\.\\iQVW64"],
+      "service_name": "iQVW64",
+      "init_sequence": ["create_service", "start_service", "open_device"],
+      "capabilities": ["arb_physical_read", "arb_physical_write", "mmio_read", "mmio_write"],
+      "ioctl_map": {
+        "map_physical": { "code": "0x80802000", "in_size": 24, "out_size": 24, "capability": "arb_physical_read" },
+        "mmio_read":    { "code": "0x80802008", "in_size": 16, "out_size": 16, "capability": "mmio_read" },
+        "mmio_write":   { "code": "0x8080200C", "in_size": 16, "out_size": 0,  "capability": "mmio_write" }
+      },
+      "blocklist_status": { "microsoft_blocked": false, "filename_rule": false },
+      "tested": true,
+      "test_results": { "loaded": true, "blocked_by_defender": false },
+      "limitations": ["Requires Administrator", "Intel network adapter recommended"],
+      "dependencies": ["Intel network adapter"]
+    },
+    {
+      "name": "UCOREW64.SYS",
+      "family": "generic_ucore",
+      "sha256": "a7c8f4faf3cbb088cac7753d81f8ec4c38ccb97cd9da817741f49272e8d01200",
+      "size": 14632,
+      "arch": "x64",
+      "signed": true,
+      "company": "",
+      "evasion_score": 7.0,
+      "device_path": "\\\\.\\Global\\",
+      "device_aliases": ["\\\\.\\Global\\", "\\\\.\\UCOREW64", "\\\\.\\GenericDrv"],
+      "service_name": "UCOREW64",
+      "init_sequence": ["create_service", "start_service", "open_device"],
+      "capabilities": ["arb_physical_read", "arb_physical_write", "port_read", "port_write", "mmio_read", "mmio_write"],
+      "ioctl_map": {
+        "map_physical": { "code": "0x88000000", "in_size": 24, "out_size": 24, "capability": "arb_physical_read" },
+        "read_port":    { "code": "0x88000010", "in_size": 8,  "out_size": 8,  "capability": "port_read" },
+        "write_port":   { "code": "0x88000014", "in_size": 8,  "out_size": 0,  "capability": "port_write" }
+      },
+      "blocklist_status": { "microsoft_blocked": false, "filename_rule": false },
+      "tested": true,
+      "test_results": { "loaded": true, "blocked_by_defender": false },
+      "limitations": ["Requires Administrator", "Very old driver (2008), certificate likely expired"],
+      "dependencies": []
+    },
+    {
+      "name": "ene.sys",
+      "family": "ene_ec",
+      "sha256": "175eed7a4c6de9c3156c7ae16ae85c554959ec350f1c8aaa6dfe8c7e99de3347",
+      "size": 20992,
+      "arch": "x64",
+      "signed": true,
+      "company": "",
+      "evasion_score": 7.0,
+      "device_path": "\\\\.\\EneIo",
+      "device_aliases": ["\\\\.\\EneIo", "\\\\.\\ene2", "\\\\.\\ENE"],
+      "service_name": "ene",
+      "init_sequence": ["create_service", "start_service", "open_device"],
+      "capabilities": ["arb_physical_read", "arb_physical_write", "port_read", "port_write"],
+      "ioctl_map": {
+        "map_physical": { "code": "0x85000000", "in_size": 24, "out_size": 24, "capability": "arb_physical_read" },
+        "read_port":    { "code": "0x85000010", "in_size": 8,  "out_size": 8,  "capability": "port_read" }
+      },
+      "blocklist_status": { "microsoft_blocked": false, "filename_rule": false },
+      "tested": true,
+      "test_results": { "loaded": true, "blocked_by_defender": false },
+      "limitations": ["Requires Administrator", "ENE embedded controller recommended"],
+      "dependencies": []
+    },
+    {
+      "name": "NTIOLib.sys",
+      "family": "msi_ntiolib",
+      "sha256": "d8b58f6a89a7618558e37afc360cd772b6731e3ba367f8d58734ecee2244a530",
+      "size": 11888,
+      "arch": "x86",
+      "signed": true,
+      "company": "MSI",
+      "evasion_score": 7.0,
+      "device_path": "\\\\.\\NTIOLib",
+      "device_aliases": ["\\\\.\\NTIOLib", "\\\\.\\NTIOLib_1_2_4", "\\\\.\\MSI"],
+      "service_name": "NTIOLib",
+      "init_sequence": ["create_service", "start_service", "open_device"],
+      "capabilities": ["arb_physical_read", "arb_physical_write", "port_read", "port_write", "msr_read", "msr_write"],
+      "ioctl_map": {
+        "map_physical": { "code": "0x84002000", "in_size": 24, "out_size": 24, "capability": "arb_physical_read" },
+        "read_msr":     { "code": "0x84002008", "in_size": 16, "out_size": 16, "capability": "msr_read" }
+      },
+      "blocklist_status": { "microsoft_blocked": false, "filename_rule": false },
+      "tested": true,
+      "test_results": { "loaded": true, "blocked_by_defender": false },
+      "limitations": ["Requires Administrator", "x86 driver, may have WOW64 issues"],
+      "dependencies": []
+    }
+  ],
+  
+  "blocked_drivers": [
+    {
+      "name": "cpuz141.sys",
+      "sha256": "ded2927f9a4e64eefd09d0caba78e94f309e3a6292841ae81d5528cab109f95d",
+      "block_reason": "Known vulnerable CPU-Z driver (CVE-2017-15302)",
+      "blocklist_status": { "microsoft_blocked": true, "filename_rule": true },
+      "tested": true,
+      "test_results": { "loaded": false, "blocked_by_defender": true }
+    },
+    {
+      "name": "procexp1627.sys",
+      "sha256": "9b6a84f7c40ea51c38cc4d2e93efb3375e9d98d4894a85941190d94fbe73a4e4",
+      "block_reason": "Known vulnerable Sysinternals driver",
+      "blocklist_status": { "microsoft_blocked": true, "filename_rule": true },
+      "tested": true,
+      "test_results": { "loaded": false, "blocked_by_defender": true }
+    }
+  ],
+  
+  "compiler_config": {
+    "default_driver": "rtkiow10x64.sys",
+    "fallback_chain": [
+      "rtkiow10x64.sys",
+      "rtkiow8x64.sys",
+      "AMDRyzenMasterDriver.sys",
+      "nvflsh64.sys",
+      "speedfan.sys",
+      "ene.sys",
+      "iQVW64.SYS",
+      "UCOREW64.SYS",
+      "NTIOLib.sys"
+    ],
+    "hardware_selection": {
+      "amd_cpu": "AMDRyzenMasterDriver.sys",
+      "intel_cpu": "iQVW64.SYS",
+      "nvidia_gpu": "nvflsh64.sys",
+      "realtek_audio": "rtkiow10x64.sys",
+      "generic_fallback": "UCOREW64.SYS"
+    }
+  }
+}
