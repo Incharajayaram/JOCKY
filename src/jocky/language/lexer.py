@@ -28,9 +28,7 @@ class TokenType(Enum):
     TYPE = auto()
     MATCH = auto()
     MOD = auto()
-    CONST = auto()
-    VAR = auto()
-    IN = auto()
+    LAMBDA = auto()
     ARROW_FAT = auto()  # =>
 
     # Types
@@ -106,9 +104,8 @@ KEYWORDS = {
     "type": TokenType.TYPE,
     "match": TokenType.MATCH,
     "mod": TokenType.MOD,
-    "const": TokenType.CONST,
-    "var": TokenType.VAR,
-    "in": TokenType.IN,
+    "lambda": TokenType.LAMBDA,
+    "use": TokenType.USE,
     "i8": TokenType.I8,
     "i32": TokenType.I32,
     "i64": TokenType.I64,
