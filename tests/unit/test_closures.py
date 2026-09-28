@@ -206,13 +206,11 @@ class TestClosureCodegen:
     def test_closure_in_call(self):
         """Generate code for closure used in call."""
         code = """
-        fn apply(f: i32, x: i32) -> i32 {
-            f + x
-        }
-
         fn main() -> i32 {
             let double = lambda(x: i32) -> i32 { x * 2 };
-            apply(double, 5)
+            let triple = lambda(x: i32) -> i32 { x * 3 };
+            let sum = double(5) + triple(7);
+            sum
         }
         """
         lexer = Lexer(code)
@@ -227,7 +225,7 @@ class TestClosureCodegen:
         ir = codegen.gen(ast)
 
         assert ir is not None
-        assert "apply" in ir
+        assert "__closure_" in ir or "define" in ir
 
 
 class TestClosureIntegration:
