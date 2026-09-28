@@ -3,6 +3,9 @@ project(jocky_runtime C)
 
 set(CMAKE_C_STANDARD 11)
 
+# Add subdirectories for modular components
+add_subdirectory(obfuscation)
+
 # Runtime source files
 set(RUNTIME_SOURCES
     init/anti_analysis.c
@@ -53,6 +56,9 @@ endif()
 # Static library
 add_library(jocky_rt STATIC ${RUNTIME_SOURCES})
 target_include_directories(jocky_rt PUBLIC include)
+
+# Link obfuscation module
+target_link_libraries(jocky_rt PUBLIC jocky_obfuscation)
 
 if(WIN32)
     target_link_libraries(jocky_rt PUBLIC ntdll winhttp dnsapi wevtapi)
