@@ -1,0 +1,36 @@
+{
+  "name": "evga_kernel_driver-x64.sys",
+  "family": "unknown",
+  "sha256": "33da2ce240b4559cc6e847d56c5fbeaa3d644ec160841920ea0a098dcee28d0e",
+  "size": "unknown",
+  "arch": "x64",
+  "signed": true,
+  "company": "",
+  "description": "EVGA Low-Level Driver",
+  "evasion_score": 5.0,
+  "device_paths": {
+    "primary": "",
+    "aliases": []
+  },
+  "service_name": "evga_kernel_driver-x64",
+  "init_sequence": [
+    "create_service",
+    "start_service",
+    "open_device"
+  ],
+  "capabilities": [],
+  "ioctl_map": {},
+  "limitations": [
+    "Requires Administrator",
+    "Not yet tested - candidate only"
+  ],
+  "dependencies": [],
+  "blocklist_status": {
+    "microsoft_blocked": false,
+    "filename_rule": false
+  },
+  "tested": false,
+  "test_results": {},
+  "source": "LOLDrivers/02bbc006-a4a4-438f-9b6c-4382303f6b45",
+  "candidate": true
+}
