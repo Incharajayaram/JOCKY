@@ -74,6 +74,16 @@ class JType:
 # --- AST Nodes ---
 
 @dataclass
+class Attribute:
+    """Function/type attribute: #[name(args)]"""
+    name: str
+    args: List[str] = None  # Optional arguments
+
+    def __post_init__(self):
+        if self.args is None:
+            self.args = []
+
+@dataclass
 class Program:
     decls: List[Any]
 

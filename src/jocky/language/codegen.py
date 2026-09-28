@@ -501,6 +501,8 @@ class CodeGen:
             return self.emit_binary(expr)
         elif isinstance(expr, UnaryOp):
             return self.emit_unary(expr)
+        elif isinstance(expr, ClosureExpr):
+            return self.emit_closure(expr)
         elif isinstance(expr, CallExpr):
             return self.emit_call(expr)
         elif isinstance(expr, DerefExpr):
@@ -694,6 +696,64 @@ class CodeGen:
             return (r, t)
         else:
             raise CodeGenError(f"Unknown unary op: {op}")
+
+    def emit_closure(self, expr: ClosureExpr) -> Tuple[str, JType]:
+        """Emit LLVM code for closure/lambda expression.
+
+        For now, we handle non-capturing closures by generating an anonymous function.
+        Capturing closures would need environment structs.
+        """
+        # Generate unique function name for this closure
+        closure_name = f"__closure_{self.label_counter}"
+        self.label_counter += 1
+
+        # Build function signature
+        param_types = [p.type for p in expr.params]
+        param_list = ", ".join(f"{self.llvm_type(pt)} %{p.name}" for pt, p in zip(param_types, [p.name for p in expr.params]))
+        ret_type = expr.ret_type if expr.ret_type else JType("void")
+
+        # Save current function state
+        old_func = self.current_func
+        old_locals = self.locals
+        old_reg_counter = self.reg_counter
+        old_label_counter = self.label_counter
+
+        self.current_func = closure_name
+        self.locals = {}
+        self.reg_counter = 0
+
+        # Add parameters to locals
+        for param in expr.params:
+            alloca = f"%{param.name}.addr"
+            self.locals[param.name] = (alloca, param.type)
+
+        # Emit function header
+        self.emit(f"define {self.llvm_type(ret_type)} @{closure_name}({param_list}) {{")
+
+        # Emit body
+        if isinstance(expr.body, Block):
+            for stmt in expr.body.stmts:
+                self.emit_stmt(stmt)
+        else:
+            # Expression body
+            val, _ = self.emit_expr(expr.body)
+            if ret_type.name != "void":
+                self.emit(f"  ret {self.llvm_type(ret_type)} {val}")
+            else:
+                self.emit("  ret void")
+
+        self.emit("}")
+        self.emit("")
+
+        # Restore state
+        self.current_func = old_func
+        self.locals = old_locals
+        self.reg_counter = old_reg_counter
+        self.label_counter = old_label_counter
+
+        # Return function pointer
+        func_ptr_type = JType("fn", is_pointer=True)
+        return (f"@{closure_name}", func_ptr_type)
 
     def emit_call(self, expr: CallExpr) -> Tuple[str, JType]:
         if expr.name not in self.functions:
