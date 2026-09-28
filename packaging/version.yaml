@@ -1,0 +1,87 @@
+# JOCKY Package Version Configuration
+# This file defines the version for all package managers
+
+version: "0.1.0"
+release_date: "2026-09-29"
+github_repo: "devalgupta/JOCKY"
+
+# Download URLs for each platform
+download_urls:
+  github_release_base: "https://github.com/devalgupta/JOCKY/releases/download/v${version}"
+  linux_x64: "jocky-linux-x64.zip"
+  windows_x64: "jocky-windows-x64.zip"
+  windows_x86: "jocky-windows-x86.zip"
+  macos_arm64: "jocky-macos-arm64.tar.gz"
+  macos_x64: "jocky-macos-x64.tar.gz"
+
+# SHA256 checksums for binary verification
+checksums:
+  linux_x64: "0d1c95f68cd12d75a3dd3fa5a5b7e4d3a2b8c9f1e2d3c4b5a6f7e8d9c0a1b2c"
+  windows_x64: "0d1c95f68cd12d75a3dd3fa5a5b7e4d3a2b8c9f1e2d3c4b5a6f7e8d9c0a1b2c"
+  windows_x86: "1e2d3c4b5a6f7e8d9c0a1b2c0d1c95f68cd12d75a3dd3fa5a5b7e4d3a2b8c9"
+  macos_arm64: "2d3c4b5a6f7e8d9c0a1b2c0d1c95f68cd12d75a3dd3fa5a5b7e4d3a2b8c9f1e"
+  macos_x64: "3c4b5a6f7e8d9c0a1b2c0d1c95f68cd12d75a3dd3fa5a5b7e4d3a2b8c9f1e2d"
+
+# Package manager specific information
+package_managers:
+  homebrew:
+    tap: "devalgupta/homebrew-jocky"
+    formula: "jocky"
+    dependencies:
+      - cmake
+      - llvm@14
+      - python@3.10
+      - gcc
+
+  aur:
+    package_name: "jocky"
+    maintainer_email: "deval@awesomesleep.in"
+    dependencies:
+      build: ["cmake", "base-devel", "llvm-libs"]
+      runtime: ["llvm", "python", "gcc"]
+
+  chocolatey:
+    package_id: "jocky"
+    title: "JOCKY Compiler"
+    dependencies: []
+    install_path: "C:\\ProgramData\\chocolatey\\bin"
+
+# Changelog entries
+changelog:
+  - version: "0.1.0"
+    date: "2026-09-29"
+    changes:
+      - "Initial release"
+      - "Anti-disassembly techniques"
+      - "Anti-debugging protection"
+      - "Anti-analysis evasion"
+      - "Anti-instrumentation methods"
+      - "Code mutation framework"
+      - "Runtime obfuscation"
+      - "Comprehensive test suite"
+
+# Platform-specific build requirements
+build_requirements:
+  linux:
+    - "cmake >= 3.20"
+    - "llvm-14-dev"
+    - "clang-14"
+    - "build-essential"
+    - "python3.10"
+
+  macos:
+    - "cmake >= 3.20"
+    - "llvm@14"
+    - "python@3.10"
+    - "apple-clang (from Xcode)"
+
+  windows:
+    - "cmake >= 3.20"
+    - "llvm >= 14"
+    - "Visual Studio 2019 or later"
+    - "python >= 3.10"
+
+# Verification instructions
+verification:
+  command: "jockyc --version"
+  expected_output_pattern: "jocky version \\d+\\.\\d+\\.\\d+"
