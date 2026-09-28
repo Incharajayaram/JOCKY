@@ -383,6 +383,124 @@ def mutate(test: str, source: str, timeout: int, export: Optional[str], quiet: b
         raise click.Abort()
 
 # ---------------------------------------------------------------------------
+# debug
+# ---------------------------------------------------------------------------
+
+@cli.command()
+@click.argument("file", type=click.Path(exists=True, dir_okay=False))
+@click.option("--breakpoint", "-b", multiple=True, help="Set breakpoint at location (file:line or function)")
+@click.option("--lldb", is_flag=True, help="Use LLDB instead of GDB")
+@click.argument("run_args", nargs=-1, type=click.UNPROCESSED)
+def debug(file: str, breakpoint: tuple, lldb: bool, run_args: tuple):
+    """Debug a compiled JOCKY executable with GDB or LLDB."""
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent / "tools"))
+        from debugger import JockyDebugger
+    except ImportError:
+        error("Debugger tools not available. Install with: pip install -e .")
+        raise click.Abort()
+
+    executable = Path(file)
+    if not executable.exists():
+        error(f"Executable not found: {file}")
+        raise click.Abort()
+
+    debugger_type = "lldb" if lldb else "gdb"
+
+    header("JOCKY Debugger")
+    info_line("Executable:", str(executable))
+    info_line("Debugger:", debugger_type)
+    console.print()
+
+    try:
+        with JockyDebugger(str(executable), debugger_type) as dbg:
+            # Set breakpoints
+            for bp in breakpoint:
+                console.print(f"  Setting breakpoint at [cyan]{bp}[/cyan]")
+                dbg.set_breakpoint(bp)
+
+            # Run program
+            console.print(f"  Starting [bold]{executable.name}[/bold]...")
+            dbg.run(list(run_args) if run_args else None)
+            console.print()
+
+            # Interactive debugging loop
+            console.print("[dim]Type 'help' for commands, 'quit' to exit[/dim]")
+            while True:
+                try:
+                    cmd = console.input("[bold cyan](jocky-dbg)[/bold cyan] ").strip()
+                    if not cmd:
+                        continue
+
+                    if cmd == "quit" or cmd == "exit":
+                        break
+                    elif cmd == "help":
+                        _print_debug_help()
+                    elif cmd == "continue" or cmd == "c":
+                        dbg.continue_execution()
+                        console.print("[dim]Continuing...[/dim]")
+                    elif cmd == "step" or cmd == "s":
+                        dbg.step()
+                        console.print("[dim]Stepped[/dim]")
+                    elif cmd == "next" or cmd == "n":
+                        dbg.next()
+                        console.print("[dim]Next[/dim]")
+                    elif cmd == "stepi" or cmd == "si":
+                        dbg.step_instruction()
+                        console.print("[dim]Instruction stepped[/dim]")
+                    elif cmd == "backtrace" or cmd == "bt":
+                        output = dbg.backtrace()
+                        if output:
+                            console.print(output)
+                    elif cmd == "registers" or cmd == "reg":
+                        output = dbg.print_registers()
+                        if output:
+                            console.print(output)
+                    elif cmd.startswith("print "):
+                        var = cmd[6:].strip()
+                        output = dbg.print_variable(var)
+                        if output:
+                            console.print(output)
+                    elif cmd.startswith("break "):
+                        location = cmd[6:].strip()
+                        dbg.set_breakpoint(location)
+                        console.print(f"[green]Breakpoint set at {location}[/green]")
+                    else:
+                        console.print("[yellow]Unknown command. Type 'help' for help.[/yellow]")
+                except KeyboardInterrupt:
+                    console.print("\n[yellow]Interrupted[/yellow]")
+                    break
+                except EOFError:
+                    break
+
+    except FileNotFoundError as e:
+        error(str(e))
+        raise click.Abort()
+    except RuntimeError as e:
+        error(str(e))
+        raise click.Abort()
+
+
+def _print_debug_help():
+    """Print debug command help."""
+    help_text = """
+[bold cyan]JOCKY Debugger Commands:[/bold cyan]
+
+  [bold]c, continue[/bold]       Continue execution
+  [bold]s, step[/bold]          Step one source line
+  [bold]n, next[/bold]          Step over (next function)
+  [bold]si, stepi[/bold]        Step one machine instruction
+  [bold]bt, backtrace[/bold]    Print call stack
+  [bold]reg, registers[/bold]   Print CPU registers
+  [bold]print VAR[/bold]        Print variable value
+  [bold]break LOCATION[/bold]   Set breakpoint (file:line or function)
+  [bold]help[/bold]             Show this help
+  [bold]quit, exit[/bold]       Exit debugger
+"""
+    console.print(help_text)
+
+# ---------------------------------------------------------------------------
 # clean
 # ---------------------------------------------------------------------------
 
