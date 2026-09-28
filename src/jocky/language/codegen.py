@@ -1,5 +1,6 @@
 from .ast import *
 from .errors import CodeGenError as BaseCodeGenError, SourceRange
+from .bytecode import BytecodeCompiler
 from typing import Dict, List, Tuple, Any, Optional
 
 class CodeGenError(BaseCodeGenError):
@@ -383,6 +384,13 @@ class CodeGen:
         self.loop_stack = []
         self.current_block = "entry"
 
+        # Check if function should be virtualized
+        if decl.attributes:
+            for attr in decl.attributes:
+                if attr.name == 'virtualize':
+                    self.emit_virtualized_function(decl)
+                    return
+
         # Emit function debug info
         func_debug_id = self.emit_function_debug_info(decl, self.cu_id, self.file_id) if self.debug_enabled else -1
 
@@ -438,6 +446,70 @@ class CodeGen:
             return "0"
         else:
             return "0"
+
+    def emit_virtualized_function(self, decl: FuncDecl):
+        """Emit a virtualized function using bytecode VM."""
+        compiler = BytecodeCompiler()
+        bytecode = compiler.compile_function(decl, obfuscate=True)
+
+        bytecode_name = f"@.vm.{decl.name}"
+        bytecode_len = len(bytecode) if bytecode else 1
+        if not bytecode:
+            bytecode = bytes([0xFF])
+
+        bytecode_bytes = ", ".join(f"i8 {b}" for b in bytecode)
+        self.emit(f"{bytecode_name} = internal constant [{bytecode_len} x i8] [{bytecode_bytes}]")
+
+        declare_stubs = [
+            "declare i8* @jocky_vm_create()",
+            "declare void @jocky_vm_load(i8*, i8*, i64)",
+            "declare i64 @jocky_vm_execute(i8*, i64, i64, i64, i64)",
+            "declare void @jocky_vm_destroy(i8*)",
+        ]
+        for stub in declare_stubs:
+            if stub not in self.output_lines:
+                self.output_lines.insert(0, stub)
+
+        params = ", ".join(f"{self.llvm_type(p.type)} %{p.name}" for p in decl.params)
+        ret = self.llvm_type(decl.ret_type)
+
+        self.emit(f"define {ret} @{decl.name}({params}) {{")
+        self.emit("entry:")
+
+        self.emit(f"  %vm = call i8* @jocky_vm_create()")
+        self.emit(f"  %bytecode_ptr = getelementptr [{bytecode_len} x i8], [{bytecode_len} x i8]* {bytecode_name}, i32 0, i32 0")
+        self.emit(f"  call void @jocky_vm_load(i8* %vm, i8* %bytecode_ptr, i64 {bytecode_len})")
+
+        if len(decl.params) > 0:
+            self.emit(f"  %arg0 = sext {self.llvm_type(decl.params[0].type)} %{decl.params[0].name} to i64")
+
+        if len(decl.params) > 1:
+            self.emit(f"  %arg1 = sext {self.llvm_type(decl.params[1].type)} %{decl.params[1].name} to i64")
+
+        if len(decl.params) > 2:
+            self.emit(f"  %arg2 = sext {self.llvm_type(decl.params[2].type)} %{decl.params[2].name} to i64")
+
+        if len(decl.params) > 3:
+            self.emit(f"  %arg3 = sext {self.llvm_type(decl.params[3].type)} %{decl.params[3].name} to i64")
+
+        arg0 = "%arg0" if len(decl.params) > 0 else "0"
+        arg1 = "%arg1" if len(decl.params) > 1 else "0"
+        arg2 = "%arg2" if len(decl.params) > 2 else "0"
+        arg3 = "%arg3" if len(decl.params) > 3 else "0"
+
+        self.emit(f"  %result = call i64 @jocky_vm_execute(i8* %vm, i64 {arg0}, i64 {arg1}, i64 {arg2}, i64 {arg3})")
+        self.emit(f"  call void @jocky_vm_destroy(i8* %vm)")
+
+        if decl.ret_type.name == "void":
+            self.emit("  ret void")
+        elif decl.ret_type.name in ["i32", "i16", "i8"]:
+            ret_type = self.llvm_type(decl.ret_type)
+            self.emit(f"  %ret = trunc i64 %result to {ret_type}")
+            self.emit(f"  ret {ret_type} %ret")
+        else:
+            self.emit(f"  ret i64 %result")
+
+        self.emit("}")
 
     def last_line_is_terminator(self) -> bool:
         if not self.output_lines:
