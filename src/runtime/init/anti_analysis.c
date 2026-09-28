@@ -15,11 +15,13 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <intrin.h>
+#include <tlhelp32.h>
 #else
 #include <sys/ptrace.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <errno.h>
 #endif
 
@@ -101,24 +103,305 @@ bool jocky_is_vm(void)
 #endif
 }
 
+bool jocky_is_hyperv(void)
+{
+#ifdef _WIN32
+    int cpuinfo[4] = {0};
+    __cpuid(cpuinfo, 1);
+    return (cpuinfo[2] & (1 << 31)) != 0;
+#else
+    unsigned int eax, ebx, ecx, edx;
+    __asm__ __volatile__("cpuid"
+                         : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
+                         : "a"(1));
+    if ((ecx & (1U << 31)) == 0) return false;
+
+    __asm__ __volatile__("cpuid"
+                         : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
+                         : "a"(0x40000000));
+    return (ebx == 0x7263694d && ecx == 0x666f736f && edx == 0x76482074);
+#endif
+}
+
+bool jocky_is_xen(void)
+{
+#ifdef _WIN32
+    return false;
+#else
+    unsigned int eax, ebx, ecx, edx;
+    __asm__ __volatile__("cpuid"
+                         : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
+                         : "a"(0x40000000));
+    return (ebx == 0x566e6558 && ecx == 0x65583256 && edx == 0x4d4d566d);
+#endif
+}
+
+bool jocky_is_kvm(void)
+{
+#ifdef _WIN32
+    return false;
+#else
+    unsigned int eax, ebx, ecx, edx;
+    __asm__ __volatile__("cpuid"
+                         : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
+                         : "a"(0x40000000));
+    return (ebx == 0x4b4d564b && ecx == 0x564b4d56 && edx == 0x0000004d);
+#endif
+}
+
+bool jocky_is_vmware(void)
+{
+#ifdef _WIN32
+    int cpuinfo[4] = {0};
+    int magic = 0;
+    __cpuid(cpuinfo, 0x564d5868);
+    magic = cpuinfo[0];
+    return magic == 0x564d5868;
+#else
+    unsigned int eax, ebx;
+    __asm__ __volatile__(
+        "mov $0x564d5868, %%eax\n"
+        "mov $0x3c, %%ecx\n"
+        "xor %%edx, %%edx\n"
+        "in %%dx, %%eax\n"
+        : "=a"(eax)
+        :
+        : "ecx", "edx"
+    );
+    return eax == 0x564d5868;
+#endif
+}
+
+bool jocky_is_virtualbox(void)
+{
+#ifdef _WIN32
+    DWORD vendor = 0;
+    __asm {
+        mov eax, 1
+        cpuid
+        mov vendor, ebx
+    }
+    return vendor == 0x756e6547;
+#else
+    FILE* cpuinfo = fopen("/proc/cpuinfo", "r");
+    if (!cpuinfo) return false;
+
+    char line[256];
+    bool found = false;
+
+    while (fgets(line, sizeof(line), cpuinfo)) {
+        if (strstr(line, "VirtualBox") || strstr(line, "VBOX")) {
+            found = true;
+            break;
+        }
+    }
+
+    fclose(cpuinfo);
+    return found;
+#endif
+}
+
+bool jocky_is_qemu(void)
+{
+#ifdef _WIN32
+    return false;
+#else
+    FILE* cpuinfo = fopen("/proc/cpuinfo", "r");
+    if (!cpuinfo) return false;
+
+    char line[256];
+    bool found = false;
+
+    while (fgets(line, sizeof(line), cpuinfo)) {
+        if (strstr(line, "QEMU") || strstr(line, "qemu")) {
+            found = true;
+            break;
+        }
+    }
+
+    fclose(cpuinfo);
+    return found;
+#endif
+}
+
 /* ============================================================================
  * Sandbox Detection
  * ============================================================================ */
 
+static bool jocky_file_exists(const char* path)
+{
+#ifdef _WIN32
+    return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
+#else
+    return access(path, F_OK) == 0;
+#endif
+}
+
+bool jocky_detect_sandbox_filesystem(void)
+{
+    static const char* sandbox_paths[] = {
+        "/opt/cuckoo",
+        "/opt/sandboxie",
+        "/opt/threat_defense",
+        "/opt/frida",
+        "/var/sandbox",
+        "/etc/sandbox",
+        "C:\\Cuckoo",
+        "C:\\Sandboxie",
+        "C:\\Analysis",
+        "C:\\cuckoo",
+    };
+
+    for (size_t i = 0; i < sizeof(sandbox_paths) / sizeof(sandbox_paths[0]); i++) {
+        if (jocky_file_exists(sandbox_paths[i])) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool jocky_detect_analysis_processes(void)
+{
+#ifdef _WIN32
+    static const char* analysis_procs[] = {
+        "procmon.exe", "procexp.exe", "filemon.exe", "regmon.exe",
+        "apispy.exe", "dd.exe", "windbg.exe", "ida.exe", "ida64.exe",
+        "x64dbg.exe", "x32dbg.exe", "ollydbg.exe", "ghidra",
+        "frida-server.exe", "frida.exe", "strace.exe", "fiddler.exe",
+        "burp.exe", "wireshark.exe", "tcpdump.exe", "autoruns.exe",
+        "processexplorer.exe", "winapioverride.exe", "importrec.exe",
+        "lordpe.exe", "petools.exe", "resource_hacker.exe",
+        NULL
+    };
+
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) return false;
+
+    PROCESSENTRY32 entry = {0};
+    entry.dwSize = sizeof(entry);
+
+    if (!Process32First(snapshot, &entry)) {
+        CloseHandle(snapshot);
+        return false;
+    }
+
+    bool found = false;
+    do {
+        for (int i = 0; analysis_procs[i]; i++) {
+            if (_stricmp(entry.szExeFile, analysis_procs[i]) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (found) break;
+    } while (Process32Next(snapshot, &entry));
+
+    CloseHandle(snapshot);
+    return found;
+
+#else
+    static const char* analysis_procs[] = {
+        "strace", "ltrace", "gdb", "lldb", "radare2", "ghidra",
+        "frida-server", "frida", "objdump", "readelf", "strings",
+        "nm", "addr2line", "valgrind", "perf", "systemtap",
+        NULL
+    };
+
+    FILE* proc_fd = fopen("/proc/self/cmdline", "r");
+    if (!proc_fd) return false;
+
+    char cmdline[512] = {0};
+    if (!fgets(cmdline, sizeof(cmdline), proc_fd)) {
+        fclose(proc_fd);
+        return false;
+    }
+    fclose(proc_fd);
+
+    for (int i = 0; analysis_procs[i]; i++) {
+        if (strstr(cmdline, analysis_procs[i]) != NULL) {
+            return true;
+        }
+    }
+
+    return false;
+#endif
+}
+
+bool jocky_detect_analysis_environment(void)
+{
+#ifdef _WIN32
+    static const char* env_vars[] = {
+        "CUCKOO", "SANDBOX", "QEMU", "WINE", "VPC", "XPVM",
+        "FRIDA", "FRIDA_AGENT", "FRIDA_GADGET", "ANDROGUARD",
+        "DEXGUARD", "IARM", NULL
+    };
+
+    for (int i = 0; env_vars[i]; i++) {
+        if (GetEnvironmentVariableA(env_vars[i], NULL, 0) != 0) {
+            return true;
+        }
+    }
+
+#else
+    static const char* env_vars[] = {
+        "CUCKOO", "SANDBOX", "QEMU", "WINE", "VPC", "XPVM",
+        "FRIDA", "LD_PRELOAD", "LD_AUDIT", "VALGRIND", NULL
+    };
+
+    for (int i = 0; env_vars[i]; i++) {
+        if (getenv(env_vars[i]) != NULL) {
+            return true;
+        }
+    }
+#endif
+
+    return false;
+}
+
+bool jocky_detect_execution_tracing(void)
+{
+#ifdef _WIN32
+    BOOL dbg_present = false;
+    CheckRemoteDebuggerPresent(GetCurrentProcess(), &dbg_present);
+    if (dbg_present) return true;
+
+    return IsDebuggerPresent() != 0;
+#else
+    FILE* status = fopen("/proc/self/status", "r");
+    if (!status) return false;
+
+    char line[256];
+    bool is_traced = false;
+
+    while (fgets(line, sizeof(line), status)) {
+        if (strncmp(line, "TracerPid:", 10) == 0) {
+            int pid = atoi(line + 10);
+            if (pid != 0) {
+                is_traced = true;
+            }
+            break;
+        }
+    }
+
+    fclose(status);
+    return is_traced;
+#endif
+}
+
 bool jocky_is_sandbox(void)
 {
-    /* Check if sleep is accelerated (sandbox may skip sleeps) */
     if (!jocky_check_timing_api())
         return true;
 
 #ifdef _WIN32
-    /* Check common sandbox usernames */
     char username[256] = {0};
     DWORD len = sizeof(username);
     if (GetUserNameA(username, &len)) {
         static const char* sandbox_users[] = {
             "sandbox", "vmware", "virtualbox", "john doe", "test",
-            "malware", "virus", "john", "admin", NULL
+            "malware", "virus", "john", "admin", "guest", "tester",
+            "analyst", "lab", "analysis", NULL
         };
         for (int i = 0; sandbox_users[i]; i++) {
             if (_stricmp(username, sandbox_users[i]) == 0)
@@ -126,30 +409,24 @@ bool jocky_is_sandbox(void)
         }
     }
 
-    /* Check if common sandbox DLLs are loaded */
     static const char* sandbox_dlls[] = {
-        "sbiedll.dll",        /* Sandboxie */
-        "api_log.dll",        /* Various sandboxes */
-        "dir_watch.dll",      /* Various sandboxes */
-        "pstorec.dll",        /* Anubis */
-        "vmcheck.dll",        /* VirtualPC */
-        "wpespy.dll",         /* WPE */
-        NULL
+        "sbiedll.dll", "api_log.dll", "dir_watch.dll", "pstorec.dll",
+        "vmcheck.dll", "wpespy.dll", "sf.dll", "protect.dll",
+        "thookdll.dll", "sample.dll", "httpsniffer.dll",
+        "fxsst.dll", "dbghelp.dll", "dbgeng.dll", NULL
     };
     for (int i = 0; sandbox_dlls[i]; i++) {
         if (GetModuleHandleA(sandbox_dlls[i]) != NULL)
             return true;
     }
 #else
-    /* Linux: check for common VM indicators */
     FILE* f = fopen("/sys/class/dmi/id/product_name", "r");
     if (f) {
         char name[128] = {0};
         if (fgets(name, sizeof(name), f)) {
-            if (strcasestr(name, "vmware") ||
-                strcasestr(name, "virtualbox") ||
-                strcasestr(name, "kvm") ||
-                strcasestr(name, "qemu")) {
+            if (strcasestr(name, "vmware") || strcasestr(name, "virtualbox") ||
+                strcasestr(name, "kvm") || strcasestr(name, "qemu") ||
+                strcasestr(name, "bochs") || strcasestr(name, "xen")) {
                 fclose(f);
                 return true;
             }
@@ -157,6 +434,19 @@ bool jocky_is_sandbox(void)
         fclose(f);
     }
 #endif
+
+    if (jocky_detect_sandbox_filesystem())
+        return true;
+
+    if (jocky_detect_analysis_processes())
+        return true;
+
+    if (jocky_detect_analysis_environment())
+        return true;
+
+    if (jocky_detect_execution_tracing())
+        return true;
+
     return false;
 }
 
