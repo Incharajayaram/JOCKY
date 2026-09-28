@@ -2,12 +2,14 @@ from .ast import *
 from .errors import CodeGenError as BaseCodeGenError, SourceRange
 from .bytecode import BytecodeCompiler
 from typing import Dict, List, Tuple, Any, Optional
+from .optimizations import IREmissionBuffer, FunctionDeduplicator, LLVMTypeCache
 
 class CodeGenError(BaseCodeGenError):
     pass
 
 class CodeGen:
     def __init__(self):
+        self.emission_buffer = IREmissionBuffer()
         self.output_lines: List[str] = []
         self.string_constants: Dict[str, str] = {}
         self.string_counter = 0
@@ -31,6 +33,8 @@ class CodeGen:
         self.loop_stack = []
         self.debug_enabled = True
         self.source_file = "<unknown>"
+        self.func_deduplicator = FunctionDeduplicator()
+        self.type_cache = LLVMTypeCache()
 
     def next_reg(self) -> str:
         r = f"%{self.reg_counter}"
@@ -43,7 +47,7 @@ class CodeGen:
         return l
 
     def emit(self, line: str):
-        self.output_lines.append(line)
+        self.emission_buffer.emit(line)
 
     def emit_label(self, label: str):
         self.output_lines.append(f"{label}:")
@@ -136,7 +140,8 @@ class CodeGen:
             escaped = "".join(parts)
             prelude.append(f'{name} = private constant [{length} x i8] c"{escaped}\\00"')
 
-        return "\n".join(prelude + [""] + self.output_lines)
+        self.emission_buffer.flush()
+        return "\n".join(prelude + [""] + self.emission_buffer.get_all())
 
     def emit_struct_def(self, struct_def: StructDef):
         """Emit LLVM struct type definition."""
@@ -213,10 +218,14 @@ class CodeGen:
         self.emit(f"declare {ret} @{decl.name}({params})")
 
     def llvm_type(self, t: JType) -> str:
+        cache_key = str(t)
+        cached = self.type_cache.get_llvm_type(cache_key)
+        if cached:
+            return cached
+
         resolved = self.resolve_type_alias(t)
         result = resolved.llvm_type()
-        if result == "i8**" and resolved.is_array:
-            return "i8*"
+        self.type_cache.cache_type(cache_key, result)
         return result
 
     def resolve_type_alias(self, t: JType) -> JType:
