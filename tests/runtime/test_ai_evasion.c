@@ -100,7 +100,7 @@ void test_strategy_recommendation(void)
     JOCKY_AI_TELEMETRY telemetry = {0};
     telemetry.alert_count = 5;  /* High threat */
 
-    JOCKY_AI_STRATEGY strategy = jocky_ai_recommend_strategy(&telemetry);
+    JOCKY_STRATEGY strategy = jocky_ai_recommend_strategy(&telemetry);
 
     if (strategy >= JOCKY_STRAT_BASELINE && strategy <= JOCKY_STRAT_AI_ADAPTIVE) {
         PASS();
