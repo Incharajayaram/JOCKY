@@ -1,10 +1,8 @@
 from .ast import *
 from .errors import TypeError as BaseTypeError, SourceRange
-from typing import Dict, Any, Optional, List, Tuple, Set
-try:
-    from jocky.core.modules import Module, ModuleRegistry, get_registry
-except ImportError:
-    from ..core.modules import Module, ModuleRegistry, get_registry
+from typing import Dict, Any, Optional, List, Tuple
+from jocky.core.modules import Module, ModuleRegistry, get_registry
+from .generics import GenericTypeChecker, Monomorphizer, TypeBindings
 
 class TypeError(BaseTypeError):
     pass
@@ -57,12 +55,15 @@ class Monomorphization:
 class TypeChecker:
     def __init__(self, module_registry: Optional[ModuleRegistry] = None):
         self.functions: Dict[str, (List[JType], JType)] = {}
+        self.generic_functions: Dict[str, FuncDecl] = {}  # generic_func_name -> FuncDecl
+        self.monomorphic_instances: Dict[str, FuncDecl] = {}  # instance_name -> FuncDecl
         self.structs: Dict[str, StructDef] = {}  # struct_name -> StructDef
         self.enums: Dict[str, EnumDef] = {}      # enum_name -> EnumDef
         self.type_aliases: Dict[str, JType] = {} # alias_name -> JType
         self.locals: Dict[str, JType] = {}
         self.current_ret: JType = JType("void")
         self.loop_depth: int = 0
+        self.monomorphizer = Monomorphizer()
 
         self.globals: Dict[str, JType] = {}
 
@@ -98,8 +99,12 @@ class TypeChecker:
             elif isinstance(decl, EnumDef):
                 self.enums[decl.name] = decl
             elif isinstance(decl, FuncDecl):
-                ptypes = [p.type for p in decl.params]
-                self.functions[decl.name] = (ptypes, decl.ret_type, False)
+                if decl.is_generic:
+                    # Store generic function template for later instantiation
+                    self.generic_functions[decl.name] = decl
+                else:
+                    ptypes = [p.type for p in decl.params]
+                    self.functions[decl.name] = (ptypes, decl.ret_type, False)
             elif isinstance(decl, FFIDecl):
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, decl.variadic)
@@ -125,7 +130,9 @@ class TypeChecker:
         # Second pass: check bodies
         for decl in prog.decls:
             if isinstance(decl, FuncDecl):
-                self.check_func(decl)
+                if not decl.is_generic:
+                    # Generic functions are type-checked upon instantiation
+                    self.check_func(decl)
 
     def resolve_type_alias(self, t: JType) -> JType:
         """Resolve type alias recursively."""
@@ -252,6 +259,25 @@ class TypeChecker:
         ptypes = [p.type for p in decl.params]
         self.functions[decl.name] = (ptypes, decl.ret_type, False)
 
+    def instantiate_and_check_generic(self, generic_func: FuncDecl, arg_types: List[JType]) -> str:
+        """
+        Instantiate a generic function with concrete type arguments.
+        Returns the monomorphic instance name.
+        """
+        # Infer type bindings from arguments
+        bindings = GenericTypeChecker.infer_type_bindings(generic_func, arg_types)
+
+        # Instantiate the function
+        instance = self.monomorphizer.instantiate(generic_func, bindings)
+
+        # Type-check the instance
+        self.check_func(instance)
+
+        # Register the instance
+        self.monomorphic_instances[instance.name] = instance
+
+        return instance.name
+
     def check_block(self, block: Block):
         for stmt in block.stmts:
             self.check_stmt(stmt)
@@ -316,6 +342,9 @@ class TypeChecker:
         elif isinstance(stmt, ContinueStmt):
             if self.loop_depth == 0:
                 raise TypeError("'continue' outside loop")
+        else:
+            # Handle bare expressions (implicit returns)
+            self.typeof(stmt)
 
     def typeof(self, expr: Any, type_hint: Optional[JType] = None) -> JType:
         if isinstance(expr, IntLiteral):
