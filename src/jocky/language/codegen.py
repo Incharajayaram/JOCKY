@@ -22,6 +22,7 @@ class CodeGen:
         self.loop_stack: List[Tuple[str, str]] = []  # [(continue_label, break_label)]
         self._all_funcs: List[FuncDecl] = []  # For generic resolution
         self.monomorphizations: set = set()  # Track monomorphizations to generate
+        self.type_context = None  # Current type substitution context for generics
 
     def next_reg(self) -> str:
         r = f"%{self.reg_counter}"
@@ -83,10 +84,11 @@ class CodeGen:
                     self.emit_ffi_decl(decl)
                     emitted_ffis.add(decl.name)
 
-        # Emit function definitions
+        # Emit function definitions (skip generic functions)
         for decl in prog.decls:
             if isinstance(decl, FuncDecl):
-                self.emit_func(decl)
+                if not decl.generic_params:  # Only emit non-generic functions
+                    self.emit_func(decl)
 
         # Emit monomorphized functions
         for mono in self.monomorphizations:
@@ -138,7 +140,7 @@ class CodeGen:
 
     def substitute_type(self, jtype: JType, type_context) -> JType:
         """Substitute type variables with concrete types."""
-        if jtype.is_generic:
+        if type_context:
             concrete = type_context.lookup(jtype.name)
             if concrete:
                 return JType(
@@ -163,11 +165,13 @@ class CodeGen:
         saved_locals = self.locals.copy()
         saved_func = self.current_func
         saved_block = self.current_block
+        saved_type_context = self.type_context
 
         # Setup for monomorphized function
         self.current_func = mono.mangled_name
         self.current_block = "entry"
         self.locals = {}
+        self.type_context = type_context
 
         # Emit function header
         param_types = []
@@ -199,6 +203,12 @@ class CodeGen:
             self.emit(f"  ret {self.llvm_type(ret_type)} 0")
 
         self.emit("}")
+
+        # Restore state
+        self.locals = saved_locals
+        self.current_func = saved_func
+        self.current_block = saved_block
+        self.type_context = saved_type_context
 
         # Restore state
         self.locals = saved_locals
