@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 /* Adaptive AI-Driven Evasion Engine
  *
@@ -94,7 +95,7 @@ float jocky_ai_score_threat(const JOCKY_AI_TELEMETRY* telemetry);
 JOCKY_AI_RISK_LEVEL jocky_ai_classify_threat(const JOCKY_AI_TELEMETRY* telemetry);
 
 /* Get recommended evasion strategy */
-JOCKY_AI_STRATEGY jocky_ai_recommend_strategy(const JOCKY_AI_TELEMETRY* telemetry);
+JOCKY_STRATEGY jocky_ai_recommend_strategy(const JOCKY_AI_TELEMETRY* telemetry);
 
 /* Generate adaptive mutation strategy */
 bool jocky_ai_generate_mutation(
@@ -129,7 +130,7 @@ bool jocky_ai_predict_next_mutation(JOCKY_AI_MUTATION_STRATEGY* out_strategy);
 JOCKY_AI_RISK_LEVEL jocky_ai_get_current_risk(void);
 
 /* Get current applied strategy */
-JOCKY_AI_STRATEGY jocky_ai_get_current_strategy(void);
+JOCKY_STRATEGY jocky_ai_get_current_strategy(void);
 
 /* Query model statistics */
 typedef struct {

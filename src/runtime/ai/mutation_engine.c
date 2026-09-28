@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 #include <stdio.h>
+#include <math.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -12,12 +13,15 @@
 #include <sys/time.h>
 #endif
 
+/* Forward declaration */
+static uint64_t jocky_ai_get_current_time_ms(void);
+
 /* Global AI state */
 static struct {
     JOCKY_AI_MODEL* model;
     JOCKY_AI_TELEMETRY latest_telemetry;
     JOCKY_AI_RISK_LEVEL current_risk;
-    JOCKY_AI_STRATEGY current_strategy;
+    JOCKY_STRATEGY current_strategy;
     JOCKY_AI_STATS statistics;
 
     /* Telemetry collection */
@@ -202,7 +206,7 @@ JOCKY_AI_RISK_LEVEL jocky_ai_classify_threat(const JOCKY_AI_TELEMETRY* telemetry
 }
 
 /* Recommend evasion strategy */
-JOCKY_AI_STRATEGY jocky_ai_recommend_strategy(const JOCKY_AI_TELEMETRY* telemetry)
+JOCKY_STRATEGY jocky_ai_recommend_strategy(const JOCKY_AI_TELEMETRY* telemetry)
 {
     JOCKY_AI_RISK_LEVEL risk = jocky_ai_classify_threat(telemetry);
 
@@ -270,7 +274,7 @@ bool jocky_ai_generate_mutation(
     /* Obfuscation level inversely proportional to risk */
     /* (high risk = maximum obfuscation) */
     out_strategy->obfuscation_level = 10 - ((risk + 1) * 2);
-    if (out_strategy->obfuscation_level < 0) out_strategy->obfuscation_level = 10;
+    if ((int)out_strategy->obfuscation_level < 0) out_strategy->obfuscation_level = 10;
 
     g_ai_state.current_strategy = out_strategy->strategy;
     g_ai_state.statistics.mutations_applied++;
@@ -369,7 +373,7 @@ JOCKY_AI_RISK_LEVEL jocky_ai_get_current_risk(void)
 }
 
 /* Get current strategy */
-JOCKY_AI_STRATEGY jocky_ai_get_current_strategy(void)
+JOCKY_STRATEGY jocky_ai_get_current_strategy(void)
 {
     return g_ai_state.current_strategy;
 }

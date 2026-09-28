@@ -1,0 +1,1 @@
+/usr/bin/cc  -Wall -Wextra -O2 CMakeFiles/test_fence2pwn.dir/test_fence2pwn.c.o CMakeFiles/test_fence2pwn.dir/home/incharanew/JOCKY/src/runtime/linux/lpe/fence2pwn.c.o -o test_fence2pwn 
