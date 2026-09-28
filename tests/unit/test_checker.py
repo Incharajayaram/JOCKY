@@ -267,3 +267,30 @@ def test_check_error_while_condition_not_bool():
 def test_check_error_for_condition_not_bool():
     with pytest.raises(JockyTypeError, match="For condition must be bool"):
         check(_fn("for (let i: i32 = 0; 1; i = i + 1) { }"))
+
+
+# ============================================================
+# Builtin functions
+# ============================================================
+
+def test_check_sizeof_builtin():
+    check(_fn("let x: i32 = 0; let size: i32 = sizeof(x);"))
+
+
+def test_check_nameof_builtin():
+    check(_fn("let x: i32 = 0; let name: string = nameof(x);"))
+
+
+def test_check_sizeof_wrong_arg_count():
+    with pytest.raises(JockyTypeError, match="sizeof expects 1 argument"):
+        check(_fn("let x: i32 = sizeof();"))
+
+
+def test_check_nameof_wrong_arg_count():
+    with pytest.raises(JockyTypeError, match="nameof expects 1 argument"):
+        check(_fn("let x: string = nameof(1, 2);"))
+
+
+def test_check_nameof_requires_var():
+    with pytest.raises(JockyTypeError, match="nameof requires a variable"):
+        check(_fn("let x: string = nameof(1 + 2);"))

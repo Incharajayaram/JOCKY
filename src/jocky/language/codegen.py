@@ -740,14 +740,8 @@ class CodeGen:
                 sig = self.functions[expr.name]
                 return sig[1]
             # Check if calling a local variable holding a function pointer
-            # Debug: check what's happening
-            import sys
-            print(f"DEBUG: Checking CallExpr {repr(expr.name)} (type={type(expr.name)})", file=sys.stderr)
-            print(f"       expr.name in self.locals: {expr.name in self.locals}", file=sys.stderr)
-            print(f"       locals keys: {list(self.locals.keys())}", file=sys.stderr)
             if expr.name in self.locals:
                 alloca, var_type = self.locals[expr.name]
-                print(f"       var_type.name: {var_type.name}", file=sys.stderr)
                 if var_type.name == "fn" and hasattr(var_type, 'return_type'):
                     return var_type.return_type
             raise CodeGenError(f"Undefined function: {expr.name}")

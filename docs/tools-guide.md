@@ -177,6 +177,88 @@ python tools/profiler.py compare before.json after.json
 
 ---
 
+## Performance Regression Testing
+
+### Overview
+
+Automated regression testing in CI/CD ensures compiler performance doesn't degrade across commits. Baselines are established on first run and compared on subsequent runs.
+
+### Running Locally
+
+Run regression tests:
+```bash
+pytest tests/performance/ -v
+```
+
+This will:
+1. Check baselines exist in `tests/performance/baselines/`
+2. Compare current build times against baselines
+3. Fail if performance degrades > 10%
+
+### Baseline Management
+
+#### Establish Baseline
+First run creates baseline files:
+```bash
+pytest tests/performance/test_regressions.py
+```
+
+Baseline files are stored as JSON:
+```
+tests/performance/baselines/
+├── basic_example.json
+├── pattern_matching_example.json
+└── enum_matching_example.json
+```
+
+Each baseline contains:
+```json
+{
+  "average": 0.325,
+  "min": 0.310,
+  "max": 0.340,
+  "times": [0.325, 0.315, 0.335],
+  "iterations": 3
+}
+```
+
+#### Update Baselines
+When a performance improvement is intentional, update baselines:
+```bash
+# Remove old baselines
+rm tests/performance/baselines/*.json
+# Establish new baselines
+pytest tests/performance/ -v
+```
+
+### CI/CD Integration
+
+The performance workflow:
+1. Downloads compiled C++ compiler from build step
+2. Runs `pytest tests/performance/ -v`
+3. Uploads baseline files as artifacts for tracking
+4. Fails if regression exceeds 10% threshold
+
+Baselines are preserved across runs via artifact caching.
+
+### Configuration
+
+Adjust sensitivity in `tests/performance/test_regressions.py`:
+
+```python
+REGRESSION_THRESHOLD = 0.10  # 10% variance allowed
+MIN_RUNS = 2                 # Minimum iterations to establish baseline
+```
+
+### Best Practices
+
+- **Track baselines** - Commit baseline files when intentional improvements are made
+- **Review regressions** - Investigate failures to identify bottlenecks
+- **Min runs** - Use at least 2 iterations to average out OS variance
+- **Profile profiles** - Test multiple obfuscation profiles to catch profile-specific regressions
+
+---
+
 ## Docker Setup
 
 ### Build Image
@@ -218,6 +300,7 @@ Located in `.github/workflows/ci.yml`:
 - **Test** - Python unit tests (Python 3.9, 3.10, 3.11)
 - **Build** - C++ compiler compilation
 - **Integration** - End-to-end tests
+- **Performance** - Regression testing against baseline
 - **Security** - Security scanning with bandit
 - **Release** - Create releases from git tags
 
