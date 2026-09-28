@@ -74,7 +74,7 @@ class TestErrorFormatter:
         assert "E0002" in result
         assert "test.jky:1:14" in result
         assert "let x: i32 = true;" in result
-        assert "^" in result or "^" in result
+        assert "^" in result
 
     def test_format_error_with_multiline_range(self):
         file_lines = [
@@ -101,6 +101,24 @@ class TestErrorFormatter:
 
         assert "Undefined variable" in result
         assert "Missing semicolon" in result
+
+    def test_format_error_with_surrounding_context(self):
+        file_lines = [
+            "fn test() {",
+            "  let x: i32 = 1;",
+            "  let y: bool = x;",
+            "  let z: i32 = 3;",
+            "}"
+        ]
+        rng = SourceRange(3, 18, 3, 18)
+        err = TypeError("Type mismatch", rng, "test.jky", "E0002")
+        formatter = ErrorFormatter(file_lines)
+        result = formatter.format_error(err)
+
+        assert "test.jky:3:18" in result
+        assert "let x: i32 = 1;" in result  # Context: line before
+        assert "let y: bool = x;" in result  # Error line
+        assert "let z: i32 = 3;" in result  # Context: line after
 
 
 class TestJockyError:

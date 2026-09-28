@@ -345,6 +345,44 @@ def repl(file: str):
         raise click.Abort()
 
 # ---------------------------------------------------------------------------
+# mutate
+# ---------------------------------------------------------------------------
+
+@cli.command()
+@click.option("--test", required=True, type=click.Path(exists=True), help="Test file to run")
+@click.option("--source", required=True, type=click.Path(exists=True), help="Source file to mutate")
+@click.option("--timeout", type=int, default=10, help="Timeout per test run (seconds)")
+@click.option("--export", type=click.Path(), help="Export results to JSON file")
+@click.option("--quiet", is_flag=True, help="Suppress verbose output")
+def mutate(test: str, source: str, timeout: int, export: Optional[str], quiet: bool):
+    """Run mutation testing to measure test quality."""
+    try:
+        from tools.mutation_test import MutationTester
+    except ImportError:
+        error("Mutation testing tools not available. Install with: pip install -e .")
+        raise click.Abort()
+
+    if not quiet:
+        header("Mutation Testing")
+        info_line("Test file:", test)
+        info_line("Source file:", source)
+        info_line("Timeout:", f"{timeout}s")
+        console.print()
+
+    try:
+        tester = MutationTester(test, source, timeout=timeout)
+        report_text = tester.run_and_report()
+
+        console.print(report_text)
+
+        if export:
+            tester.export_json(export)
+            success(f"Results exported to {export}")
+    except Exception as e:
+        error(f"Mutation testing failed: {e}")
+        raise click.Abort()
+
+# ---------------------------------------------------------------------------
 # clean
 # ---------------------------------------------------------------------------
 
