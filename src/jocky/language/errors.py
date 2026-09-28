@@ -73,8 +73,28 @@ class CodeGenError(JockyError):
 
 
 class ErrorFormatter:
+    CONTEXT_LINES = 2
+
     def __init__(self, file_lines: Optional[List[str]] = None):
         self.file_lines = file_lines or []
+
+    def _format_code_context(self, line_num: int, indicator_col: int = -1) -> List[str]:
+        """Format code context with surrounding lines."""
+        context = []
+        start_line = max(1, line_num - self.CONTEXT_LINES)
+        end_line = min(len(self.file_lines), line_num + self.CONTEXT_LINES)
+
+        for i in range(start_line, end_line + 1):
+            prefix = ">>>" if i == line_num else "   "
+            line_content = self.file_lines[i - 1] if i <= len(self.file_lines) else ""
+            context.append(f"  {prefix} {i:4d} | {line_content}")
+
+            # Add indicator under the error location
+            if i == line_num and indicator_col >= 0:
+                col_indicator = " " * (indicator_col - 1) + "^"
+                context.append(f"       |{col_indicator}")
+
+        return context
 
     def format_error(self, error: JockyError, color: bool = False) -> str:
         lines = []
@@ -88,15 +108,13 @@ class ErrorFormatter:
             range_ = error.source_range
             loc = f"  ├─ {error.file}:{range_.start_line}:{range_.start_col}"
             lines.append(loc)
+            lines.append("  ├─")
 
+            # Add code context for error
             for line_num in range(range_.start_line, range_.end_line + 1):
                 if 1 <= line_num <= len(self.file_lines):
-                    source_line = self.file_lines[line_num - 1]
-                    lines.append(f"  ├─ {source_line}")
-
-                    if line_num == range_.start_line:
-                        indicator = " " * (range_.start_col - 1) + "^" * max(1, range_.end_col - range_.start_col + 1)
-                        lines.append(f"  │  {indicator}")
+                    context = self._format_code_context(line_num, range_.start_col if line_num == range_.start_line else -1)
+                    lines.extend(context)
 
         return "\n".join(lines)
 
