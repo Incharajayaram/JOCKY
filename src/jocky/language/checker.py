@@ -347,6 +347,8 @@ class TypeChecker:
                 return t
             else:
                 raise TypeError(f"Unknown unary op: {expr.op}")
+        elif isinstance(expr, ClosureExpr):
+            return self.typeof_closure(expr)
         elif isinstance(expr, CallExpr):
             # Handle generic function calls: func::<T1, T2>(args)
             if expr.generic_args:
@@ -639,6 +641,66 @@ class TypeChecker:
                 raise TypeError(f"Variant {pattern.name} has fields, but pattern provides no bindings")
 
             return bindings
+
+    def typeof_closure(self, expr: ClosureExpr) -> JType:
+        """Type check a closure expression and return its function type."""
+        # Save current locals to check captures
+        outer_locals = self.locals.copy()
+
+        # Create new scope for closure body
+        closure_locals = {}
+
+        # Add parameters to closure locals
+        for param in expr.params:
+            closure_locals[param.name] = param.type
+
+        # Validate captures - all must exist in outer scope
+        for capture_var in expr.captures:
+            if capture_var not in outer_locals:
+                raise TypeError(f"Captured variable '{capture_var}' not found in outer scope")
+
+        # Switch to closure scope and check body type
+        old_locals = self.locals
+        self.locals = closure_locals
+
+        # Type check closure body
+        if isinstance(expr.body, Block):
+            # Block closure
+            body_type = JType("void")
+            for stmt in expr.body.stmts:
+                if isinstance(stmt, ReturnStmt):
+                    if stmt.value:
+                        body_type = self.typeof(stmt.value)
+                    else:
+                        body_type = JType("void")
+                elif isinstance(stmt, ExprStmt):
+                    body_type = self.typeof(stmt.expr)
+        else:
+            # Expression closure
+            body_type = self.typeof(expr.body)
+
+        # Restore outer scope
+        self.locals = old_locals
+
+        # Validate return type if explicitly specified
+        if expr.ret_type:
+            if not self.types_equal(body_type, expr.ret_type):
+                raise TypeError(f"Closure body type {body_type} doesn't match declared return type {expr.ret_type}")
+            ret_type = expr.ret_type
+        else:
+            ret_type = body_type
+
+        # Build function type from parameters and return type
+        param_types = [p.type for p in expr.params]
+
+        # Create function pointer type representation
+        # For now, represent as a function type marker
+        func_type = JType("fn")
+        func_type.param_types = param_types
+        func_type.return_type = ret_type
+        func_type.captured_vars = expr.captures
+
+        return func_type
 
     def is_numeric(self, t: JType) -> bool:
         return t.name in ("i8", "i32", "i64", "f32", "f64") and not t.is_pointer
