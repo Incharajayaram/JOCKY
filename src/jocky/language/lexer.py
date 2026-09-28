@@ -222,7 +222,7 @@ class Lexer:
                 break
             elif ch == '"':
                 self.tokens.append(Token(TokenType.STRING, self.read_string(), start_line, start_col))
-            elif ch.isdigit():
+            elif ch in "0123456789":
                 self.tokens.append(Token(TokenType.NUMBER, self.read_number(), start_line, start_col))
             elif ch.isalpha() or ch == "_":
                 ident = self.read_ident()
