@@ -37,12 +37,6 @@ static const uint8_t PROLOGUE_VARIANT_3[] = {
     0x0f, 0x1f, 0x00,          /* nop (3-byte multi-byte nop) */
 };
 
-static const uint8_t PROLOGUE_VARIANT_4[] = {
-    0x55,                       /* push rbp */
-    0x48, 0x8b, 0xec,          /* mov rbp, rsp (alternate encoding) */
-    0xcc, 0x90,                 /* int3 + nop (confuse static analysis) */
-};
-
 /* Stack frame confusion pattern - interleave fake operations */
 static void jocky_confuse_stack_frame(void)
 {
