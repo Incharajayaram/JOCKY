@@ -124,6 +124,10 @@ class CodeGen:
 
     def emit_struct_def(self, struct_def: StructDef):
         """Emit LLVM struct type definition."""
+        if struct_def.attributes:
+            attr_strs = [f"{attr.name}" + (f"({','.join(map(str, attr.args))})" if attr.args else "") for attr in struct_def.attributes]
+            self.emit(f"; struct attributes: [{', '.join(attr_strs)}]")
+
         field_types = ", ".join(self.llvm_type(f.type) for f in struct_def.fields)
         self.emit(f"%{struct_def.name} = type {{ {field_types} }}")
 
@@ -212,76 +216,30 @@ class CodeGen:
             )
         return t
 
-    def substitute_type(self, jtype: JType, type_context) -> JType:
-        """Substitute type variables with concrete types."""
-        if type_context:
-            concrete = type_context.lookup(jtype.name)
-            if concrete:
-                return JType(
-                    concrete.name,
-                    is_pointer=jtype.is_pointer or concrete.is_pointer,
-                    is_array=jtype.is_array or concrete.is_array,
-                    array_size=jtype.array_size or concrete.array_size,
-                    is_generic=False
-                )
-        return jtype
+    def get_attribute_flags(self, attributes: List[Any]) -> str:
+        """Generate LLVM attribute string from attributes."""
+        if not attributes:
+            return ""
 
-    def emit_monomorphized_func(self, func_decl: FuncDecl, mono):
-        """Generate a monomorphized version of a generic function."""
-        from jocky.language.checker import GenericContext
+        flags = []
+        for attr in attributes:
+            if attr.name == 'inline':
+                if attr.args and attr.args[0] == 'never':
+                    flags.append('noinline')
+                elif attr.args and attr.args[0] == 'always':
+                    flags.append('alwaysinline')
+                else:
+                    flags.append('inlinehint')
+            elif attr.name == 'no_mangle':
+                pass
+            elif attr.name == 'cold':
+                flags.append('cold')
+            elif attr.name == 'hot':
+                flags.append('hot')
+            elif attr.name == 'obfuscate':
+                pass
 
-        # Create type context from monomorphization
-        type_context = GenericContext()
-        for param, arg_type in mono.type_bindings.items():
-            type_context.bind(param, arg_type)
-
-        # Save current state
-        saved_locals = self.locals.copy()
-        saved_func = self.current_func
-        saved_block = self.current_block
-        saved_type_context = self.type_context
-
-        # Setup for monomorphized function
-        self.current_func = mono.mangled_name
-        self.current_block = "entry"
-        self.locals = {}
-        self.type_context = type_context
-
-        # Emit function header
-        param_types = []
-        for param in func_decl.params:
-            subst_type = self.substitute_type(param.type, type_context)
-            param_types.append(subst_type)
-
-        ret_type = self.substitute_type(func_decl.ret_type, type_context)
-
-        param_str = ", ".join(f"{self.llvm_type(t)} %{p.name}" for t, p in zip(param_types, func_decl.params))
-        self.emit(f"define {self.llvm_type(ret_type)} @{mono.mangled_name}({param_str}) {{")
-        self.emit("entry:")
-
-        # Process parameters
-        for param, subst_type in zip(func_decl.params, param_types):
-            alloca = self.next_reg()
-            self.emit(f"  {alloca} = alloca {self.llvm_type(subst_type)}")
-            self.emit(f"  store {self.llvm_type(subst_type)} %{param.name}, {self.llvm_type(subst_type)}* {alloca}")
-            self.locals[param.name] = (alloca, subst_type)
-
-        # Emit function body
-        for stmt in func_decl.body.stmts:
-            self.emit_stmt(stmt)
-
-        # Default return
-        if ret_type.name == "void":
-            self.emit("  ret void")
-        else:
-            self.emit(f"  ret {self.llvm_type(ret_type)} 0")
-
-        self.emit("}")
-
-        self.locals = saved_locals
-        self.current_func = saved_func
-        self.current_block = saved_block
-        self.type_context = saved_type_context
+        return " ".join(flags)
 
     def collect_lets(self, stmts: List[Any]) -> List[Tuple[str, JType]]:
         """Walk statement list recursively and collect (name, type) for every LetStmt."""
@@ -331,6 +289,10 @@ class CodeGen:
         self.locals = {}
         self.loop_stack = []
         self.current_block = "entry"
+
+        if decl.attributes:
+            attr_strs = [f"{attr.name}" + (f"({','.join(map(str, attr.args))})" if attr.args else "") for attr in decl.attributes]
+            self.emit(f"; attributes: [{', '.join(attr_strs)}]")
 
         params = ", ".join(f"{self.llvm_type(p.type)} %{p.name}" for p in decl.params)
         ret = self.llvm_type(decl.ret_type)
@@ -1136,17 +1098,46 @@ class CodeGen:
     def emit_closure(self, expr: ClosureExpr) -> Tuple[str, JType]:
         """Emit LLVM code for closure/lambda expression.
 
-        For now, we handle non-capturing closures by generating an anonymous function.
-        Capturing closures would need environment structs.
+        For capturing closures, generates an environment struct to hold captured variables,
+        and modifies the closure function to accept an environment pointer as first parameter.
         """
         # Generate unique function name for this closure
         closure_name = f"__closure_{self.label_counter}"
         self.label_counter += 1
 
-        # Build function signature
-        param_types = [p.type for p in expr.params]
-        param_list = ", ".join(f"{self.llvm_type(pt)} %{p.name}" for pt, p in zip(param_types, [p.name for p in expr.params]))
         ret_type = expr.ret_type if expr.ret_type else JType("void")
+
+        # Check if this closure captures variables
+        has_captures = len(expr.captures) > 0
+        env_struct_name = None
+        capture_types = {}
+
+        if has_captures:
+            env_struct_name = f"{closure_name}_env"
+
+            # Collect types of captured variables from outer scope
+            for capture_name in expr.captures:
+                if capture_name in self.locals:
+                    _, capture_type = self.locals[capture_name]
+                    capture_types[capture_name] = capture_type
+                else:
+                    raise CodeGenError(f"Captured variable '{capture_name}' not found in scope")
+
+            # Emit environment struct type definition
+            field_types = ", ".join(self.llvm_type(capture_types[cap]) for cap in expr.captures)
+            self.emit(f"%{env_struct_name} = type {{ {field_types} }}")
+
+        # Build function signature with environment pointer if needed
+        param_types = [p.type for p in expr.params]
+        if has_captures:
+            env_param = f"%{env_struct_name}* %__env"
+            param_list_items = [env_param]
+            param_list_items.extend(f"{self.llvm_type(pt)} %{p.name}"
+                                   for pt, p in zip(param_types, [p.name for p in expr.params]))
+            param_list = ", ".join(param_list_items)
+        else:
+            param_list = ", ".join(f"{self.llvm_type(pt)} %{p.name}"
+                                  for pt, p in zip(param_types, [p.name for p in expr.params]))
 
         # Save current function state
         old_func = self.current_func
@@ -1157,6 +1148,19 @@ class CodeGen:
         self.current_func = closure_name
         self.locals = {}
         self.reg_counter = 0
+
+        # If capturing, load captured variables from environment struct
+        if has_captures:
+            for i, capture_name in enumerate(expr.captures):
+                capture_type = capture_types[capture_name]
+                # Get pointer to struct field
+                gep_reg = self.next_reg()
+                self.emit(f"  {gep_reg} = getelementptr %{env_struct_name}, %{env_struct_name}* %__env, i32 0, i32 {i}")
+                # Load value from field
+                load_reg = self.next_reg()
+                self.emit(f"  {load_reg} = load {self.llvm_type(capture_type)}, {self.llvm_type(capture_type)}* {gep_reg}")
+                # Store in local variable
+                self.locals[capture_name] = (load_reg, capture_type)
 
         # Add parameters to locals
         for param in expr.params:
@@ -1187,8 +1191,11 @@ class CodeGen:
         self.reg_counter = old_reg_counter
         self.label_counter = old_label_counter
 
-        # Return function pointer
+        # Return function pointer with environment info
         func_ptr_type = JType("fn", is_pointer=True)
+        if has_captures:
+            func_ptr_type.env_struct = env_struct_name
+            func_ptr_type.captures = expr.captures
         return (f"@{closure_name}", func_ptr_type)
 
     def emit_call(self, expr: CallExpr) -> Tuple[str, JType]:
