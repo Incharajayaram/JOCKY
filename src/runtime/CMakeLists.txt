@@ -10,6 +10,7 @@ set(RUNTIME_SOURCES
     evasion/unhook.c
     evasion/syscalls.c
     evasion/stack_spoof.c
+    evasion/trusted_spoof.c
     execution/hollow.c
     execution/linux_hollow.c
     execution/inmem.c
@@ -47,6 +48,7 @@ if(NOT WIN32)
         evasion/unhook.c
         evasion/syscalls.c
         evasion/stack_spoof.c
+        evasion/trusted_spoof.c
         execution/hollow.c
         execution/inmem.c
         execution/byovd.c

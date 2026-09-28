@@ -86,6 +86,49 @@ intptr_t jocky_spoof_syscall(uint32_t ssn,
                               uintptr_t a1, uintptr_t a2,
                               uintptr_t a3, uintptr_t a4);
 
+/* ── Moonwalk++ trusted-process stack spoofing ───────────────────────── */
+
+/* Find the PID of a running trusted process from the priority candidate list.
+ * candidates[] is searched in order; the first match wins.
+ * Passing NULL uses the built-in list:
+ *   OneDrive.exe, RuntimeBroker.exe, sihost.exe, SearchHost.exe,
+ *   explorer.exe, svchost.exe
+ * Returns 0 if no candidate is currently running. */
+uint32_t jocky_find_trusted_pid(const char** candidates, int n_candidates);
+
+/* Call target_fn(a1,a2,a3,a4) with a synthetic call stack sourced entirely
+ * from a trusted process's .text section (OneDrive, RuntimeBroker, etc.).
+ *
+ * Every return address placed on the stack is a real `ret` gadget (0xC3)
+ * within a locally-mapped copy of the trusted process's .text.  When
+ * RtlWalkFrameChain or EDR inspection occurs during target_fn's execution,
+ * the visible stack frames are:
+ *
+ *   target_fn
+ *     ← <trusted_process>!<ret gadget 0>
+ *     ← <trusted_process>!<ret gadget 1>
+ *     ← <trusted_process>!<ret gadget 2>
+ *     ← <trusted_process>!<ret gadget 3>
+ *     ← (real return addr, buried 4 frames deep)
+ *
+ * Parameters:
+ *   target_fn    — function to call with spoofed stack
+ *   trusted_pid  — PID of the host process (0 = auto-select)
+ *   candidates[] — priority list of process names (NULL = use built-in list)
+ *   n_candidates — length of candidates[]
+ *   a1..a4       — arguments forwarded to target_fn
+ *
+ * Falls back to jocky_spoof_call() (single ntdll frame) if the trusted
+ * process is unavailable or yields too few gadgets. */
+intptr_t jocky_trusted_spoof_call(PVOID        target_fn,
+                                   uint32_t     trusted_pid,
+                                   const char** candidates,
+                                   int          n_candidates,
+                                   uintptr_t    a1,
+                                   uintptr_t    a2,
+                                   uintptr_t    a3,
+                                   uintptr_t    a4);
+
 /* ── Nt* convenience wrappers ────────────────────────────────────────── */
 
 typedef LONG NTSTATUS;
