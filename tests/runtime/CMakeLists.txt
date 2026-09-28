@@ -87,13 +87,15 @@ add_executable(test_ai_evasion
     ${CMAKE_SOURCE_DIR}/../../src/runtime/ai/mutation_engine.c
 )
 
-# Add test for exfiltration
-add_executable(test_exfiltration
-    test_exfiltration.c
-    ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/exfil/enhanced_exfiltration.c
-)
+# Link math library for AI module
+target_link_libraries(test_ai_evasion PRIVATE m)
 
-if(WIN32)
+# Add test for exfiltration (Windows only due to winsock2.h)
+if(WINDOWS_BUILD)
+    add_executable(test_exfiltration
+        test_exfiltration.c
+        ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/exfil/enhanced_exfiltration.c
+    )
     target_link_libraries(test_exfiltration PRIVATE ws2_32)
 endif()
 
@@ -113,7 +115,9 @@ if(LINUX_BUILD)
 endif()
 
 add_test(NAME AIEvasion COMMAND test_ai_evasion)
-add_test(NAME Exfiltration COMMAND test_exfiltration)
+if(WINDOWS_BUILD)
+    add_test(NAME Exfiltration COMMAND test_exfiltration)
+endif()
 
 # Summary
 message(STATUS "")
