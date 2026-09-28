@@ -1696,3 +1696,288 @@ fn main() -> void {
     jocky_cleanup_all();
 }
 ```
+
+---
+
+## 17  Polymorphic Obfuscation (NEW)
+
+Runtime mutation and code variant selection for obfuscation evasion.
+
+### `jocky_polymorphic_select_variant() -> i32`
+
+At runtime, selects one of multiple obfuscated code variants based on
+environment entropy. Each variant implements the same logic with different
+instruction sequences and control flow patterns.
+
+Returns the variant ID (0-N) that was selected. The compiler generates
+corresponding variant paths during the build if `--profile aggressive` or
+`--profile paranoid` is used.
+
+```
+ffi jocky_polymorphic_select_variant() -> i32;
+
+fn main() -> void {
+    let variant: i32 = jocky_polymorphic_select_variant();
+    ffi printf(fmt: string, ...) -> i32;
+    printf("Using variant %d\n", variant);
+}
+```
+
+**Usage Notes:**
+- Called automatically by the runtime on initialization
+- Each program execution may select a different variant
+- Variants are generated at compile time via the polymorphic obfuscation pass
+- Requires `--profile aggressive` or higher
+
+---
+
+### `jocky_polymorphic_mutate() -> void`
+
+Trigger a runtime code mutation event. This re-encodes instruction sequences
+with alternative encodings (e.g., different opcode forms that produce the same
+result) to defeat constant patterns that static analysis relies on.
+
+```
+ffi jocky_polymorphic_mutate() -> void;
+
+fn main() -> void {
+    // Perform sensitive operation
+    let result = do_sensitive_work();
+    
+    // Mutate code to avoid pattern detection
+    jocky_polymorphic_mutate();
+    
+    // Continue execution with different encoding
+}
+```
+
+**Implementation Details:**
+- Allocates RWX memory
+- Generates alternative instruction encodings
+- Patches code at runtime
+- Clears instruction cache (if supported)
+
+---
+
+### `jocky_polymorphic_get_entropy() -> i32`
+
+Retrieve the current entropy value used for variant/mutation selection.
+Useful for logging or debugging which code path was taken.
+
+```
+ffi jocky_polymorphic_get_entropy() -> i32;
+```
+
+---
+
+## 18  Bytecode VM Virtualization (NEW)
+
+Custom bytecode virtual machine for obfuscation. Sensitive functions can be
+compiled to bytecode instructions that are interpreted at runtime, hiding
+their original logic from static analysis.
+
+### `jocky_vm_init() -> i8*`
+
+Initialize the bytecode VM interpreter. Returns an opaque VM context.
+Must be called once before executing any bytecode.
+
+```
+ffi jocky_vm_init() -> i8*;
+
+fn main() -> void {
+    let vm: i8* = jocky_vm_init();
+    if vm == null { return; }
+    
+    // ... execute bytecode ...
+    
+    jocky_vm_destroy(vm);
+}
+```
+
+---
+
+### `jocky_vm_destroy(ctx) -> void`
+
+Clean up VM resources. Safe to call on `null`.
+
+```
+ffi jocky_vm_destroy(i8*) -> void;
+```
+
+---
+
+### `jocky_vm_execute(ctx, bytecode, bytecode_size, stack, stack_size) -> i64`
+
+Execute a bytecode sequence. Returns the final value left on the stack.
+
+| Parameter      | Type    | Meaning |
+|----------------|---------|---------|
+| `ctx`          | `i8*`   | VM context from `jocky_vm_init()` |
+| `bytecode`     | `i8*`   | Pointer to bytecode instruction stream |
+| `bytecode_size`| `i32`   | Size of bytecode in bytes |
+| `stack`        | `i64*`  | Pointer to working stack (caller-allocated) |
+| `stack_size`   | `i32`   | Stack capacity in entries (typically 256) |
+
+```
+ffi jocky_vm_execute(i8*, i8*, i32, i64*, i32) -> i64;
+
+fn main() -> void {
+    let vm: i8* = jocky_vm_init();
+    
+    // Bytecode sequence compiled at build time
+    let bytecode: i8* = 0;  // points to .jvm section
+    let bytecode_len: i32 = 512;
+    
+    // Working stack
+    let stack: i64[256] = [0; 256];
+    
+    // Execute
+    let result: i64 = jocky_vm_execute(vm, bytecode, bytecode_len, stack, 256);
+    ffi printf(fmt: string, ...) -> i32;
+    printf("Result: %lld\n", result);
+    
+    jocky_vm_destroy(vm);
+}
+```
+
+---
+
+### `jocky_vm_get_opcode_set() -> i32`
+
+Return the opcode set ID used by this build. Different builds may use
+different custom instruction encodings to prevent generic VM analysis.
+
+```
+ffi jocky_vm_get_opcode_set() -> i32;
+```
+
+---
+
+### Bytecode Instruction Types
+
+Common operations in the bytecode instruction set (exact opcodes vary per build):
+
+| Opcode Category | Examples |
+|-----------------|----------|
+| **Arithmetic** | ADD, SUB, MUL, DIV, MOD |
+| **Logic** | AND, OR, XOR, NOT, SHL, SHR |
+| **Comparison** | CMP, JEQ, JNE, JLT, JGT, JLE, JGE |
+| **Stack** | PUSH, POP, DUP, SWAP |
+| **Memory** | LOAD, STORE, ALLOC, FREE |
+| **Control** | JMP, CALL, RET, TRAP |
+| **Obfuscation** | DUMMY, NOOP, JUNK, POLY |
+
+**Note:** Instruction encodings are randomized per-build and may be
+obfuscated further with polymorphic encoding.
+
+---
+
+## 19  Attributes & Compiler Directives (NEW)
+
+JOCKY supports compile-time attributes for fine-grained control over code
+generation and optimization.
+
+### Function Attributes
+
+```jky
+#[inline]
+fn small_function(x: i32) -> i32 {
+    x * 2
+}
+
+#[no_mangle]
+fn c_compatible_function() -> void {
+    // Callable from C without name mangling
+}
+
+#[no_obfuscate]
+fn debug_function() -> i32 {
+    // Compiled with --profile none
+    return 42;
+}
+
+#[deprecated]
+fn old_function() -> void {
+    // Compiler warns if used
+}
+```
+
+---
+
+### Struct Attributes
+
+```jky
+#[packed]
+struct TightLayout {
+    a: i8,
+    b: i32,   // no padding
+    c: i8,
+}
+
+#[repr(C)]
+struct CCompatible {
+    x: i32,
+    y: i32,   // matches C layout rules
+}
+
+#[derive(Debug)]
+struct DebugInfo {
+    id: i32,
+    // Automatic Debug implementation
+}
+```
+
+---
+
+### Enum Attributes
+
+```jky
+#[derive(Debug, Copy, Clone)]
+enum Status {
+    Success = 0,
+    Error = 1,
+    Pending = 2,
+}
+```
+
+---
+
+### Supported Attributes by Declaration
+
+| Attribute | Function | Struct | Enum | Module | FFI |
+|-----------|:--------:|:------:|:----:|:------:|:---:|
+| `inline` | ✓ | | | | |
+| `no_mangle` | ✓ | | | | ✓ |
+| `no_obfuscate` | ✓ | | | | |
+| `deprecated` | ✓ | ✓ | ✓ | | |
+| `packed` | | ✓ | | | |
+| `repr(C)` | | ✓ | | | |
+| `derive(...)` | | ✓ | ✓ | | |
+| `doc` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `cfg(...)` | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+---
+
+### Compile-Time Conditionals
+
+```jky
+#[cfg(target_os = "windows")]
+fn win_specific_code() -> void {
+    // Only included when compiling for Windows
+}
+
+#[cfg(debug)]
+fn debug_helper() -> void {
+    // Only when --profile none
+}
+
+#[cfg(test)]
+fn test_function() -> void {
+    // Only in test builds
+}
+```
+
+---
+
+**API Reference Version:** 2.0  
+**Last Updated:** 2026-09-29
