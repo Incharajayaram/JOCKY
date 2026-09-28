@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <dirent.h>
 
 typedef struct {
     pid_t target_pid;
@@ -136,7 +137,6 @@ int jocky_kernel_escalate_privileges(
 
 int jocky_kernel_enumerate_processes(void)
 {
-    FILE* proc_dir = fopen("/proc", "r");
     struct dirent* entry;
     DIR* d;
     int count = 0;
