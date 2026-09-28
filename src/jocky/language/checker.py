@@ -71,6 +71,9 @@ class TypeChecker:
         self.visible_symbols: Dict[str, Any] = {}  # Imported symbols
 
     def check(self, prog: Program):
+        # Store all declarations for generic resolution
+        self._all_decls = prog.decls
+
         # Phase 0: Process modules and imports
         for decl in prog.decls:
             if isinstance(decl, ModDecl):
@@ -122,8 +125,8 @@ class TypeChecker:
         if context is None:
             context = self.generic_context
 
-        if jtype.is_generic:
-            # This is a type variable like T, U, etc.
+        # Check if this type should be substituted (either marked as generic or found in context)
+        if jtype.is_generic or context.lookup(jtype.name):
             concrete = context.lookup(jtype.name)
             if concrete:
                 # Preserve pointer and array flags
@@ -335,28 +338,83 @@ class TypeChecker:
             else:
                 raise TypeError(f"Unknown unary op: {expr.op}")
         elif isinstance(expr, CallExpr):
-            # Check in functions first, then visible imports
-            if expr.name in self.functions:
-                sig = self.functions[expr.name]
-            elif expr.name in self.visible_symbols:
-                symbol = self.visible_symbols[expr.name]
-                sig = symbol.type_info
-            else:
-                raise TypeError(f"Undefined function: {expr.name}")
+            # Handle generic function calls: func::<T1, T2>(args)
+            if expr.generic_args:
+                if expr.name not in self.functions:
+                    raise TypeError(f"Undefined generic function: {expr.name}")
 
-            if len(sig) == 3:
-                ptypes, ret, is_variadic = sig
+                base_sig = self.functions[expr.name]
+                if len(base_sig) == 3:
+                    ptypes, ret, is_variadic = base_sig
+                else:
+                    ptypes, ret = base_sig
+                    is_variadic = False
+
+                # Find the generic function definition to get type parameters
+                generic_func = None
+                for decl in getattr(self, '_all_decls', []):
+                    if isinstance(decl, FuncDecl) and decl.name == expr.name:
+                        if decl.generic_params:
+                            generic_func = decl
+                            break
+
+                if not generic_func:
+                    raise TypeError(f"Function {expr.name} is not generic")
+
+                if len(expr.generic_args) != len(generic_func.generic_params):
+                    raise TypeError(f"Function {expr.name} expects {len(generic_func.generic_params)} type args, got {len(expr.generic_args)}")
+
+                # Create type bindings: T -> i32, U -> string, etc.
+                type_context = GenericContext()
+                for param, arg_type in zip(generic_func.generic_params, expr.generic_args):
+                    param_name = param if isinstance(param, str) else param.name
+                    type_context.bind(param_name, arg_type)
+
+                # Substitute types in function signature
+                substituted_ptypes = [self.substitute_type(pt, type_context) for pt in ptypes]
+                substituted_ret = self.substitute_type(ret, type_context)
+
+                # Type-check arguments with substituted types
+                min_args = len(substituted_ptypes)
+                if len(expr.args) < min_args:
+                    raise TypeError(f"Function {expr.name} expects at least {min_args} args, got {len(expr.args)}")
+                for i, (pt, arg) in enumerate(zip(substituted_ptypes, expr.args)):
+                    at = self.typeof(arg, type_hint=pt)
+                    if not self.types_equal(pt, at):
+                        raise TypeError(f"Arg {i} to {expr.name}: expected {pt}, got {at}")
+
+                # Record monomorphization for codegen
+                type_bindings = {}
+                for param, arg_type in zip(generic_func.generic_params, expr.generic_args):
+                    param_name = param if isinstance(param, str) else param.name
+                    type_bindings[param_name] = arg_type
+                mono = Monomorphization(expr.name, type_bindings)
+                self.monomorphizations.add(mono)
+
+                return substituted_ret
             else:
-                ptypes, ret = sig
-                is_variadic = False
-            min_args = len(ptypes)
-            if len(expr.args) < min_args:
-                raise TypeError(f"Function {expr.name} expects at least {min_args} args, got {len(expr.args)}")
-            for i, (pt, arg) in enumerate(zip(ptypes, expr.args)):
-                at = self.typeof(arg)
-                if not self.types_equal(pt, at):
-                    raise TypeError(f"Arg {i} to {expr.name}: expected {pt}, got {at}")
-            return ret
+                # Non-generic function call
+                if expr.name in self.functions:
+                    sig = self.functions[expr.name]
+                elif expr.name in self.visible_symbols:
+                    symbol = self.visible_symbols[expr.name]
+                    sig = symbol.type_info
+                else:
+                    raise TypeError(f"Undefined function: {expr.name}")
+
+                if len(sig) == 3:
+                    ptypes, ret, is_variadic = sig
+                else:
+                    ptypes, ret = sig
+                    is_variadic = False
+                min_args = len(ptypes)
+                if len(expr.args) < min_args:
+                    raise TypeError(f"Function {expr.name} expects at least {min_args} args, got {len(expr.args)}")
+                for i, (pt, arg) in enumerate(zip(ptypes, expr.args)):
+                    at = self.typeof(arg, type_hint=pt)
+                    if not self.types_equal(pt, at):
+                        raise TypeError(f"Arg {i} to {expr.name}: expected {pt}, got {at}")
+                return ret
         elif isinstance(expr, DerefExpr):
             t = self.typeof(expr.operand)
             if not t.is_pointer and t.name != "string":
