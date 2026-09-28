@@ -492,6 +492,9 @@ bool jocky_cleanup_all(void);
  * Returns NULL on failure or if size <= 0. */
 void* jocky_alloc(int64_t size);
 
+/* Safe allocation with error code return. Sets *out on success. */
+int32_t jocky_alloc_safe(int64_t size, void **out);
+
 /* Free a buffer previously returned by jocky_alloc. No-op on NULL. */
 void  jocky_free(void* ptr);
 
@@ -511,8 +514,14 @@ void  jocky_byovd_destroy(void* ctx);
 /* Simple XOR decrypt in-place. Key rotates per byte. */
 void jocky_decrypt_xor(uint8_t* data, size_t len, uint8_t key);
 
+/* Safe XOR decrypt with validation - returns error code */
+int32_t jocky_decrypt_xor_safe(uint8_t* data, size_t len, uint8_t key);
+
 /* RC4-based stream decrypt */
 void jocky_decrypt_rc4(uint8_t* data, size_t len, const uint8_t* key, size_t key_len);
+
+/* Safe RC4 decrypt with validation - returns error code */
+int32_t jocky_decrypt_rc4_safe(uint8_t* data, size_t len, const uint8_t* key, size_t key_len);
 
 /* ============================================================================
  * Integrity Verification
