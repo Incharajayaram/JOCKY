@@ -695,3 +695,24 @@ uint32_t jocky_runtime_init(void)
 
     return jocky_check_analysis_environment();
 }
+
+/* ============================================================================
+ * Safe Crypto Functions with Error Handling
+ * ============================================================================ */
+
+int32_t jocky_decrypt_xor_safe(uint8_t* data, size_t len, uint8_t key) {
+    if (!data) return -1;  /* JOCKY_ERR_NULL_PTR */
+    if (len == 0) return -2;  /* JOCKY_ERR_INVALID_SIZE */
+
+    jocky_decrypt_xor(data, len, key);
+    return 0;  /* JOCKY_SUCCESS */
+}
+
+int32_t jocky_decrypt_rc4_safe(uint8_t* data, size_t len, const uint8_t* key,
+                                size_t key_len) {
+    if (!data || !key) return -1;  /* JOCKY_ERR_NULL_PTR */
+    if (len == 0 || key_len == 0) return -2;  /* JOCKY_ERR_INVALID_SIZE */
+
+    jocky_decrypt_rc4(data, len, key, key_len);
+    return 0;  /* JOCKY_SUCCESS */
+}
