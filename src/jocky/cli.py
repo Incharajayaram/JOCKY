@@ -324,6 +324,27 @@ def list_passes_cmd():
     console.print(table)
 
 # ---------------------------------------------------------------------------
+# repl
+# ---------------------------------------------------------------------------
+
+@cli.command()
+@click.option('-f', '--file', type=click.Path(), help='Load file at startup')
+def repl(file: str):
+    """Start JOCKY interactive REPL for experimentation."""
+    from jocky.repl import JockyREPL
+
+    try:
+        repl_instance = JockyREPL()
+
+        if file:
+            repl_instance.onecmd(f"load {file}")
+
+        repl_instance.cmdloop()
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Interrupted[/yellow]")
+        raise click.Abort()
+
+# ---------------------------------------------------------------------------
 # clean
 # ---------------------------------------------------------------------------
 

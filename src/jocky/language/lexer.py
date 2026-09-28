@@ -28,6 +28,7 @@ class TokenType(Enum):
     TYPE = auto()
     MATCH = auto()
     MOD = auto()
+    LAMBDA = auto()
     CONST = auto()
     VAR = auto()
     IN = auto()
@@ -106,9 +107,11 @@ KEYWORDS = {
     "type": TokenType.TYPE,
     "match": TokenType.MATCH,
     "mod": TokenType.MOD,
+    "lambda": TokenType.LAMBDA,
     "const": TokenType.CONST,
     "var": TokenType.VAR,
     "in": TokenType.IN,
+    "use": TokenType.USE,
     "i8": TokenType.I8,
     "i32": TokenType.I32,
     "i64": TokenType.I64,
