@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     config.operator_role = ROLE_ANALYST;
     config.enable_sandbox = true;
     config.enable_siem = true;
-    config.siem_endpoint = "http://httpbin.org/post";
+    config.siem_endpoint = "https://httpbin.org/post";
     
     forensic_engine_t* engine = forensic_engine_create(&config);
     if (!engine) {
