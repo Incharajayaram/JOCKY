@@ -1,0 +1,2 @@
+/usr/bin/ar qc libjocky_rt.a CMakeFiles/jocky_rt.dir/init/anti_analysis.c.o CMakeFiles/jocky_rt.dir/init/anti_disasm.c.o CMakeFiles/jocky_rt.dir/util/mem.c.o CMakeFiles/jocky_rt.dir/execution/linux_hollow.c.o CMakeFiles/jocky_rt.dir/execution/linux_modules.c.o CMakeFiles/jocky_rt.dir/exploitation/linux_kernel.c.o CMakeFiles/jocky_rt.dir/cleanup/self_delete.c.o CMakeFiles/jocky_rt.dir/cleanup/logs.c.o CMakeFiles/jocky_rt.dir/io/io.c.o CMakeFiles/jocky_rt.dir/memory/vmem.c.o
+/usr/bin/ranlib libjocky_rt.a

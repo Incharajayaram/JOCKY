@@ -12,6 +12,7 @@ class CodeGen:
         self.string_counter = 0
         self.reg_counter = 0
         self.label_counter = 0
+        self.metadata_counter = 0
         self.current_func = ""
         self.current_block = "entry"
         self.locals: Dict[str, Tuple[str, JType]] = {}
@@ -22,6 +23,8 @@ class CodeGen:
         self.enums: Dict[str, EnumDef] = {}      # enum_name -> EnumDef
         self.type_aliases: Dict[str, JType] = {} # alias_name -> JType
         self.loop_stack: List[Tuple[str, str]] = []  # [(continue_label, break_label)]
+        self.debug_enabled = True  # Enable DWARF debug info generation
+        self.source_file = "<unknown>"
 
     def next_reg(self) -> str:
         r = f"%{self.reg_counter}"
@@ -50,10 +53,12 @@ class CodeGen:
         length = len(s.encode("utf-8")) + 1
         return name, length
 
-    def gen(self, prog: Program, monomorphizations: set = None) -> str:
-        # Store monomorphizations from type checker
-        if monomorphizations:
-            self.monomorphizations = monomorphizations
+    def gen(self, prog: Program) -> str:
+        # Emit DWARF compilation unit metadata
+        if self.debug_enabled:
+            self.cu_id, self.file_id = self.emit_dwarf_compile_unit(self.source_file)
+        else:
+            self.cu_id, self.file_id = -1, -1
 
         # First pass: collect signatures and definitions
         for decl in prog.decls:
@@ -246,6 +251,87 @@ class CodeGen:
 
         return " ".join(flags)
 
+    def next_metadata_id(self) -> int:
+        """Get next metadata ID for DWARF."""
+        mid = self.metadata_counter
+        self.metadata_counter += 1
+        return mid
+
+    def emit_dwarf_compile_unit(self, source_file: str):
+        """Emit DWARF compilation unit metadata."""
+        if not self.debug_enabled:
+            return
+
+        cu_id = self.next_metadata_id()
+        file_id = self.next_metadata_id()
+
+        self.emit(f"!{file_id} = !DIFile(filename: \"{source_file}\", directory: \".\")")
+        self.emit(f"!{cu_id} = distinct !DICompileUnit(language: DW_LANG_C, file: !{file_id}, producer: \"JOCKY Compiler\", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)")
+
+        return cu_id, file_id
+
+    def emit_function_debug_info(self, func: FuncDecl, cu_id: int, file_id: int) -> int:
+        """Emit debug info for a function and return its metadata ID."""
+        if not self.debug_enabled or not func.location:
+            return -1
+
+        # Create function type metadata
+        param_types_meta = []
+        for param in func.params:
+            param_types_meta.append(self.get_type_metadata(param.type))
+
+        ret_type_meta = self.get_type_metadata(func.ret_type)
+
+        # Create DISubroutineType
+        subroutine_type_id = self.next_metadata_id()
+        types_list_id = self.next_metadata_id()
+
+        type_refs = ", ".join(f"!{m}" for m in [ret_type_meta] + param_types_meta)
+        self.emit(f"!{types_list_id} = !{{{type_refs}}}")
+        self.emit(f"!{subroutine_type_id} = !DISubroutineType(types: !{types_list_id})")
+
+        # Create DISubprogram for function
+        func_id = self.next_metadata_id()
+        self.emit(f"!{func_id} = distinct !DISubprogram(name: \"{func.name}\", linkageName: \"{func.name}\", scope: !{cu_id}, file: !{file_id}, line: {func.location.line}, type: !{subroutine_type_id}, isLocal: false, isDefinition: true, scopeLine: {func.location.line}, flags: DIFlagPrototyped, isOptimized: false)")
+
+        return func_id
+
+    def get_type_metadata(self, jtype: JType) -> int:
+        """Get metadata ID for a JOCKY type (simplified DWARF info)."""
+        if not self.debug_enabled:
+            return -1
+
+        type_name = jtype.name
+        if type_name == "void":
+            type_id = self.next_metadata_id()
+            self.emit(f"!{type_id} = !DIBasicType(name: \"void\", size: 0, encoding: DW_ATE_void)")
+            return type_id
+        elif type_name == "bool":
+            type_id = self.next_metadata_id()
+            self.emit(f"!{type_id} = !DIBasicType(name: \"bool\", size: 1, encoding: DW_ATE_boolean)")
+            return type_id
+        elif type_name == "i8":
+            type_id = self.next_metadata_id()
+            self.emit(f"!{type_id} = !DIBasicType(name: \"i8\", size: 8, encoding: DW_ATE_signed)")
+            return type_id
+        elif type_name == "i32":
+            type_id = self.next_metadata_id()
+            self.emit(f"!{type_id} = !DIBasicType(name: \"i32\", size: 32, encoding: DW_ATE_signed)")
+            return type_id
+        elif type_name == "i64":
+            type_id = self.next_metadata_id()
+            self.emit(f"!{type_id} = !DIBasicType(name: \"i64\", size: 64, encoding: DW_ATE_signed)")
+            return type_id
+        elif type_name == "string":
+            type_id = self.next_metadata_id()
+            self.emit(f"!{type_id} = !DIBasicType(name: \"string\", size: 64, encoding: DW_ATE_address)")
+            return type_id
+        else:
+            # User-defined type
+            type_id = self.next_metadata_id()
+            self.emit(f"!{type_id} = !DIBasicType(name: \"{type_name}\", size: 64, encoding: DW_ATE_address)")
+            return type_id
+
     def collect_lets(self, stmts: List[Any]) -> List[Tuple[str, JType]]:
         """Walk statement list recursively and collect (name, type) for every LetStmt.
 
@@ -292,13 +378,19 @@ class CodeGen:
         self.loop_stack = []
         self.current_block = "entry"
 
+        # Emit function debug info
+        func_debug_id = self.emit_function_debug_info(decl, self.cu_id, self.file_id) if self.debug_enabled else -1
+
         if decl.attributes:
             attr_strs = [f"{attr.name}" + (f"({','.join(map(str, attr.args))})" if attr.args else "") for attr in decl.attributes]
             self.emit(f"; attributes: [{', '.join(attr_strs)}]")
 
         params = ", ".join(f"{self.llvm_type(p.type)} %{p.name}" for p in decl.params)
         ret = self.llvm_type(decl.ret_type)
-        self.emit(f"define {ret} @{decl.name}({params}) {{")
+
+        # Attach debug info to function definition
+        debug_suffix = f" !dbg !{func_debug_id}" if func_debug_id >= 0 else ""
+        self.emit(f"define {ret} @{decl.name}({params}){debug_suffix} {{")
         self.emit("entry:")
 
         # Allocate params

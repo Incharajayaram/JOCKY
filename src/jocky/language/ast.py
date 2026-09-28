@@ -1,6 +1,22 @@
 from dataclasses import dataclass
 from typing import Optional, Any, List
 
+# --- Source Location ---
+
+@dataclass
+class SourceLocation:
+    """Track source file location for debugging."""
+    filename: str
+    line: int
+    column: int
+    end_line: Optional[int] = None
+    end_column: Optional[int] = None
+
+    def __str__(self):
+        if self.end_line:
+            return f"{self.filename}:{self.line}:{self.column}-{self.end_line}:{self.end_column}"
+        return f"{self.filename}:{self.line}:{self.column}"
+
 # --- Types ---
 
 @dataclass
@@ -120,6 +136,7 @@ class FuncDecl:
     attributes: List[Attribute] = None  # #[inline], #[no_mangle], etc.
     type_params: Optional[List[str]] = None  # Generic type parameters: ['T', 'U']
     is_generic: bool = False  # True if this function has type parameters
+    location: Optional["SourceLocation"] = None  # Source code location for debugging
 
     def __post_init__(self):
         if self.attributes is None:
@@ -190,6 +207,7 @@ class LetStmt:
     name: str
     type: Optional[JType]
     init: Any
+    location: Optional["SourceLocation"] = None  # Source code location for debugging
 
 @dataclass
 class ConstDecl:
@@ -207,12 +225,14 @@ class VarDecl:
 class AssignStmt:
     target: Any
     value: Any
+    location: Optional["SourceLocation"] = None  # Source code location for debugging
 
 @dataclass
 class IfStmt:
     cond: Any
     then_block: Block
     else_block: Optional[Block]
+    location: Optional["SourceLocation"] = None  # Source code location for debugging
 
 @dataclass
 class WhileStmt:
