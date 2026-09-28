@@ -103,6 +103,7 @@ class CachingCompiler:
             codegen.structs = checker.structs
             codegen.enums = checker.enums
             codegen.functions = checker.functions
+            codegen.monomorphic_instances = checker.monomorphic_instances
             return codegen.gen(ast), False
 
         # Try to load from cache
@@ -115,6 +116,7 @@ class CachingCompiler:
         codegen.structs = checker.structs
         codegen.enums = checker.enums
         codegen.functions = checker.functions
+        codegen.monomorphic_instances = checker.monomorphic_instances
         ir = codegen.gen(ast)
 
         # Save to cache
