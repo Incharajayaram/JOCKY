@@ -1,0 +1,87 @@
+{
+  "Function Definition": {
+    "prefix": "fn",
+    "body": "fn ${1:name}(${2:}) -> ${3:void} {\n\t${0}\n}",
+    "description": "Define a new function"
+  },
+  "Main Function": {
+    "prefix": "main",
+    "body": "fn main() -> void {\n\t${0}\n}",
+    "description": "Define the main entry point"
+  },
+  "Struct Definition": {
+    "prefix": "struct",
+    "body": "struct ${1:Name} {\n\t${2:field}: ${3:i32},\n};",
+    "description": "Define a new struct"
+  },
+  "Enum Definition": {
+    "prefix": "enum",
+    "body": "enum ${1:Name} {\n\t${2:Variant1} = 0,\n\t${3:Variant2} = 1,\n};",
+    "description": "Define a new enum"
+  },
+  "If Expression": {
+    "prefix": "if",
+    "body": "if ${1:condition} {\n\t${2:}\n} else {\n\t${3:}\n}",
+    "description": "If-else conditional"
+  },
+  "While Loop": {
+    "prefix": "while",
+    "body": "while ${1:condition} {\n\t${0}\n}",
+    "description": "While loop"
+  },
+  "For Loop": {
+    "prefix": "for",
+    "body": "for ${1:i} = ${2:0}; ${1:i} < ${3:10}; ${1:i} = ${1:i} + 1 {\n\t${0}\n}",
+    "description": "For loop"
+  },
+  "Match Expression": {
+    "prefix": "match",
+    "body": "match ${1:expr} {\n\t${2:pattern} => ${3:},\n}",
+    "description": "Pattern matching expression"
+  },
+  "Let Binding": {
+    "prefix": "let",
+    "body": "let ${1:name}: ${2:i32} = ${3:0};",
+    "description": "Variable binding with type annotation"
+  },
+  "Return Statement": {
+    "prefix": "ret",
+    "body": "return ${1:};",
+    "description": "Return from function"
+  },
+  "FFI Declaration": {
+    "prefix": "ffi",
+    "body": "ffi fn ${1:external_name}(${2:}) -> ${3:void};",
+    "description": "Foreign function interface declaration"
+  },
+  "Type Alias": {
+    "prefix": "type",
+    "body": "type ${1:Name} = ${2:i32};",
+    "description": "Define a type alias"
+  },
+  "Lambda": {
+    "prefix": "lambda",
+    "body": "lambda ${1:} -> ${2:i32} { ${3:} }",
+    "description": "Anonymous function"
+  },
+  "Array Literal": {
+    "prefix": "arr",
+    "body": "[${1:}, ${2:}, ${3:}]",
+    "description": "Array literal"
+  },
+  "Array with Type": {
+    "prefix": "arr-typed",
+    "body": "let ${1:arr}: ${2:i32}[${3:10}] = [${4:}];",
+    "description": "Typed array declaration"
+  },
+  "Comment Block": {
+    "prefix": "/*",
+    "body": "/*\n * ${1:}\n */",
+    "description": "Block comment"
+  },
+  "Line Comment": {
+    "prefix": "//",
+    "body": "// ${1:}",
+    "description": "Line comment"
+  }
+}
