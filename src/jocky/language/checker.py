@@ -1,10 +1,8 @@
 from .ast import *
 from .errors import TypeError as BaseTypeError, SourceRange
-from typing import Dict, Any, Optional, List, Tuple, Set
-try:
-    from jocky.core.modules import Module, ModuleRegistry, get_registry
-except ImportError:
-    from ..core.modules import Module, ModuleRegistry, get_registry
+from typing import Dict, Any, Optional, List, Tuple
+from jocky.core.modules import Module, ModuleRegistry, get_registry
+from .generics import GenericTypeChecker, Monomorphizer, TypeBindings
 
 class TypeError(BaseTypeError):
     pass
@@ -57,12 +55,15 @@ class Monomorphization:
 class TypeChecker:
     def __init__(self, module_registry: Optional[ModuleRegistry] = None):
         self.functions: Dict[str, (List[JType], JType)] = {}
+        self.generic_functions: Dict[str, FuncDecl] = {}  # generic_func_name -> FuncDecl
+        self.monomorphic_instances: Dict[str, FuncDecl] = {}  # instance_name -> FuncDecl
         self.structs: Dict[str, StructDef] = {}  # struct_name -> StructDef
         self.enums: Dict[str, EnumDef] = {}      # enum_name -> EnumDef
         self.type_aliases: Dict[str, JType] = {} # alias_name -> JType
         self.locals: Dict[str, JType] = {}
         self.current_ret: JType = JType("void")
         self.loop_depth: int = 0
+        self.monomorphizer = Monomorphizer()
 
         self.globals: Dict[str, JType] = {}
 
@@ -98,8 +99,12 @@ class TypeChecker:
             elif isinstance(decl, EnumDef):
                 self.enums[decl.name] = decl
             elif isinstance(decl, FuncDecl):
-                ptypes = [p.type for p in decl.params]
-                self.functions[decl.name] = (ptypes, decl.ret_type, False)
+                if decl.is_generic:
+                    # Store generic function template for later instantiation
+                    self.generic_functions[decl.name] = decl
+                else:
+                    ptypes = [p.type for p in decl.params]
+                    self.functions[decl.name] = (ptypes, decl.ret_type, False)
             elif isinstance(decl, FFIDecl):
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, decl.variadic)
@@ -125,7 +130,9 @@ class TypeChecker:
         # Second pass: check bodies
         for decl in prog.decls:
             if isinstance(decl, FuncDecl):
-                self.check_func(decl)
+                if not decl.is_generic:
+                    # Generic functions are type-checked upon instantiation
+                    self.check_func(decl)
 
     def resolve_type_alias(self, t: JType) -> JType:
         """Resolve type alias recursively."""
@@ -233,6 +240,25 @@ class TypeChecker:
         ptypes = [p.type for p in decl.params]
         self.functions[decl.name] = (ptypes, decl.ret_type, False)
 
+    def instantiate_and_check_generic(self, generic_func: FuncDecl, arg_types: List[JType]) -> str:
+        """
+        Instantiate a generic function with concrete type arguments.
+        Returns the monomorphic instance name.
+        """
+        # Infer type bindings from arguments
+        bindings = GenericTypeChecker.infer_type_bindings(generic_func, arg_types)
+
+        # Instantiate the function
+        instance = self.monomorphizer.instantiate(generic_func, bindings)
+
+        # Type-check the instance
+        self.check_func(instance)
+
+        # Register the instance
+        self.monomorphic_instances[instance.name] = instance
+
+        return instance.name
+
     def check_block(self, block: Block):
         for stmt in block.stmts:
             self.check_stmt(stmt)
@@ -297,6 +323,9 @@ class TypeChecker:
         elif isinstance(stmt, ContinueStmt):
             if self.loop_depth == 0:
                 raise TypeError("'continue' outside loop")
+        else:
+            # Handle bare expressions (implicit returns)
+            self.typeof(stmt)
 
     def typeof(self, expr: Any, type_hint: Optional[JType] = None) -> JType:
         if isinstance(expr, IntLiteral):
@@ -380,6 +409,48 @@ class TypeChecker:
                 if not isinstance(arg, VarRef):
                     raise TypeError("nameof requires a variable or type name")
                 return JType("string")
+
+            # Check for generic function - infer types and instantiate
+            if expr.name in self.generic_functions:
+                generic_func = self.generic_functions[expr.name]
+                # Get argument types
+                arg_types = [self.typeof(arg) for arg in expr.args]
+                # Instantiate and check the generic function
+                instance_name = self.instantiate_and_check_generic(generic_func, arg_types)
+                # Look up the instantiated function's signature
+                sig = self.functions.get(instance_name)
+                if sig is None:
+                    raise TypeError(f"Failed to instantiate generic function {expr.name}")
+                if len(sig) == 3:
+                    ptypes, ret, is_variadic = sig
+                else:
+                    ptypes, ret = sig
+                    is_variadic = False
+                return ret
+
+            # Check if calling through a local variable holding a function pointer
+            if expr.name in self.locals:
+                var_type = self.locals[expr.name]
+                if var_type.name == "fn":
+                    # Indirect call through function pointer
+                    if hasattr(var_type, 'param_types'):
+                        ptypes = var_type.param_types
+                    else:
+                        raise TypeError(f"Cannot determine parameter types for function pointer {expr.name}")
+
+                    if hasattr(var_type, 'return_type'):
+                        ret = var_type.return_type
+                    else:
+                        ret = JType("void")
+
+                    # Check argument count and types
+                    if len(expr.args) != len(ptypes):
+                        raise TypeError(f"Function call through {expr.name}: expected {len(ptypes)} args, got {len(expr.args)}")
+                    for i, (pt, arg) in enumerate(zip(ptypes, expr.args)):
+                        at = self.typeof(arg)
+                        if not self.types_equal(pt, at):
+                            raise TypeError(f"Arg {i} to indirect call through {expr.name}: expected {pt}, got {at}")
+                    return ret
 
             # Check in functions, then visible imports
             if expr.name in self.functions:
