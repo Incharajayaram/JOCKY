@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <zlib.h>
+#include <sqlite3.h>
 
 /* ============================================================================
  * Compression Helpers (zlib)
@@ -69,10 +70,123 @@ static int decompress_file(const char* input_path, const char* output_path) {
     gzclose(in);
     return 0;
 }
+/* ============================================================================
+ * SQLite Helpers
+ * ============================================================================ */
+
+static int sqlite_init_store(forensic_evidence_store_t* store) {
+    char db_path[1024];
+    snprintf(db_path, sizeof(db_path), "%s/index.db", store->base_path);
+    
+    int rc = sqlite3_open(db_path, (sqlite3**)&store->sqlite_db);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "[evidence_store] Failed to open SQLite database: %s\n", sqlite3_errmsg((sqlite3*)store->sqlite_db));
+        return -1;
+    }
+    
+    // Create tables
+    const char* schema = 
+        "CREATE TABLE IF NOT EXISTS evidence ("
+        "  evidence_id TEXT PRIMARY KEY,"
+        "  artifact_type TEXT NOT NULL,"
+        "  source_plugin TEXT NOT NULL,"
+        "  timestamp TEXT NOT NULL,"
+        "  raw_path TEXT NOT NULL,"
+        "  parsed_path TEXT,"
+        "  provenance_path TEXT,"
+        "  raw_size INTEGER NOT NULL,"
+        "  parsed_size INTEGER DEFAULT 0,"
+        "  hash TEXT,"
+        "  compressed INTEGER DEFAULT 0,"
+        "  compressed_at INTEGER DEFAULT 0"
+        ");"
+        "CREATE INDEX IF NOT EXISTS idx_evidence_type ON evidence(artifact_type);"
+        "CREATE INDEX IF NOT EXISTS idx_evidence_source ON evidence(source_plugin);"
+        "CREATE INDEX IF NOT EXISTS idx_evidence_timestamp ON evidence(timestamp);"
+        "CREATE INDEX IF NOT EXISTS idx_evidence_hash ON evidence(hash);"
+        "CREATE TABLE IF NOT EXISTS iocs ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  evidence_id TEXT NOT NULL,"
+        "  type TEXT NOT NULL,"
+        "  value TEXT NOT NULL,"
+        "  source TEXT,"
+        "  confidence REAL DEFAULT 0.0,"
+        "  FOREIGN KEY(evidence_id) REFERENCES evidence(evidence_id)"
+        ");"
+        "CREATE INDEX IF NOT EXISTS idx_iocs_type ON iocs(type);"
+        "CREATE INDEX IF NOT EXISTS idx_iocs_value ON iocs(value);"
+        "CREATE INDEX IF NOT EXISTS idx_iocs_evidence ON iocs(evidence_id);";
+    
+    char* err_msg = NULL;
+    rc = sqlite3_exec((sqlite3*)store->sqlite_db, schema, NULL, NULL, &err_msg);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "[evidence_store] Failed to create schema: %s\n", err_msg ? err_msg : "unknown");
+        sqlite3_free(err_msg);
+        return -1;
+    }
+    
+    return 0;
+}
+
+static void sqlite_close_store(forensic_evidence_store_t* store) {
+    if (store->sqlite_db) {
+        sqlite3_close((sqlite3*)store->sqlite_db);
+        store->sqlite_db = NULL;
+    }
+}
 
 /* ============================================================================
- * Helper Functions
+ * SQLite Query Helpers
  * ============================================================================ */
+
+static int sqlite_callback(void* data, int argc, char** argv, char** col_names) {
+    forensic_query_result_t* result = (forensic_query_result_t*)data;
+    
+    if (result->count >= result->total) {
+        // Resize
+        result->total = result->total ? result->total * 2 : 16;
+        result->items = realloc(result->items, result->total * sizeof(forensic_evidence_metadata_t));
+    }
+    
+    forensic_evidence_metadata_t* meta = &result->items[result->count++];
+    for (int i = 0; i < argc; i++) {
+        const char* col = col_names[i];
+        const char* val = argv[i] ? argv[i] : "";
+        
+        if (strcmp(col, "evidence_id") == 0) {
+            strncpy(meta->evidence_id, val, sizeof(meta->evidence_id) - 1);
+        } else if (strcmp(col, "artifact_type") == 0) {
+            strncpy(meta->artifact_type, val, sizeof(meta->artifact_type) - 1);
+        } else if (strcmp(col, "source_plugin") == 0) {
+            strncpy(meta->source_plugin, val, sizeof(meta->source_plugin) - 1);
+        } else if (strcmp(col, "timestamp") == 0) {
+            strncpy(meta->timestamp, val, sizeof(meta->timestamp) - 1);
+        } else if (strcmp(col, "raw_path") == 0) {
+            strncpy(meta->raw_path, val, sizeof(meta->raw_path) - 1);
+        } else if (strcmp(col, "parsed_path") == 0) {
+            strncpy(meta->parsed_path, val, sizeof(meta->parsed_path) - 1);
+        } else if (strcmp(col, "provenance_path") == 0) {
+            strncpy(meta->provenance_path, val, sizeof(meta->provenance_path) - 1);
+        } else if (strcmp(col, "raw_size") == 0) {
+            meta->raw_size = (size_t)atoll(val);
+        } else if (strcmp(col, "parsed_size") == 0) {
+            meta->parsed_size = (size_t)atoll(val);
+        } else if (strcmp(col, "hash") == 0) {
+            strncpy(meta->hash, val, sizeof(meta->hash) - 1);
+        } else if (strcmp(col, "compressed") == 0) {
+            meta->compressed = atoi(val);
+        } else if (strcmp(col, "compressed_at") == 0) {
+            meta->compressed_at = (time_t)atoll(val);
+        }
+    }
+    
+    return 0;
+}
+
+/* ============================================================================
+ * Evidence Store
+ * ============================================================================
+ */
 
 static int create_dir(const char* path) {
     struct stat st = {0};
@@ -349,6 +463,12 @@ forensic_evidence_store_t* forensic_evidence_store_open(const char* base_path) {
         return NULL;
     }
     
+    // Initialize SQLite
+    if (sqlite_init_store(store) != 0) {
+        forensic_evidence_store_close(store);
+        return NULL;
+    }
+    
     // Load existing index
     snprintf(path, sizeof(path), "%s/index.json", base_path);
     FILE* f = fopen(path, "r");
@@ -375,6 +495,7 @@ void forensic_evidence_store_close(forensic_evidence_store_t* store) {
     }
     
     forensic_evidence_store_save_index(store);
+    sqlite_close_store(store);
     free(store->index);
     free(store);
 }
@@ -552,4 +673,132 @@ int forensic_evidence_store_save_index(const forensic_evidence_store_t* store) {
     fprintf(f, "}\n");
     fclose(f);
     return 0;
+}
+
+/* ============================================================================
+ * SQLite Query API
+ * ============================================================================ */
+
+static void build_where_clause(const forensic_query_params_t* params, char* where, size_t where_size, char** bind_values, int* bind_count) {
+    where[0] = '\0';
+    *bind_count = 0;
+    bool first = true;
+    
+    #define ADD_CONDITION(cond, val) \
+        do { \
+            if (val && val[0]) { \
+                if (!first) strncat(where, " AND ", where_size - strlen(where) - 1); \
+                first = false; \
+                strncat(where, cond, where_size - strlen(where) - 1); \
+                bind_values[(*bind_count)++] = (char*)val; \
+            } \
+        } while (0)
+    
+    ADD_CONDITION("artifact_type = ?", params->artifact_type);
+    ADD_CONDITION("source_plugin = ?", params->source_plugin);
+    ADD_CONDITION("timestamp >= ?", params->timestamp_from);
+    ADD_CONDITION("timestamp <= ?", params->timestamp_to);
+    ADD_CONDITION("hash = ?", params->hash);
+    
+    #undef ADD_CONDITION
+}
+
+int forensic_evidence_store_query(const forensic_evidence_store_t* store,
+                                   const forensic_query_params_t* params,
+                                   forensic_query_result_t* result) {
+    if (!store || !params || !result || !store->sqlite_db) return -1;
+    
+    result->items = NULL;
+    result->count = 0;
+    result->total = 0;
+    
+    sqlite3* db = (sqlite3*)store->sqlite_db;
+    sqlite3_stmt* stmt = NULL;
+    
+    // Build WHERE clause
+    char where[1024];
+    char* bind_values[16];
+    int bind_count = 0;
+    build_where_clause(params, where, sizeof(where), bind_values, &bind_count);
+    
+    // Build query
+    char query[2048];
+    if (params->ioc_type || params->ioc_value) {
+        // Query with IOC join
+        char ioc_where[512] = "";
+        if (params->ioc_type) {
+            strncat(ioc_where, "type = ?", sizeof(ioc_where) - 1);
+        }
+        if (params->ioc_value) {
+            if (ioc_where[0]) strncat(ioc_where, " AND ", sizeof(ioc_where) - strlen(ioc_where) - 1);
+            strncat(ioc_where, "value = ?", sizeof(ioc_where) - strlen(ioc_where) - 1);
+        }
+        
+        snprintf(query, sizeof(query),
+            "SELECT e.evidence_id, e.artifact_type, e.source_plugin, e.timestamp, "
+            "       e.raw_path, e.parsed_path, e.provenance_path, e.raw_size, "
+            "       e.parsed_size, e.hash, e.compressed, e.compressed_at "
+            "FROM evidence e "
+            "LEFT JOIN iocs i ON e.evidence_id = i.evidence_id "
+            "WHERE (1=1) %s %s "
+            "GROUP BY e.evidence_id "
+            "ORDER BY e.timestamp DESC "
+            "LIMIT %zu OFFSET %zu",
+            where[0] ? " AND " : "", where,
+            params->limit ? params->limit : 1000,
+            params->offset ? params->offset : 0);
+        
+        // Add IOC conditions to bind values
+        if (params->ioc_type) bind_values[bind_count++] = (char*)params->ioc_type;
+        if (params->ioc_value) bind_values[bind_count++] = (char*)params->ioc_value;
+    } else {
+        snprintf(query, sizeof(query),
+            "SELECT evidence_id, artifact_type, source_plugin, timestamp, "
+            "       raw_path, parsed_path, provenance_path, raw_size, "
+            "       parsed_size, hash, compressed, compressed_at "
+            "FROM evidence "
+            "WHERE 1=1 %s "
+            "ORDER BY timestamp DESC "
+            "LIMIT %zu OFFSET %zu",
+            where,
+            params->limit ? params->limit : 1000,
+            params->offset ? params->offset : 0);
+    }
+    
+    int rc = sqlite3_prepare_v2((sqlite3*)store->sqlite_db, query, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "[evidence_store] Failed to prepare query: %s\n", sqlite3_errmsg((sqlite3*)store->sqlite_db));
+        return -1;
+    }
+    
+    // Bind parameters
+    for (int i = 0; i < bind_count; i++) {
+        sqlite3_bind_text(stmt, i + 1, bind_values[i], -1, SQLITE_TRANSIENT);
+    }
+    
+    forensic_query_result_t result_data = {0};
+    char* err_msg = NULL;
+    int rc_exec = sqlite3_exec((sqlite3*)store->sqlite_db, query, sqlite_callback, &result_data, &err_msg);
+    
+    if (rc_exec != SQLITE_OK) {
+        fprintf(stderr, "[evidence_store] Query failed: %s\n", err_msg ? err_msg : "unknown");
+        sqlite3_free(err_msg);
+        sqlite3_finalize(stmt);
+        return -1;
+    }
+    
+    result->items = result_data.items;
+    result->count = result_data.count;
+    result->total = result_data.count;
+    
+    sqlite3_finalize(stmt);
+    return 0;
+}
+
+void forensic_query_result_free(forensic_query_result_t* result) {
+    if (!result) return;
+    free(result->items);
+    result->items = NULL;
+    result->count = 0;
+    result->total = 0;
 }

@@ -43,16 +43,17 @@ SRCS=(
     "test_forensic_engine.c"
 )
 
-INCLUDES="-Isrc/runtime/forensics"
+INCLUDES="-Isrc/runtime/forensics -Iinclude"
 
 mkdir -p build_forensics
 
 echo "Compiling..."
 gcc -std=c99 -O2 -g \
     $INCLUDES \
+    -Llib \
     "${SRCS[@]}" \
     -o build_forensics/forensic_test \
-    -lpthread -lm -lz -lssl -lcrypto
+    -lpthread -lm -lz -lssl -lcrypto -lsqlite3
 
 if [ $? -eq 0 ]; then
     echo "Build successful: build_forensics/forensic_test"

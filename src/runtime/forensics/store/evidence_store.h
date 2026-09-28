@@ -68,6 +68,7 @@ typedef struct {
     size_t count;
     size_t capacity;
     forensic_retention_policy_t retention_policy;
+    void* sqlite_db;              // SQLite database handle
 } forensic_evidence_store_t;
 
 /* ============================================================================
@@ -90,6 +91,34 @@ int forensic_evidence_store_list(const forensic_evidence_store_t* store,
                                   size_t* count);
 
 int forensic_evidence_store_save_index(const forensic_evidence_store_t* store);
+
+/* ============================================================================
+ * SQLite Query API
+ * ============================================================================ */
+
+typedef struct {
+    const char* artifact_type;      // Filter by artifact type (e.g., "process", "file", "pe_file")
+    const char* source_plugin;      // Filter by source plugin (e.g., "process_collector")
+    const char* timestamp_from;     // Filter by timestamp >= (ISO 8601)
+    const char* timestamp_to;       // Filter by timestamp <= (ISO 8601)
+    const char* hash;               // Filter by hash
+    const char* ioc_type;           // Filter by IOC type
+    const char* ioc_value;          // Filter by IOC value
+    size_t limit;                   // Max results (0 = no limit)
+    size_t offset;                  // Pagination offset
+} forensic_query_params_t;
+
+typedef struct {
+    forensic_evidence_metadata_t* items;
+    size_t count;
+    size_t total;
+} forensic_query_result_t;
+
+int forensic_evidence_store_query(const forensic_evidence_store_t* store,
+                                   const forensic_query_params_t* params,
+                                   forensic_query_result_t* result);
+
+void forensic_query_result_free(forensic_query_result_t* result);
 
 /* ============================================================================
  * Retention & Compression API
