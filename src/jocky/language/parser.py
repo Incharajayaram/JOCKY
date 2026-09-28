@@ -15,6 +15,7 @@ from .ast import (
     ClosureExpr, CaptureVar,
     Attribute,
     JType,
+    SourceLocation,
 )
 from .errors import ParseError as BaseParseError, SourceRange
 from typing import Optional, Any, List
@@ -23,9 +24,10 @@ class ParseError(BaseParseError):
     pass
 
 class Parser:
-    def __init__(self, tokens: List[Token]):
+    def __init__(self, tokens: List[Token], source_file: str = "<unknown>"):
         self.tokens = tokens
         self.pos = 0
+        self.source_file = source_file
 
     def peek(self) -> Token:
         if self.pos < len(self.tokens):
@@ -49,6 +51,18 @@ class Parser:
 
     def match(self, *types: TokenType) -> bool:
         return self.peek().type in types
+
+    def make_location(self, start_tok: Token, end_tok: Optional[Token] = None) -> SourceLocation:
+        """Create a SourceLocation from token(s)."""
+        if end_tok is None:
+            end_tok = start_tok
+        return SourceLocation(
+            filename=self.source_file,
+            line=start_tok.line,
+            column=start_tok.column,
+            end_line=end_tok.line,
+            end_column=end_tok.column
+        )
 
     def parse_type(self, allow_type_vars: bool = False) -> JType:
         tok = self.peek()
@@ -178,6 +192,7 @@ class Parser:
             raise ParseError(f"Unexpected token {tok.type.name}; expected fn, ffi, struct, enum, type, mod, use, const, or var", source_range)
 
     def parse_func_decl_with_attributes(self, attributes: List[Attribute]) -> FuncDecl:
+        start_tok = self.peek()
         self.expect(TokenType.FN)
         name = self.expect(TokenType.IDENT).value
 
@@ -200,7 +215,9 @@ class Parser:
             self.advance()
             ret_type = self.parse_type(allow_type_vars=len(type_params) > 0)
         body = self.parse_block()
-        return FuncDecl(name, params, ret_type, body, attributes, type_params=type_params if type_params else None)
+
+        location = self.make_location(start_tok)
+        return FuncDecl(name, params, ret_type, body, attributes, type_params=type_params if type_params else None, location=location)
 
     def parse_func_decl(self) -> FuncDecl:
         return self.parse_func_decl_with_attributes([])
@@ -744,6 +761,7 @@ class Parser:
         return VarDecl(name, typ, init)
 
     def parse_let_stmt(self) -> LetStmt:
+        start_tok = self.peek()
         self.expect(TokenType.LET)
         name = self.expect(TokenType.IDENT).value
         typ: Optional[JType] = None
@@ -752,10 +770,13 @@ class Parser:
             typ = self.parse_type()
         self.expect(TokenType.EQ)
         init = self.parse_expr()
-        self.consume_semicolon()
-        return LetStmt(name, typ, init)
+        end_tok = self.peek()
+        self.expect(TokenType.SEMICOLON)
+        location = self.make_location(start_tok, end_tok)
+        return LetStmt(name, typ, init, location=location)
 
     def parse_if_stmt(self) -> IfStmt:
+        start_tok = self.peek()
         self.expect(TokenType.IF)
         cond = self.parse_expr()
         then_block = self.parse_block()
@@ -767,7 +788,8 @@ class Parser:
                 else_block = Block([self.parse_if_stmt()])
             else:
                 else_block = self.parse_block()
-        return IfStmt(cond, then_block, else_block)
+        location = self.make_location(start_tok)
+        return IfStmt(cond, then_block, else_block, location=location)
 
     def parse_while_stmt(self) -> WhileStmt:
         self.expect(TokenType.WHILE)
