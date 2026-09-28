@@ -231,6 +231,7 @@ class UnaryOp:
 class CallExpr:
     name: str
     args: List[Any]
+    generic_args: Optional[List[Any]] = None
 
 @dataclass
 class DerefExpr:
