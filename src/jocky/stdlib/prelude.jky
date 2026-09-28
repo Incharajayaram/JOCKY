@@ -19,7 +19,7 @@ ffi jocky_byovd_new() -> i8*;
 ffi jocky_byovd_destroy(ctx: i8*) -> void;
 
 // ---- Anti-analysis ----
-ffi jocky_runtime_init() -> void;
+ffi jocky_runtime_init() -> i32;
 ffi jocky_check_analysis_environment() -> i32;
 ffi jocky_is_debugger_present() -> bool;
 ffi jocky_is_vm() -> bool;
