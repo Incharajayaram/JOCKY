@@ -28,6 +28,7 @@ SRCS=(
     "src/runtime/forensics/plugins/parsers/dns_parser.c"
     "src/runtime/forensics/plugins/parsers/arp_parser.c"
     "src/runtime/forensics/plugins/parsers/memory_parser.c"
+    "src/runtime/forensics/plugins/parsers/elf_parser.c"
     "src/runtime/forensics/plugins/output/json_output.c"
     "src/runtime/forensics/plugins/output/stix_output.c"
     "src/runtime/forensics/plugins/output/sigma_output.c"

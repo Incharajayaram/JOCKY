@@ -35,6 +35,7 @@ extern forensic_artifact_parser_plugin_t file_parser_plugin;
 extern forensic_artifact_parser_plugin_t dns_parser_plugin;
 extern forensic_artifact_parser_plugin_t arp_parser_plugin;
 extern forensic_artifact_parser_plugin_t memory_parser_plugin;
+extern forensic_artifact_parser_plugin_t elf_parser_plugin;
 
 extern forensic_output_plugin_t json_output_plugin;
 extern forensic_output_plugin_t stix_output_plugin;
@@ -117,6 +118,7 @@ int forensic_engine_register_default_plugins(forensic_engine_t* engine) {
     forensic_plugin_registry_register_parser(engine->registry, &dns_parser_plugin);
     forensic_plugin_registry_register_parser(engine->registry, &arp_parser_plugin);
     forensic_plugin_registry_register_parser(engine->registry, &memory_parser_plugin);
+    forensic_plugin_registry_register_parser(engine->registry, &elf_parser_plugin);
     
     forensic_plugin_registry_register_output(engine->registry, &json_output_plugin);
     forensic_plugin_registry_register_output(engine->registry, &stix_output_plugin);
