@@ -4,26 +4,33 @@
 #include <stdint.h>
 #include <stddef.h>
 
-typedef void* jocky_obfuscation_ctx_t;
+typedef void* jocky_code_patch_t;
+typedef void (*jocky_code_callback_t)(void* context);
 
-#define JOCKY_XOR_OBFUSCATE 1
-#define JOCKY_ROT_OBFUSCATE 2
-#define JOCKY_SHUFFLE_OBFUSCATE 3
+int jocky_enable_code_mutation(void);
 
-int jocky_obfuscate_code(uint8_t* code, int code_size, int method, uint32_t key);
+int jocky_disable_code_mutation(void);
 
-int jocky_deobfuscate_code(uint8_t* code, int code_size, int method, uint32_t key);
+int jocky_patch_code(void* target_addr, const uint8_t* patch_code, int patch_size);
 
-uint32_t jocky_generate_obfuscation_key(void);
+int jocky_restore_code(void* target_addr, int patch_size);
 
-int jocky_polymorphic_mutate(uint8_t* code, int code_size, uint8_t* output, int* output_size);
+int jocky_generate_runtime_stub(const char* function_name, uint8_t* output, int* output_size);
 
-int jocky_inject_junk_code(uint8_t* code, int code_size, uint8_t* output, int* output_size);
+int jocky_hook_function(void* original_func, void* hook_func, jocky_code_patch_t* patch_handle);
 
-int jocky_flatten_control_flow(uint8_t* code, int code_size, uint8_t* output, int* output_size);
+int jocky_unhook_function(jocky_code_patch_t patch_handle);
 
-int jocky_apply_string_obfuscation(uint8_t* data, int data_size, uint32_t key);
+int jocky_allocate_code_buffer(int size, void** buffer_addr);
 
-int jocky_mangle_function_name(const char* original_name, char* mangled_name, int max_len);
+int jocky_free_code_buffer(void* buffer_addr, int size);
+
+int jocky_make_code_executable(void* addr, int size);
+
+int jocky_make_code_writable(void* addr, int size);
+
+int jocky_mutate_based_on_analysis(void);
+
+int jocky_adaptive_obfuscation_step(void);
 
 #endif
