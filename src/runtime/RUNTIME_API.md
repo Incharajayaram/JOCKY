@@ -2066,3 +2066,127 @@ Temporarily disable Windows PatchGuard (Kernel Patch Protection):
 3. Set flag to disable checks
 
 Returns `false` on Windows 11 with HVCI hardened.
+
+---
+
+## 22  Advanced Linux Kernel Operations  *(Linux, requires CAP_SYS_ADMIN / CAP_SYS_PTRACE)*
+
+Comprehensive kernel-level exploitation and system manipulation primitives.
+
+### Syscall Interception & Manipulation
+
+```
+ffi jocky_syscall_hook_init(target_pid: i32) -> i32;
+ffi jocky_syscall_hook_install(target_pid: i32, syscall_num: i64, hook_addr: i64) -> i32;
+ffi jocky_syscall_trace_enable(target_pid: i32) -> i32;
+ffi jocky_syscall_intercept_read_args(target_pid: i32) -> i32;
+ffi jocky_syscall_intercept_modify_args(target_pid: i32, arg_index: i32, new_value: i64) -> i32;
+ffi jocky_syscall_inject_syscall(target_pid: i32, syscall_num: i64, arg1: i64, arg2: i64, arg3: i64) -> i32;
+ffi jocky_syscall_hook_cleanup(target_pid: i32) -> i32;
+```
+
+**ptrace-based syscall interception:**
+- Hook and intercept syscalls on target processes
+- Read syscall arguments from registers (rdi, rsi, rdx, r10, r8, r9)
+- Modify arguments before syscall execution
+- Inject arbitrary syscalls with custom parameters
+- Requires `CAP_SYS_PTRACE`
+
+### Kernel Memory Operations
+
+```
+ffi jocky_kernel_read_memory(pid: i32, kernel_addr: i64, buffer: i8*, size: i64) -> i32;
+ffi jocky_kernel_write_memory(pid: i32, kernel_addr: i64, data: i8*, size: i64) -> i32;
+ffi jocky_kernel_read_task_struct(pid: i32) -> i64;
+ffi jocky_kernel_enumerate_processes() -> i32;
+ffi jocky_kernel_find_function(symbol_name: i8*) -> i64;
+ffi jocky_kernel_enumerate_memory(pid: i32) -> i32;
+ffi jocky_kernel_query_capabilities(pid: i32) -> i32;
+```
+
+**Direct kernel memory access via /proc/[pid]/mem:**
+- Read arbitrary kernel memory
+- Write to kernel data structures
+- Locate task_struct and kernel base
+- Enumerate all system processes
+- Resolve kernel symbols via /proc/kallsyms
+- Query process capabilities for privilege escalation
+- Requires `CAP_SYS_PTRACE` for most operations
+
+### Advanced Process Manipulation
+
+```
+ffi jocky_process_enter_namespace(target_pid: i32) -> i32;
+ffi jocky_process_create_namespace(namespace_type: i32) -> i32;
+ffi jocky_process_inject_cgroup(target_pid: i32, cgroup_path: i8*) -> i32;
+ffi jocky_process_manipulate_credentials(target_pid: i32, new_uid: i32, new_gid: i32) -> i32;
+ffi jocky_process_hide_from_proc(target_pid: i32) -> i32;
+ffi jocky_process_enumerate_threads(target_pid: i32) -> i32;
+ffi jocky_process_read_environment(target_pid: i32, buffer: i8*, buffer_size: i64) -> i32;
+ffi jocky_process_query_limits(target_pid: i32) -> i32;
+ffi jocky_process_modify_signal_handlers(target_pid: i32) -> i32;
+```
+
+**Linux namespace and process isolation manipulation:**
+- Access target process namespace file descriptors (PID, NET, IPC, UTS, USER, MNT)
+- Create new isolated namespaces for process containers
+- Inject processes into unrestricted cgroups
+- Manipulate uid_map/gid_map for privilege mapping
+- Hide processes from /proc (requires kernel module or eBPF)
+- Enumerate threads and read environment variables
+- Query and manipulate resource limits
+- Modify signal handler tables
+- Requires `CAP_SYS_ADMIN` for most operations
+
+### Kernel Module & eBPF Loading
+
+```
+ffi jocky_linux_lkm_load(module_path: i8*) -> i32;
+ffi jocky_linux_ebpf_load(program_path: i8*) -> i32;
+ffi jocky_linux_ftrace_init() -> i32;
+ffi jocky_linux_ftrace_hook(function_name: i8*) -> i32;
+```
+
+**Loadable kernel module and eBPF program injection:**
+- Load compiled kernel modules (.ko files)
+- Load and attach eBPF programs for system tracing
+- Enable ftrace for function-level kernel tracing
+- Hook kernel functions via ftrace
+- Requires `CAP_SYS_ADMIN` and CONFIG_MODULES=y
+
+### Privilege Escalation Framework
+
+```
+ffi jocky_kernel_escalate_privileges(target_pid: i32, new_uid: i32, new_gid: i32) -> i32;
+ffi jocky_linux_lpe_fence2pwn(target_addr: i64) -> i32;
+ffi jocky_linux_priv_esc_vector(vector_type: i32) -> i32;
+```
+
+**Kernel-based privilege escalation vectors:**
+- Direct kernel memory manipulation for UID/GID escalation
+- Fence2pwn (UAF in fence gate driver)
+- Capability-based escalation with CAP_SYS_ADMIN
+- Various CVE exploitation frameworks
+- Requires kernel vulnerability or CAP_SYS_ADMIN
+
+### Artifact Hiding & Anti-Analysis
+
+```
+ffi jocky_linux_hide_artifact(path: i8*) -> i32;
+ffi jocky_linux_userland_evasion_init() -> i32;
+ffi jocky_linux_anti_analysis_check() -> i32;
+```
+
+**Advanced evasion on Linux:**
+- Hide files/directories from stat/readdir via eBPF/LKM
+- Userland hooking and function trampolines
+- Debugger and tracer detection
+- Requires LKM or eBPF for effective hiding
+
+**Authorization Note:** All advanced Linux kernel operations require explicit authorization through:
+1. Research institution (Red Hat, IIT Bombay, etc.)
+2. Defense use case (detection research, forensics)
+3. Proper capability escalation (CAP_SYS_ADMIN, CAP_SYS_PTRACE)
+4. Signed research agreement
+
+Misuse violates Linux kernel security model and system administrator trust.
