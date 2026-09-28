@@ -6,9 +6,15 @@
 
 /* BYOUD (Bring Your Own Unwinding Data)
  *
- * CET (Control-flow Enforcement Technology) bypass technique that manipulates
- * the stack unwinding metadata (.xdata/.pdata sections) instead of return addresses.
- * This allows forging legitimate call stacks even on CET-enabled systems.
+ * Windows PE-specific CET (Control-flow Enforcement Technology) bypass technique
+ * that manipulates stack unwinding metadata (.pdata/.xdata sections) instead of
+ * return addresses. This allows forging legitimate call stacks even on CET-enabled
+ * systems, bypassing return-oriented CFI protections.
+ *
+ * PLATFORM: Windows PE format only
+ * - Targets .pdata section (RUNTIME_FUNCTION array)
+ * - Targets .xdata section (UNWIND_INFO structures)
+ * - Requires Windows PE image manipulation capabilities
  *
  * Key components:
  * - RUNTIME_FUNCTION: Maps instruction ranges to unwind info
