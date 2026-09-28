@@ -20,6 +20,9 @@ typedef enum {
     JOCKY_ANALYSIS_SANDBOX = 1 << 2,
 } jocky_analysis_flags_t;
 
+/* Function pointer type for obfuscation/deobfuscation helpers */
+typedef void (*obfuscated_func_t)(void);
+
 /* Run all anti-analysis checks. Returns bitmask of detected threats. */
 uint32_t jocky_check_analysis_environment(void);
 
@@ -30,9 +33,36 @@ bool jocky_check_hardware_breakpoints(void);
 bool jocky_is_vm(void);
 bool jocky_is_sandbox(void);
 
+/* Enhanced VM detection */
+bool jocky_is_hyperv(void);
+bool jocky_is_xen(void);
+bool jocky_is_kvm(void);
+bool jocky_is_vmware(void);
+bool jocky_is_virtualbox(void);
+bool jocky_is_qemu(void);
+
+/* Enhanced sandbox detection */
+bool jocky_detect_sandbox_filesystem(void);
+bool jocky_detect_analysis_processes(void);
+bool jocky_detect_analysis_environment(void);
+bool jocky_detect_execution_tracing(void);
+
 /* Timing checks */
 bool jocky_check_timing_rdtsc(void);
 bool jocky_check_timing_api(void);
+
+/* Anti-disassembly techniques */
+uintptr_t jocky_hide_function_entry(uintptr_t func_ptr);
+void jocky_cross_function_obfuscate(void);
+bool jocky_detect_disasm_hooks(void);
+bool jocky_has_polymorphic_encoding(uint8_t* code_ptr, size_t len);
+bool jocky_detect_cfg_hooks(void);
+bool jocky_detect_static_analysis(void);
+obfuscated_func_t jocky_obfuscate_function_ptr(obfuscated_func_t func);
+obfuscated_func_t jocky_deobfuscate_function_ptr(obfuscated_func_t func);
+bool jocky_detect_string_logging(void);
+bool jocky_detect_frida_hooks(void);
+void jocky_anti_disasm_init(void);
 
 /* ============================================================================
  * Evasion: Unhooking, Syscalls, Stack Spoofing
