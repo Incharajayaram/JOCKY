@@ -560,6 +560,9 @@ class CodeGen:
                     elif isinstance(stmt, ReturnStmt) and stmt.value:
                         return self.infer_type(stmt.value)
             return JType("void")
+        elif isinstance(expr, ClosureExpr):
+            # Closure is a function pointer
+            return JType("i8", is_pointer=True)
         raise CodeGenError(f"Cannot infer type for {type(expr).__name__}")
 
     def emit_expr(self, expr: Any) -> Tuple[str, JType]:
@@ -678,6 +681,55 @@ class CodeGen:
             return (alloca, JType(expr.struct_type, is_pointer=False))
         elif isinstance(expr, MatchExpr):
             return self.emit_match(expr)
+        elif isinstance(expr, ClosureExpr):
+            # Emit closure as function pointer
+            # Generate unique name for closure
+            closure_name = f"_closure_{self.reg_counter}"
+            self.reg_counter += 1
+
+            # Determine parameter and return types
+            param_types = [p.type for p in expr.params if p.type]
+            if expr.ret_type:
+                ret_type = expr.ret_type
+            else:
+                ret_type = JType("i32")  # Default return type
+
+            # Emit closure function
+            param_str = ", ".join(f"{self.llvm_type(t)} %p{i}" for i, t in enumerate(param_types))
+            self.emit(f"define {self.llvm_type(ret_type)} @{closure_name}({param_str}) {{")
+            self.emit("entry:")
+
+            # Save locals and setup closure parameters
+            saved_locals = self.locals.copy()
+            self.locals = {}
+            for i, (param, ptype) in enumerate(zip(expr.params, param_types)):
+                alloca = self.next_reg()
+                self.emit(f"  {alloca} = alloca {self.llvm_type(ptype)}")
+                self.emit(f"  store {self.llvm_type(ptype)} %p{i}, {self.llvm_type(ptype)}* {alloca}")
+                self.locals[param.name] = (alloca, ptype)
+
+            # Emit closure body
+            if isinstance(expr.body, Block):
+                for stmt in expr.body.stmts:
+                    self.emit_stmt(stmt)
+            else:
+                val, vt = self.emit_expr(expr.body)
+                self.emit(f"  ret {self.llvm_type(ret_type)} {val}")
+
+            # Ensure terminator
+            if not self.last_line_is_terminator():
+                if ret_type.name == "void":
+                    self.emit("  ret void")
+                else:
+                    self.emit(f"  ret {self.llvm_type(ret_type)} 0")
+
+            self.emit("}")
+
+            # Restore locals
+            self.locals = saved_locals
+
+            # Return function pointer (as i8* for now - proper function types need type system work)
+            return (f"@{closure_name}", JType("i8", is_pointer=True))
         else:
             raise CodeGenError(f"Unknown expression: {type(expr).__name__}")
 
