@@ -69,6 +69,56 @@ ffi jocky_check_timing_api()          -> bool;  // GetTickCount delta over 500 m
 
 Returns `true` when the condition is detected.
 
+### Enhanced VM Detection  →  `bool`
+
+Detect specific hypervisors and VM technologies:
+
+```
+ffi jocky_is_hyperv()        -> bool;  // Hyper-V via CPUID leaf 0x40000000
+ffi jocky_is_xen()           -> bool;  // Xen via CPUID hypervisor signature
+ffi jocky_is_kvm()           -> bool;  // KVM via CPUID hypervisor signature
+ffi jocky_is_vmware()        -> bool;  // VMware via backdoor port 0x5658
+ffi jocky_is_virtualbox()    -> bool;  // VirtualBox via /proc/cpuinfo (Linux)
+ffi jocky_is_qemu()          -> bool;  // QEMU via /proc/cpuinfo (Linux)
+```
+
+### Enhanced Sandbox Detection  →  `bool`
+
+Detect analysis environments via multiple vectors:
+
+```
+ffi jocky_detect_sandbox_filesystem() -> bool;  // Check for Cuckoo, Sandboxie, etc paths
+ffi jocky_detect_analysis_processes() -> bool;  // Process list scan for debuggers/tools
+ffi jocky_detect_analysis_environment()-> bool; // Environment variables (CUCKOO, FRIDA, etc)
+ffi jocky_detect_execution_tracing()   -> bool; // ptrace/debugger attachment detection
+```
+
+### Anti-Disassembly Helpers  →  `bool`
+
+Defeat static analysis and disassembler heuristics:
+
+```
+ffi jocky_detect_disasm_hooks()       -> bool;   // Check for disassembler API interception
+ffi jocky_has_polymorphic_encoding()  -> bool;   // Verify code uses alternate instruction encodings
+ffi jocky_detect_cfg_hooks()          -> bool;   // Detect CFG/CET instrumentation (Windows/Linux)
+ffi jocky_detect_static_analysis()    -> bool;   // Runtime check if code was instrumented
+ffi jocky_detect_string_logging()     -> bool;   // Detect API logging/interception
+ffi jocky_detect_frida_hooks()        -> bool;   // Detect Frida code injection
+```
+
+Function pointer obfuscation (hides xrefs in IDA/Ghidra):
+
+```
+ffi jocky_obfuscate_function_ptr()    -> void*;  // XOR-encrypt function pointer
+ffi jocky_deobfuscate_function_ptr()  -> void*;  // XOR-decrypt function pointer
+```
+
+Runtime initialization:
+
+```
+ffi jocky_anti_disasm_init()          -> void;   // Initialize anti-disasm defenses
+```
+
 ### `jocky_verify_integrity() -> bool`  *(Windows only)*
 
 Reads the running binary from disk, recomputes the XOR-folded CRC32 of all
