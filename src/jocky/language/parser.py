@@ -164,6 +164,27 @@ class Parser:
         self.expect(TokenType.GT)
         return params
 
+    def parse_type_args(self) -> List[JType]:
+        """Parse type arguments in generic function calls: <i32, string>"""
+        args = []
+        if not self.match(TokenType.LT):
+            tok = self.peek()
+            source_range = SourceRange.at(tok.line, tok.column)
+            raise ParseError("Expected '<' for type arguments", source_range)
+
+        self.advance()  # consume <
+        while not self.match(TokenType.GT):
+            args.append(self.parse_type())
+            if self.match(TokenType.COMMA):
+                self.advance()
+            elif not self.match(TokenType.GT):
+                tok = self.peek()
+                source_range = SourceRange.at(tok.line, tok.column)
+                raise ParseError("Expected '>' or ',' in type arguments", source_range)
+
+        self.expect(TokenType.GT)
+        return args
+
     def parse_struct_decl(self) -> StructDef:
         self.expect(TokenType.STRUCT)
         name = self.expect(TokenType.IDENT).value
@@ -613,7 +634,19 @@ class Parser:
     def parse_postfix(self) -> Any:
         node = self.parse_primary()
         while True:
-            if self.match(TokenType.LPAREN):
+            if isinstance(node, VarRef) and self.match(TokenType.COLONCOLON):
+                self.advance()
+                generic_args = self.parse_type_args()
+                if self.match(TokenType.LPAREN):
+                    self.advance()
+                    args = self.parse_args()
+                    self.expect(TokenType.RPAREN)
+                    node = CallExpr(node.name, args, generic_args)
+                else:
+                    tok = self.peek()
+                    source_range = SourceRange.at(tok.line, tok.column)
+                    raise ParseError("Expected '(' after generic arguments", source_range)
+            elif self.match(TokenType.LPAREN):
                 self.advance()
                 args = self.parse_args()
                 self.expect(TokenType.RPAREN)

@@ -20,6 +20,8 @@ class CodeGen:
         self.enums: Dict[str, EnumDef] = {}      # enum_name -> EnumDef
         self.type_aliases: Dict[str, JType] = {} # alias_name -> JType
         self.loop_stack: List[Tuple[str, str]] = []  # [(continue_label, break_label)]
+        self._all_funcs: List[FuncDecl] = []  # For generic resolution
+        self.monomorphizations: set = set()  # Track monomorphizations to generate
 
     def next_reg(self) -> str:
         r = f"%{self.reg_counter}"
@@ -48,7 +50,11 @@ class CodeGen:
         length = len(s.encode("utf-8")) + 1
         return name, length
 
-    def gen(self, prog: Program) -> str:
+    def gen(self, prog: Program, monomorphizations: set = None) -> str:
+        # Store monomorphizations from type checker
+        if monomorphizations:
+            self.monomorphizations = monomorphizations
+
         # First pass: collect signatures and definitions
         for decl in prog.decls:
             if isinstance(decl, TypeAlias):
@@ -60,6 +66,7 @@ class CodeGen:
             elif isinstance(decl, FuncDecl):
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, False)
+                self._all_funcs.append(decl)  # Store for generic resolution
             elif isinstance(decl, FFIDecl):
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, decl.variadic)
@@ -80,6 +87,12 @@ class CodeGen:
         for decl in prog.decls:
             if isinstance(decl, FuncDecl):
                 self.emit_func(decl)
+
+        # Emit monomorphized functions
+        for mono in self.monomorphizations:
+            for func_decl in self._all_funcs:
+                if func_decl.name == mono.base_name:
+                    self.emit_monomorphized_func(func_decl, mono)
 
         # Prepend string constants
         prelude = []
@@ -122,6 +135,75 @@ class CodeGen:
                 array_size=t.array_size or resolved.array_size
             )
         return t
+
+    def substitute_type(self, jtype: JType, type_context) -> JType:
+        """Substitute type variables with concrete types."""
+        if jtype.is_generic:
+            concrete = type_context.lookup(jtype.name)
+            if concrete:
+                return JType(
+                    concrete.name,
+                    is_pointer=jtype.is_pointer or concrete.is_pointer,
+                    is_array=jtype.is_array or concrete.is_array,
+                    array_size=jtype.array_size or concrete.array_size,
+                    is_generic=False
+                )
+        return jtype
+
+    def emit_monomorphized_func(self, func_decl: FuncDecl, mono):
+        """Generate a monomorphized version of a generic function."""
+        from jocky.language.checker import GenericContext
+
+        # Create type context from monomorphization
+        type_context = GenericContext()
+        for param, arg_type in mono.type_bindings.items():
+            type_context.bind(param, arg_type)
+
+        # Save current state
+        saved_locals = self.locals.copy()
+        saved_func = self.current_func
+        saved_block = self.current_block
+
+        # Setup for monomorphized function
+        self.current_func = mono.mangled_name
+        self.current_block = "entry"
+        self.locals = {}
+
+        # Emit function header
+        param_types = []
+        for param in func_decl.params:
+            subst_type = self.substitute_type(param.type, type_context)
+            param_types.append(subst_type)
+
+        ret_type = self.substitute_type(func_decl.ret_type, type_context)
+
+        param_str = ", ".join(f"{self.llvm_type(t)} %{p.name}" for t, p in zip(param_types, func_decl.params))
+        self.emit(f"define {self.llvm_type(ret_type)} @{mono.mangled_name}({param_str}) {{")
+        self.emit("entry:")
+
+        # Process parameters
+        for param, subst_type in zip(func_decl.params, param_types):
+            alloca = self.next_reg()
+            self.emit(f"  {alloca} = alloca {self.llvm_type(subst_type)}")
+            self.emit(f"  store {self.llvm_type(subst_type)} %{param.name}, {self.llvm_type(subst_type)}* {alloca}")
+            self.locals[param.name] = (alloca, subst_type)
+
+        # Emit function body
+        for stmt in func_decl.body.stmts:
+            self.emit_stmt(stmt)
+
+        # Default return
+        if ret_type.name == "void":
+            self.emit("  ret void")
+        else:
+            self.emit(f"  ret {self.llvm_type(ret_type)} 0")
+
+        self.emit("}")
+
+        # Restore state
+        self.locals = saved_locals
+        self.current_func = saved_func
+        self.current_block = saved_block
 
     def collect_lets(self, stmts: List[Any]) -> List[Tuple[str, JType]]:
         """Walk statement list recursively and collect (name, type) for every LetStmt."""
@@ -698,14 +780,45 @@ class CodeGen:
     def emit_call(self, expr: CallExpr) -> Tuple[str, JType]:
         if expr.name not in self.functions:
             raise CodeGenError(f"Undefined function: {expr.name}")
+
+        # Determine the actual function name (may be mangled for generics)
+        func_name = expr.name
+        if expr.generic_args:
+            type_names = [t.name for t in expr.generic_args]
+            func_name = f"{expr.name}_{'_'.join(type_names)}"
+
         sig = self.functions[expr.name]
         if len(sig) == 3:
             ptypes, ret, _ = sig
         else:
             ptypes, ret = sig
+
         # Resolve type aliases in parameter and return types
         ptypes = [self.resolve_type_alias(pt) for pt in ptypes]
         ret = self.resolve_type_alias(ret)
+
+        # If generic, substitute types in signature
+        if expr.generic_args:
+            # Create type bindings for substitution
+            from jocky.language.checker import GenericContext
+            type_context = GenericContext()
+            # We need to map generic params to type args
+            # Find the function definition to get generic params
+            generic_params = []
+            for func_def in getattr(self, '_all_funcs', []):
+                if func_def.name == expr.name and func_def.generic_params:
+                    generic_params = func_def.generic_params
+                    break
+
+            if generic_params:
+                for param, arg_type in zip(generic_params, expr.generic_args):
+                    param_name = param if isinstance(param, str) else param.name
+                    type_context.bind(param_name, arg_type)
+
+            # Substitute types
+            ptypes = [self.substitute_type(pt, type_context) for pt in ptypes]
+            ret = self.substitute_type(ret, type_context)
+
         args = []
         for i, arg in enumerate(expr.args):
             val, vt = self.emit_expr(arg)
@@ -716,10 +829,10 @@ class CodeGen:
             args.append(f"{self.llvm_type(vt)} {val}")
         arg_str = ", ".join(args)
         if ret.name == "void":
-            self.emit(f"  call void @{expr.name}({arg_str})")
+            self.emit(f"  call void @{func_name}({arg_str})")
             return ("", ret)
         r = self.next_reg()
-        self.emit(f"  {r} = call {self.llvm_type(ret)} @{expr.name}({arg_str})")
+        self.emit(f"  {r} = call {self.llvm_type(ret)} @{func_name}({arg_str})")
         return (r, ret)
 
     def emit_match(self, expr: MatchExpr) -> Tuple[str, JType]:
