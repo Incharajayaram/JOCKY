@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD 14)
 # Runtime source files
 set(RUNTIME_SOURCES
     init/anti_analysis.c
+    init/anti_disasm.c
     util/mem.c
     evasion/unhook.c
     evasion/syscalls.c
