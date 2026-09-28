@@ -1,0 +1,50 @@
+// Fibonacci calculation - useful for demonstrating debugger features
+
+fn fibonacci(n: i32) -> i32 {
+    if n <= 1 {
+        return n;
+    }
+
+    let fib_n_minus_1: i32 = fibonacci(n - 1);
+    let fib_n_minus_2: i32 = fibonacci(n - 2);
+
+    return fib_n_minus_1 + fib_n_minus_2;
+}
+
+fn factorial(n: i32) -> i32 {
+    if n <= 1 {
+        return 1;
+    }
+
+    let result: i32 = n * factorial(n - 1);
+    return result;
+}
+
+fn is_prime(n: i32) -> bool {
+    if n < 2 {
+        return false;
+    }
+
+    let i: i32 = 2;
+    while i * i <= n {
+        if n % i == 0 {
+            return false;
+        }
+        i = i + 1;
+    }
+
+    return true;
+}
+
+fn main() -> i32 {
+    // Calculate fibonacci(10)
+    let fib_result: i32 = fibonacci(10);
+
+    // Calculate factorial(5)
+    let fact_result: i32 = factorial(5);
+
+    // Check if 7 is prime
+    let prime_check: bool = is_prime(7);
+
+    return fib_result;
+}

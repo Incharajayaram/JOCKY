@@ -158,7 +158,7 @@ bool jocky_is_vmware(void)
     magic = cpuinfo[0];
     return magic == 0x564d5868;
 #else
-    unsigned int eax, ebx;
+    unsigned int eax;
     __asm__ __volatile__(
         "mov $0x564d5868, %%eax\n"
         "mov $0x3c, %%ecx\n"
