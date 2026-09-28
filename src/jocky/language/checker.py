@@ -689,10 +689,12 @@ class TypeChecker:
         for param in expr.params:
             closure_locals[param.name] = param.type
 
-        # Validate captures - all must exist in outer scope
+        # Validate captures - all must exist in outer scope and add to closure locals
         for capture_var in expr.captures:
             if capture_var not in outer_locals:
                 raise TypeError(f"Captured variable '{capture_var}' not found in outer scope")
+            # Add captured variable to closure locals
+            closure_locals[capture_var] = outer_locals[capture_var]
 
         # Switch to closure scope and check body type
         old_locals = self.locals
@@ -710,6 +712,9 @@ class TypeChecker:
                         body_type = JType("void")
                 elif isinstance(stmt, ExprStmt):
                     body_type = self.typeof(stmt.expr)
+                else:
+                    # Raw expression (implicit return)
+                    body_type = self.typeof(stmt)
         else:
             # Expression closure
             body_type = self.typeof(expr.body)
