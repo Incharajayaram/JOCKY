@@ -519,8 +519,12 @@ class CodeGen:
             # Check if calling a local variable holding a function pointer
             if expr.name in self.locals:
                 alloca, var_type = self.locals[expr.name]
-                if var_type.name == "fn" and hasattr(var_type, 'return_type'):
-                    return var_type.return_type
+                if var_type.name == "fn":
+                    if hasattr(var_type, 'return_type'):
+                        return var_type.return_type
+                    else:
+                        # Function type without explicit return type info
+                        return JType("i32")
             raise CodeGenError(f"Undefined function: {expr.name}")
         elif isinstance(expr, DerefExpr):
             t = self.infer_type(expr.operand)
