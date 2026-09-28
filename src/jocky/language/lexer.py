@@ -28,6 +28,7 @@ class TokenType(Enum):
     TYPE = auto()
     MATCH = auto()
     MOD = auto()
+    LAMBDA = auto()
     ARROW_FAT = auto()  # =>
 
     # Types
@@ -101,6 +102,7 @@ KEYWORDS = {
     "type": TokenType.TYPE,
     "match": TokenType.MATCH,
     "mod": TokenType.MOD,
+    "lambda": TokenType.LAMBDA,
     "use": TokenType.USE,
     "i8": TokenType.I8,
     "i32": TokenType.I32,
