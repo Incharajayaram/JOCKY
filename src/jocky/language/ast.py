@@ -9,6 +9,8 @@ class JType:
     is_pointer: bool = False
     is_array: bool = False
     array_size: int = 0  # 0 means not an array or unsized
+    is_type_var: bool = False  # True for type variables like T, U
+    type_var_name: Optional[str] = None  # Name of the type variable if is_type_var
 
     def __str__(self):
         base = self.name
@@ -99,10 +101,15 @@ class FuncDecl:
     ret_type: JType
     body: "Block"
     attributes: List[Attribute] = None  # #[inline], #[no_mangle], etc.
+    type_params: Optional[List[str]] = None  # Generic type parameters: ['T', 'U']
+    is_generic: bool = False  # True if this function has type parameters
 
     def __post_init__(self):
         if self.attributes is None:
             self.attributes = []
+        if self.type_params is None:
+            self.type_params = []
+        self.is_generic = len(self.type_params) > 0
 
 @dataclass
 class FFIDecl:
