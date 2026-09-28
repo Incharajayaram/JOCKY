@@ -16,6 +16,7 @@ class CodeGen:
         self.current_block = "entry"
         self.locals: Dict[str, Tuple[str, JType]] = {}
         self.functions: Dict[str, (List[JType], JType)] = {}
+        self.monomorphic_instances: Dict[str, FuncDecl] = {}  # instance_name -> FuncDecl
         self.structs: Dict[str, StructDef] = {}  # struct_name -> StructDef
         self.enums: Dict[str, EnumDef] = {}      # enum_name -> EnumDef
         self.type_aliases: Dict[str, JType] = {} # alias_name -> JType
@@ -58,11 +59,19 @@ class CodeGen:
             elif isinstance(decl, EnumDef):
                 self.enums[decl.name] = decl
             elif isinstance(decl, FuncDecl):
+                # Skip generic functions - they don't generate code directly
+                if decl.is_generic:
+                    continue
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, False)
             elif isinstance(decl, FFIDecl):
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, decl.variadic)
+
+        # Register monomorphic instances
+        for instance_name, instance_decl in self.monomorphic_instances.items():
+            ptypes = [p.type for p in instance_decl.params]
+            self.functions[instance_name] = (ptypes, instance_decl.ret_type, False)
 
         # Emit struct type definitions
         for struct_name, struct_def in self.structs.items():
@@ -76,9 +85,16 @@ class CodeGen:
                     self.emit_ffi_decl(decl)
                     emitted_ffis.add(decl.name)
 
-        # Emit function definitions
+        # Emit monomorphic instances from type checker
+        for instance_name, instance_decl in self.monomorphic_instances.items():
+            self.emit_func(instance_decl)
+
+        # Emit non-generic function definitions
         for decl in prog.decls:
             if isinstance(decl, FuncDecl):
+                # Skip generic functions
+                if decl.is_generic:
+                    continue
                 self.emit_func(decl)
 
         # Prepend string constants
@@ -153,14 +169,23 @@ class CodeGen:
         return " ".join(flags)
 
     def collect_lets(self, stmts: List[Any]) -> List[Tuple[str, JType]]:
-        """Walk statement list recursively and collect (name, type) for every LetStmt."""
+        """Walk statement list recursively and collect (name, type) for every LetStmt.
+
+        Also populates self.locals with type information for variables that are defined
+        before they are used (important for closures assigned then called).
+        """
         result = []
+
         for stmt in stmts:
             if isinstance(stmt, LetStmt):
                 t = stmt.type if stmt.type else self.infer_type(stmt.init)
                 # Resolve type aliases
                 t = self.resolve_type_alias(t)
                 result.append((stmt.name, t))
+                # Add to locals so subsequent expressions can reference it
+                # This is important for closure assignments that are called later
+                dummy_alloca = f"%temp.{stmt.name}"
+                self.locals[stmt.name] = (dummy_alloca, t)
             elif isinstance(stmt, IfStmt):
                 result.extend(self.collect_lets(stmt.then_block.stmts))
                 if stmt.else_block:
@@ -173,7 +198,11 @@ class CodeGen:
                     # Resolve type aliases
                     t = self.resolve_type_alias(t)
                     result.append((stmt.init.name, t))
+                    # Add to locals
+                    dummy_alloca = f"%temp.{stmt.init.name}"
+                    self.locals[stmt.init.name] = (dummy_alloca, t)
                 result.extend(self.collect_lets(stmt.body.stmts))
+
         return result
 
     def emit_func(self, decl: FuncDecl):
@@ -269,7 +298,11 @@ class CodeGen:
                 alloca = self.next_reg()
                 self.emit(f"  {alloca} = alloca {self.llvm_type(t)}")
             self.emit(f"  store {self.llvm_type(t)} {val}, {self.llvm_type(t)}* {alloca}")
-            self.locals[stmt.name] = (alloca, t)
+            # For function types, preserve the full type info from vt
+            if vt.name == "fn":
+                self.locals[stmt.name] = (alloca, vt)
+            else:
+                self.locals[stmt.name] = (alloca, t)
         elif isinstance(stmt, AssignStmt):
             if isinstance(stmt.target, VarRef):
                 if stmt.target.name not in self.locals:
@@ -483,6 +516,17 @@ class CodeGen:
             if expr.name in self.functions:
                 sig = self.functions[expr.name]
                 return sig[1]
+            # Check if calling a local variable holding a function pointer
+            # Debug: check what's happening
+            import sys
+            print(f"DEBUG: Checking CallExpr {repr(expr.name)} (type={type(expr.name)})", file=sys.stderr)
+            print(f"       expr.name in self.locals: {expr.name in self.locals}", file=sys.stderr)
+            print(f"       locals keys: {list(self.locals.keys())}", file=sys.stderr)
+            if expr.name in self.locals:
+                alloca, var_type = self.locals[expr.name]
+                print(f"       var_type.name: {var_type.name}", file=sys.stderr)
+                if var_type.name == "fn" and hasattr(var_type, 'return_type'):
+                    return var_type.return_type
             raise CodeGenError(f"Undefined function: {expr.name}")
         elif isinstance(expr, DerefExpr):
             t = self.infer_type(expr.operand)
@@ -523,7 +567,11 @@ class CodeGen:
         elif isinstance(expr, ClosureExpr):
             # Closure type is function pointer
             ret_type = expr.ret_type if expr.ret_type else JType("void")
-            return JType("fn", is_pointer=True)
+            func_type = JType("fn", is_pointer=True)
+            # Store parameter and return types so they can be used later
+            func_type.param_types = [p.type for p in expr.params]
+            func_type.return_type = ret_type
+            return func_type
         raise CodeGenError(f"Cannot infer type for {type(expr).__name__}")
 
     def emit_expr(self, expr: Any) -> Tuple[str, JType]:
@@ -861,15 +909,74 @@ class CodeGen:
 
         # Return function pointer with environment info
         func_ptr_type = JType("fn", is_pointer=True)
+        func_ptr_type.param_types = param_types
+        func_ptr_type.return_type = ret_type
         if has_captures:
             func_ptr_type.env_struct = env_struct_name
             func_ptr_type.captures = expr.captures
         return (f"@{closure_name}", func_ptr_type)
 
+    def find_monomorphic_instance(self, func_name: str, arg_types: List[JType]) -> Optional[str]:
+        """Find the monomorphic instance that matches the given function name and argument types."""
+        for instance_name, instance_sig in self.functions.items():
+            if not instance_name.startswith(func_name + "__"):
+                continue
+            if len(instance_sig) >= 2:
+                ptypes, _ = instance_sig[0], instance_sig[1]
+                if len(ptypes) == len(arg_types):
+                    all_match = True
+                    for pt, at in zip(ptypes, arg_types):
+                        if pt.name != at.name or pt.is_pointer != at.is_pointer:
+                            all_match = False
+                            break
+                    if all_match:
+                        return instance_name
+        return None
+
+    def infer_arg_types_simple(self, args: List[Any]) -> List[JType]:
+        """Infer types of arguments without emitting code."""
+        arg_types = []
+        for arg in args:
+            if isinstance(arg, IntLiteral):
+                arg_types.append(JType("i32"))
+            elif isinstance(arg, BoolLiteral):
+                arg_types.append(JType("bool"))
+            elif isinstance(arg, StringLiteral):
+                arg_types.append(JType("string"))
+            elif isinstance(arg, VarRef):
+                if arg.name in self.locals:
+                    alloca, vtype = self.locals[arg.name]
+                    arg_types.append(self.resolve_type_alias(vtype))
+                else:
+                    arg_types.append(JType("unknown"))
+            else:
+                # For complex expressions, return unknown
+                arg_types.append(JType("unknown"))
+        return arg_types
+
     def emit_call(self, expr: CallExpr) -> Tuple[str, JType]:
+        # Check if this is a call to a local variable holding a function pointer
+        if expr.name in self.locals:
+            alloca, var_type = self.locals[expr.name]
+            if var_type.name == "fn":
+                # Indirect call through function pointer
+                return self.emit_indirect_call(expr, alloca, var_type)
+
+        # Check if this is a generic function call that has been instantiated
+        actual_func_name = expr.name
         if expr.name not in self.functions:
-            raise CodeGenError(f"Undefined function: {expr.name}")
-        sig = self.functions[expr.name]
+            # Try to find a monomorphic instance by inferring argument types
+            arg_types = self.infer_arg_types_simple(expr.args)
+            instance_name = self.find_monomorphic_instance(expr.name, arg_types)
+            if instance_name:
+                actual_func_name = instance_name
+            else:
+                raise CodeGenError(f"Undefined function: {expr.name}")
+
+        # Otherwise, direct function call
+        if actual_func_name not in self.functions:
+            raise CodeGenError(f"Undefined function: {actual_func_name}")
+        sig = self.functions[actual_func_name]
         if len(sig) == 3:
             ptypes, ret, _ = sig
         else:
@@ -887,10 +994,60 @@ class CodeGen:
             args.append(f"{self.llvm_type(vt)} {val}")
         arg_str = ", ".join(args)
         if ret.name == "void":
-            self.emit(f"  call void @{expr.name}({arg_str})")
+            self.emit(f"  call void @{actual_func_name}({arg_str})")
             return ("", ret)
         r = self.next_reg()
-        self.emit(f"  {r} = call {self.llvm_type(ret)} @{expr.name}({arg_str})")
+        self.emit(f"  {r} = call {self.llvm_type(ret)} @{actual_func_name}({arg_str})")
+        return (r, ret)
+
+    def emit_indirect_call(self, expr: CallExpr, alloca: str, func_type: JType) -> Tuple[str, JType]:
+        """Emit indirect call through a function pointer stored in a variable."""
+        # Load the function pointer from the alloca
+        func_ptr = self.next_reg()
+        self.emit(f"  {func_ptr} = load i8*, i8** {alloca}")
+
+        # Get parameter types and return type from the function type
+        if hasattr(func_type, 'param_types'):
+            ptypes = func_type.param_types
+        else:
+            raise CodeGenError(f"Cannot determine parameter types for indirect call through {expr.name}")
+
+        if hasattr(func_type, 'return_type'):
+            ret = func_type.return_type
+        else:
+            ret = JType("void")
+
+        # Resolve type aliases
+        ptypes = [self.resolve_type_alias(pt) for pt in ptypes]
+        ret = self.resolve_type_alias(ret)
+
+        # Emit arguments
+        args = []
+        for i, arg in enumerate(expr.args):
+            val, vt = self.emit_expr(arg)
+            vt = self.resolve_type_alias(vt)
+            if i < len(ptypes) and (ptypes[i].name != vt.name or ptypes[i].is_pointer != vt.is_pointer):
+                val = self.emit_cast(val, vt, ptypes[i])
+                vt = ptypes[i]
+            args.append(f"{self.llvm_type(vt)} {val}")
+
+        arg_str = ", ".join(args)
+
+        # Build the function type signature for casting
+        # Format: return_type (param_type1, param_type2, ...)
+        param_types_str = ", ".join(self.llvm_type(pt) for pt in ptypes)
+        func_sig = f"{self.llvm_type(ret)} ({param_types_str})"
+
+        # Bitcast the function pointer to the correct function type and call
+        func_ptr_typed = self.next_reg()
+        self.emit(f"  {func_ptr_typed} = bitcast i8* {func_ptr} to {func_sig}*")
+
+        if ret.name == "void":
+            self.emit(f"  call void {func_sig}* {func_ptr_typed}({arg_str})")
+            return ("", ret)
+
+        r = self.next_reg()
+        self.emit(f"  {r} = call {func_sig}* {func_ptr_typed}({arg_str})")
         return (r, ret)
 
     def emit_match(self, expr: MatchExpr) -> Tuple[str, JType]:
