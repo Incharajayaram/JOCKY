@@ -3,6 +3,7 @@ from .errors import TypeError as BaseTypeError, SourceRange
 from typing import Dict, Any, Optional, List, Tuple
 from jocky.core.modules import Module, ModuleRegistry, get_registry
 from .generics import GenericTypeChecker, Monomorphizer, TypeBindings
+from .optimizations import TypeUnificationCache, FastSymbolTable
 
 class TypeError(BaseTypeError):
     pass
@@ -55,11 +56,11 @@ class Monomorphization:
 class TypeChecker:
     def __init__(self, module_registry: Optional[ModuleRegistry] = None):
         self.functions: Dict[str, (List[JType], JType)] = {}
-        self.generic_functions: Dict[str, FuncDecl] = {}  # generic_func_name -> FuncDecl
-        self.monomorphic_instances: Dict[str, FuncDecl] = {}  # instance_name -> FuncDecl
-        self.structs: Dict[str, StructDef] = {}  # struct_name -> StructDef
-        self.enums: Dict[str, EnumDef] = {}      # enum_name -> EnumDef
-        self.type_aliases: Dict[str, JType] = {} # alias_name -> JType
+        self.generic_functions: Dict[str, FuncDecl] = {}
+        self.monomorphic_instances: Dict[str, FuncDecl] = {}
+        self.structs: Dict[str, StructDef] = {}
+        self.enums: Dict[str, EnumDef] = {}
+        self.type_aliases: Dict[str, JType] = {}
         self.locals: Dict[str, JType] = {}
         self.current_ret: JType = JType("void")
         self.loop_depth: int = 0
@@ -73,6 +74,10 @@ class TypeChecker:
         self.module_registry = module_registry or get_registry()
         self.current_module: Optional[Module] = None
         self.visible_symbols: Dict[str, Any] = {}
+
+        # Performance optimizations
+        self.unification_cache = TypeUnificationCache()
+        self.symbol_table = FastSymbolTable()
 
     def check(self, prog: Program):
         # Store all declarations for generic resolution
@@ -817,6 +822,16 @@ class TypeChecker:
         return t.name in ("i8", "i32", "i64", "f32", "f64") and not t.is_pointer
 
     def types_equal(self, a: JType, b: JType) -> bool:
+        cache_key = f"{str(a)}:{str(b)}"
+        cached = self.unification_cache.get(cache_key.split(':')[0], cache_key.split(':')[1])
+        if cached is not None:
+            return cached
+
+        result = self._types_equal_impl(a, b)
+        self.unification_cache.set(cache_key.split(':')[0], cache_key.split(':')[1], result)
+        return result
+
+    def _types_equal_impl(self, a: JType, b: JType) -> bool:
         if a.name != b.name:
             if a.is_pointer and b.is_pointer:
                 if a.name == "i8" or b.name == "i8":
@@ -829,15 +844,12 @@ class TypeChecker:
                 return True
             return False
 
-        # Check pointer
         if a.is_pointer != b.is_pointer:
             return False
 
-        # Check array
         if a.is_array != b.is_array:
             return False
 
-        # If both are arrays, sizes must match (or one is 0 = unspecified)
         if a.is_array and b.is_array:
             if a.array_size != 0 and b.array_size != 0:
                 if a.array_size != b.array_size:
