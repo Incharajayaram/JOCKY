@@ -49,6 +49,17 @@ class TypeChecker:
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, decl.variadic)
 
+        # Validate attributes
+        for decl in prog.decls:
+            if isinstance(decl, FuncDecl):
+                self.validate_attributes(decl.attributes, 'function')
+            elif isinstance(decl, StructDef):
+                self.validate_attributes(decl.attributes, 'struct')
+            elif isinstance(decl, EnumDef):
+                self.validate_attributes(decl.attributes, 'enum')
+            elif isinstance(decl, FFIDecl):
+                self.validate_attributes(decl.attributes, 'ffi')
+
         # Second pass: check bodies
         for decl in prog.decls:
             if isinstance(decl, FuncDecl):
@@ -68,6 +79,37 @@ class TypeChecker:
             )
         return t
 
+    def validate_attributes(self, attributes: List[Attribute], context: str):
+        """Validate attributes make sense in context (function, struct, enum, ffi)."""
+        valid_attrs = {
+            'function': {'inline', 'no_mangle', 'cold', 'hot', 'obfuscate'},
+            'struct': {'repr', 'packed'},
+            'enum': {'repr', 'packed'},
+            'ffi': {'no_mangle'},
+        }
+
+        valid_for_context = valid_attrs.get(context, set())
+
+        for attr in attributes:
+            if attr.name not in valid_for_context:
+                raise TypeError(f"Attribute #{attr.name} not valid for {context} context")
+
+            if attr.name == 'inline' and attr.args:
+                valid_inline_args = {'never', 'always'}
+                if attr.args[0] not in valid_inline_args:
+                    raise TypeError(f"Invalid inline argument: {attr.args[0]}. Valid: {valid_inline_args}")
+
+            elif attr.name == 'obfuscate' and attr.args:
+                valid_obf_args = {'none', 'light', 'standard', 'aggressive'}
+                if attr.args[0] not in valid_obf_args:
+                    raise TypeError(f"Invalid obfuscate profile: {attr.args[0]}. Valid: {valid_obf_args}")
+
+            elif attr.name == 'packed' and attr.args:
+                try:
+                    int(attr.args[0])
+                except (ValueError, TypeError):
+                    raise TypeError(f"packed() expects integer alignment, got: {attr.args[0]}")
+
     def process_module_decl(self, mod_decl: ModDecl):
         """Process a module declaration."""
         module = Module(mod_decl.name)
@@ -79,11 +121,14 @@ class TypeChecker:
 
         for item in mod_decl.items:
             if isinstance(item, FuncDecl):
+                self.validate_attributes(item.attributes, 'function')
                 ptypes = [p.type for p in item.params]
                 module.add_symbol(item.name, (ptypes, item.ret_type, False), public=True)
             elif isinstance(item, StructDef):
+                self.validate_attributes(item.attributes, 'struct')
                 module.add_symbol(item.name, item, public=True)
             elif isinstance(item, EnumDef):
+                self.validate_attributes(item.attributes, 'enum')
                 module.add_symbol(item.name, item, public=True)
 
         self.current_module = old_module
@@ -259,7 +304,21 @@ class TypeChecker:
         elif isinstance(expr, ClosureExpr):
             return self.typeof_closure(expr)
         elif isinstance(expr, CallExpr):
-            # Check in functions first, then visible imports
+            # Check for builtin functions first
+            if expr.name == "sizeof":
+                if len(expr.args) != 1:
+                    raise TypeError(f"sizeof expects 1 argument, got {len(expr.args)}")
+                _ = self.typeof(expr.args[0])
+                return JType("i32")
+            elif expr.name == "nameof":
+                if len(expr.args) != 1:
+                    raise TypeError(f"nameof expects 1 argument, got {len(expr.args)}")
+                arg = expr.args[0]
+                if not isinstance(arg, VarRef):
+                    raise TypeError("nameof requires a variable or type name")
+                return JType("string")
+
+            # Check in functions, then visible imports
             if expr.name in self.functions:
                 sig = self.functions[expr.name]
             elif expr.name in self.visible_symbols:
