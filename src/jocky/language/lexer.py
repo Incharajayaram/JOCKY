@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, Any
 from enum import Enum, auto
+from .optimizations import CharacterClassLookup, TokenPositionCache
 
 class TokenType(Enum):
     # Literals
@@ -123,12 +124,15 @@ class LexerError(Exception):
     pass
 
 class Lexer:
+    _char_lookup = CharacterClassLookup()
+
     def __init__(self, source: str):
         self.source = source
         self.pos = 0
         self.line = 1
         self.column = 1
         self.tokens: list[Token] = []
+        self.pos_cache = TokenPositionCache()
 
     def error(self, msg: str):
         raise LexerError(f"{msg} at line {self.line}, column {self.column}")
@@ -150,7 +154,7 @@ class Lexer:
         return ch
 
     def skip_whitespace(self):
-        while self.peek() in " \t\r\n":
+        while self.peek() and self._char_lookup.is_whitespace(self.peek()):
             self.advance()
 
     def skip_comment(self):
@@ -187,20 +191,19 @@ class Lexer:
 
     def read_number(self) -> int:
         value = ""
-        # Support hex
         if self.peek() == "0" and self.peek(1) in "xX":
             value += self.advance()
             value += self.advance()
-            while self.peek() in "0123456789abcdefABCDEF":
+            while self.peek() and self._char_lookup.is_hex_digit(self.peek()):
                 value += self.advance()
             return int(value, 16)
-        while self.peek() in "0123456789":
+        while self.peek() and self._char_lookup.is_digit(self.peek()):
             value += self.advance()
         return int(value, 10)
 
     def read_ident(self) -> str:
         value = ""
-        while self.peek().isalnum() or self.peek() == "_":
+        while self.peek() and self._char_lookup.is_identifier_cont(self.peek()):
             value += self.advance()
         return value
 
@@ -222,9 +225,9 @@ class Lexer:
                 break
             elif ch == '"':
                 self.tokens.append(Token(TokenType.STRING, self.read_string(), start_line, start_col))
-            elif ch in "0123456789":
+            elif self._char_lookup.is_digit(ch):
                 self.tokens.append(Token(TokenType.NUMBER, self.read_number(), start_line, start_col))
-            elif ch.isalpha() or ch == "_":
+            elif self._char_lookup.is_identifier_start(ch):
                 ident = self.read_ident()
                 tok_type = KEYWORDS.get(ident, TokenType.IDENT)
                 self.tokens.append(Token(tok_type, ident, start_line, start_col))
