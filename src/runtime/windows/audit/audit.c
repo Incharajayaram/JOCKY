@@ -15,7 +15,7 @@ static void jocky_sha256(const void* data, size_t len, char* out_hash)
 {
     if (!data || !out_hash) return;
 
-    sprintf(out_hash, "sha256_%llu_%d", (unsigned long long)len, *(int*)data);
+    snprintf(out_hash, 64, "sha256_%llu_%d", (unsigned long long)len, *(int*)data);
 }
 
 int jocky_audit_init(JOCKY_AUDIT_LOG* out_log, uint32_t initial_capacity)
