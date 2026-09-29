@@ -79,6 +79,7 @@ class CompileRequest(BaseModel):
     platform: str = "windows"
     obfuscation: ObfuscationConfig = Field(default_factory=ObfuscationConfig)
     preset: str = "standard"
+    forensic: bool = False
 
     @field_validator('source')
     @classmethod
@@ -199,7 +200,7 @@ async def compile_source(request: CompileRequest):
         for ws in dead:
             conns.remove(ws)
 
-    asyncio.create_task(run_compilation(job, request.source, obf_dict, notify, request.preset, job.job_id))
+    asyncio.create_task(run_compilation(job, request.source, obf_dict, notify, request.preset, job.job_id, forensic=request.forensic))
     return CompileResponse(job_id=job.job_id)
 
 

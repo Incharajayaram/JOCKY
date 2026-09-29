@@ -55,6 +55,7 @@ export default function App() {
     linux: linuxDemoScript,
   });
   const [obfuscation, setObfuscation] = useState<ObfuscationState>(defaultObfuscation);
+  const [forensic, setForensic] = useState(false);
   const editorRef = useRef<CodeEditorHandle>(null);
   const { categories } = useRuntimeApis();
   const { compiling, logs, jobId, buildDone, compile, clearLogs } = useCompiler();
@@ -80,9 +81,13 @@ export default function App() {
     }));
   }, []);
 
+  const handleToggleForensic = useCallback(() => {
+    setForensic((prev) => !prev);
+  }, []);
+
   const handleCompile = useCallback(() => {
-    compile(editorState[platform], platform, obfuscation);
-  }, [compile, editorState, platform, obfuscation]);
+    compile(editorState[platform], platform, obfuscation, forensic);
+  }, [compile, editorState, platform, obfuscation, forensic]);
 
   return (
     <div style={styles.app}>
@@ -108,6 +113,8 @@ export default function App() {
               mlir={obfuscation.mlir}
               llvm={obfuscation.llvm}
               onToggle={handleTogglePass}
+              forensic={forensic}
+              onToggleForensic={handleToggleForensic}
             />
           </div>
         </div>

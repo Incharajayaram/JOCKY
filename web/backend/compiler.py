@@ -89,6 +89,7 @@ async def run_compilation(
     notify_callback=None,
     preset: str = "standard",
     job_id: str = None,
+    forensic: bool = False,
 ):
     build_dir = None
     source_dir = None
@@ -156,6 +157,8 @@ async def run_compilation(
                 cmd.extend(["--mlir-passes", ",".join(obf_cfg["mlir_flags"])])
             if obf_cfg.get("llvm_passes"):
                 cmd.extend(["--llvm-passes", obf_cfg["llvm_passes"]])
+            if forensic:
+                cmd.append("--forensic")
         else:
             job.progress = 15
             job.logs.append("[PIPELINE] Using local compile pipeline (Docker not available)")
@@ -175,6 +178,8 @@ async def run_compilation(
                 cmd.extend(["--mlir-passes", ",".join(obf_cfg["mlir_flags"])])
             if obf_cfg.get("llvm_passes"):
                 cmd.extend(["--llvm-passes", obf_cfg["llvm_passes"]])
+            if forensic:
+                cmd.append("--forensic")
 
         # Set up environment with proper paths
         env = os.environ.copy()

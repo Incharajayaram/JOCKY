@@ -193,6 +193,41 @@ test.describe('JOCKY Frontend', () => {
     expect(winContentAgain).toBe(winContent);
   });
 
+  test('Forensic Trace Cleanup toggle exists in obfuscation panel', async ({ page }) => {
+    await expect(page.locator('text=FORENSIC CLEANUP')).toBeVisible();
+    await expect(page.locator('text=Forensic Trace Cleanup')).toBeVisible();
+  });
+
+  test('forensic toggle starts disabled and can be enabled', async ({ page }) => {
+    const forensicRow = page.locator('div').filter({ hasText: /^Forensic Trace Cleanup/ }).first();
+    const toggle = forensicRow.locator('div[style*="cursor: pointer"]').first();
+
+    const bgBefore = await toggle.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    await toggle.click();
+    await page.waitForTimeout(300);
+
+    const bgAfter = await toggle.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(bgAfter).not.toBe(bgBefore);
+  });
+
+  test('forensic toggle is independent of obfuscation passes', async ({ page }) => {
+    const forensicRow = page.locator('div').filter({ hasText: /^Forensic Trace Cleanup/ }).first();
+    const forensicToggle = forensicRow.locator('div[style*="cursor: pointer"]').first();
+
+    const stringEncryptRow = page.locator('div').filter({ hasText: /^String Encrypt/ }).first();
+    const stringEncryptToggle = stringEncryptRow.locator('div[style*="cursor: pointer"]').first();
+
+    await forensicToggle.click();
+    await page.waitForTimeout(200);
+
+    const forensicBg = await forensicToggle.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const stringEncryptBg = await stringEncryptToggle.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    // They should be different colours since only forensic was toggled
+    expect(forensicBg).not.toBe(stringEncryptBg);
+  });
+
   test('page works at mobile width', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.waitForTimeout(500);

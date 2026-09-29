@@ -1,4 +1,4 @@
-import { Shield } from 'lucide-react';
+import { Shield, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { ObfuscationPass } from '../types';
@@ -110,15 +110,42 @@ interface ObfuscationPanelProps {
   mlir: ObfuscationPass[];
   llvm: ObfuscationPass[];
   onToggle: (type: 'mlir' | 'llvm', id: string) => void;
+  forensic: boolean;
+  onToggleForensic: () => void;
 }
 
-export default function ObfuscationPanel({ mlir, llvm, onToggle }: ObfuscationPanelProps) {
+export default function ObfuscationPanel({ mlir, llvm, onToggle, forensic, onToggleForensic }: ObfuscationPanelProps) {
+  const [forensicHovered, setForensicHovered] = useState(false);
   return (
     <div style={styles.container}>
       <div style={styles.sectionTitle}>
         <Shield size={12} />
         Obfuscation Passes
       </div>
+
+      <div style={styles.subTitle}>FORENSIC CLEANUP</div>
+      <div
+        style={{
+          ...styles.row,
+          background: forensicHovered ? 'var(--bg-hover)' : 'transparent',
+          borderRadius: 4,
+          marginBottom: 8,
+        }}
+        onMouseEnter={() => setForensicHovered(true)}
+        onMouseLeave={() => setForensicHovered(false)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Trash2 size={11} color={forensic ? 'var(--accent-purple)' : 'var(--text-secondary)'} />
+          <div>
+            <div style={styles.label}>Forensic Trace Cleanup</div>
+            <div style={styles.description}>Embed runtime that wipes logs, event history &amp; self-deletes</div>
+          </div>
+        </div>
+        <div style={switchTrackStyle(forensic)} onClick={onToggleForensic}>
+          <div style={switchKnobStyle(forensic)} />
+        </div>
+      </div>
+
       <div style={styles.subTitle}>MLIR PASSES</div>
       {mlir.map((pass) => (
         <Toggle key={pass.id} pass={pass} onToggle={() => onToggle('mlir', pass.id)} />

@@ -35,6 +35,7 @@ export function useCompiler() {
     source: string,
     platform: 'windows' | 'linux',
     obfuscation: ObfuscationState,
+    forensic: boolean,
   ) => {
     setCompiling(true);
     setBuildDone(false);
@@ -53,6 +54,7 @@ export function useCompiler() {
       source,
       platform,
       obfuscation: { mlir: mlirMap, llvm: llvmMap },
+      forensic,
     };
 
     const enabledPasses = [
@@ -61,6 +63,7 @@ export function useCompiler() {
     ];
     addLog(`[INFO] Starting ${platform} compilation...`, 'info');
     addLog(`[INFO] Obfuscation passes: ${enabledPasses.join(', ') || 'none'}`, 'info');
+    if (forensic) addLog('[INFO] Forensic cleanup runtime: enabled', 'info');
 
     try {
       const res = await fetch(`${API_BASE}/api/compile`, {

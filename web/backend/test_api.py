@@ -23,7 +23,10 @@ def test_config_endpoint(client):
 def test_runtime_apis_endpoint(client):
     response = client.get("/api/runtime-apis")
     assert response.status_code == 200
-    assert isinstance(response.json(), list)
+    data = response.json()
+    assert "categories" in data
+    assert isinstance(data["categories"], list)
+    assert len(data["categories"]) > 0
 
 
 def test_obfuscation_passes_endpoint(client):
@@ -118,3 +121,59 @@ def test_validate_source_endpoint(client):
     data = response.json()
     assert "errors" in data
     assert "has_errors" in data
+
+
+def test_compile_forensic_flag_accepted(client):
+    """forensic:true is accepted and queues a job"""
+    response = client.post(
+        "/api/compile",
+        json={
+            "source": "fn main() {}",
+            "platform": "windows",
+            "forensic": True,
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "job_id" in data
+
+
+def test_compile_forensic_false_default(client):
+    """forensic defaults to false when omitted"""
+    response = client.post(
+        "/api/compile",
+        json={
+            "source": "fn main() {}",
+            "platform": "linux",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "job_id" in data
+
+
+def test_compile_forensic_invalid_type_rejected(client):
+    """forensic must be a boolean — a dict is structurally incompatible and rejected"""
+    response = client.post(
+        "/api/compile",
+        json={
+            "source": "fn main() {}",
+            "platform": "windows",
+            "forensic": {"value": "yes"},
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_compile_forensic_linux_accepted(client):
+    """forensic flag is accepted for linux target"""
+    response = client.post(
+        "/api/compile",
+        json={
+            "source": "fn main() {}",
+            "platform": "linux",
+            "forensic": True,
+        },
+    )
+    assert response.status_code == 200
+    assert "job_id" in response.json()
