@@ -74,3 +74,65 @@ ffi jocky_patch_shimcache() -> bool;
 ffi jocky_patch_amcache() -> bool;
 ffi jocky_clear_srum() -> bool;
 ffi jocky_cleanup_all() -> void;
+ffi forensics_wipe_powershell_history() -> i32;
+ffi forensics_wipe_cmd_history() -> i32;
+ffi forensics_flush_arp_cache() -> i32;
+ffi forensics_clear_dns_cache() -> i32;
+ffi linux_forensics_wipe_bash_history() -> i32;
+ffi jocky_linux_cleanup_syslog() -> i32;
+ffi jocky_linux_cleanup_journal() -> i32;
+ffi jocky_cleanup_event_logs(channels: string) -> i32;
+ffi jocky_cleanup_usn_journal() -> i32;
+
+// ---- Filesystem ----
+ffi fs_exists(path: string) -> bool;
+ffi fs_list_files(path: string, recursive: bool) -> [string];
+ffi fs_file_size(path: string) -> i64;
+ffi fs_read_file(path: string) -> i8*;
+ffi fs_write_file(path: string, data: i8*, size: i64) -> bool;
+
+// ---- Crypto ----
+ffi crypto_generate_key(size: i32) -> [u8];
+ffi crypto_aes256_encrypt(data: i8*, size: i32, key: [u8]) -> [u8];
+ffi crypto_aes256_decrypt(data: i8*, size: i32, key: [u8]) -> [u8];
+
+// ---- Sandbox ----
+ffi sandbox_spawn(exe: string, args: string) -> i32;
+ffi sandbox_set_limits(pid: i32, mem_limit: i64, time_limit: i32, cpu_limit: i64) -> bool;
+ffi sandbox_monitor(pid: i32) -> i32;
+ffi sandbox_wait(pid: i32) -> i32;
+ffi sandbox_export_trace(pid: i32, path: string) -> bool;
+
+// ---- Registry (Windows) ----
+ffi jocky_registry_create_key(hive: i32, path: string, out_handle: i8*) -> bool;
+ffi jocky_registry_set_value(handle: i8*, name: string, value: string, type_: i32, flags: i32) -> bool;
+ffi jocky_registry_close_key(handle: i8*) -> bool;
+
+// ---- Audit ----
+ffi audit_log(category: string, action: string, detail: string, result: string) -> void;
+ffi audit_init(buffer_size: i32) -> bool;
+ffi audit_export(path: string) -> bool;
+ffi audit_verify() -> i32;
+
+// ---- Provenance ----
+ffi provenance_record(path: string, operation: string, detail: string) -> void;
+
+// ---- AI/ML ----
+ffi ai_init() -> i32;
+ffi ai_collect_telemetry() -> [u8];
+ffi ai_score_threat() -> f64;
+
+// ---- BYOVD helpers ----
+ffi byovd_load_driver(name: string) -> i32;
+ffi byovd_test_exploit(handle: i32) -> i32;
+ffi btr_disable_notifications() -> bool;
+ffi btr_mask_module(dll_name: string) -> bool;
+ffi jocky_exploit_disable_callbacks() -> i32;
+ffi jocky_exploit_token_replacement(arg1: i32, arg2: i32) -> i32;
+ffi edrhoker_detect() -> bool;
+ffi blindside_unhook_ntdll() -> bool;
+
+// ---- Exfiltration helpers ----
+ffi exfil_dns_tunnel(domain: string, metadata: string) -> i32;
+ffi exfil_discord_webhook(webhook: string, message: string) -> i32;
+ffi exfil_local_cdn(endpoint: string, name: string, token: string, metadata: string) -> i32;
