@@ -1,10 +1,9 @@
 from .ast import *
 from .errors import TypeError as BaseTypeError, SourceRange
-from typing import Dict, Any, Optional, List, Tuple, Set
-try:
-    from jocky.core.modules import Module, ModuleRegistry, get_registry
-except ImportError:
-    from ..core.modules import Module, ModuleRegistry, get_registry
+from typing import Dict, Any, Optional, List, Tuple
+from jocky.core.modules import Module, ModuleRegistry, get_registry
+from .generics import GenericTypeChecker, Monomorphizer, TypeBindings
+from .optimizations import TypeUnificationCache, FastSymbolTable
 
 class TypeError(BaseTypeError):
     pass
@@ -57,12 +56,15 @@ class Monomorphization:
 class TypeChecker:
     def __init__(self, module_registry: Optional[ModuleRegistry] = None):
         self.functions: Dict[str, (List[JType], JType)] = {}
-        self.structs: Dict[str, StructDef] = {}  # struct_name -> StructDef
-        self.enums: Dict[str, EnumDef] = {}      # enum_name -> EnumDef
-        self.type_aliases: Dict[str, JType] = {} # alias_name -> JType
+        self.generic_functions: Dict[str, FuncDecl] = {}
+        self.monomorphic_instances: Dict[str, FuncDecl] = {}
+        self.structs: Dict[str, StructDef] = {}
+        self.enums: Dict[str, EnumDef] = {}
+        self.type_aliases: Dict[str, JType] = {}
         self.locals: Dict[str, JType] = {}
         self.current_ret: JType = JType("void")
         self.loop_depth: int = 0
+        self.monomorphizer = Monomorphizer()
 
         self.globals: Dict[str, JType] = {}
 
@@ -72,6 +74,10 @@ class TypeChecker:
         self.module_registry = module_registry or get_registry()
         self.current_module: Optional[Module] = None
         self.visible_symbols: Dict[str, Any] = {}
+
+        # Performance optimizations
+        self.unification_cache = TypeUnificationCache()
+        self.symbol_table = FastSymbolTable()
 
     def check(self, prog: Program):
         # Store all declarations for generic resolution
@@ -98,8 +104,12 @@ class TypeChecker:
             elif isinstance(decl, EnumDef):
                 self.enums[decl.name] = decl
             elif isinstance(decl, FuncDecl):
-                ptypes = [p.type for p in decl.params]
-                self.functions[decl.name] = (ptypes, decl.ret_type, False)
+                if decl.is_generic:
+                    # Store generic function template for later instantiation
+                    self.generic_functions[decl.name] = decl
+                else:
+                    ptypes = [p.type for p in decl.params]
+                    self.functions[decl.name] = (ptypes, decl.ret_type, False)
             elif isinstance(decl, FFIDecl):
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, decl.variadic)
@@ -111,9 +121,23 @@ class TypeChecker:
                 t = decl.type if decl.type else init_type
                 self.globals[decl.name] = t
 
+        # Validate attributes
         for decl in prog.decls:
             if isinstance(decl, FuncDecl):
-                self.check_func(decl)
+                self.validate_attributes(decl.attributes, 'function')
+            elif isinstance(decl, StructDef):
+                self.validate_attributes(decl.attributes, 'struct')
+            elif isinstance(decl, EnumDef):
+                self.validate_attributes(decl.attributes, 'enum')
+            elif isinstance(decl, FFIDecl):
+                self.validate_attributes(decl.attributes, 'ffi')
+
+        # Second pass: check bodies
+        for decl in prog.decls:
+            if isinstance(decl, FuncDecl):
+                if not decl.is_generic:
+                    # Generic functions are type-checked upon instantiation
+                    self.check_func(decl)
 
     def resolve_type_alias(self, t: JType) -> JType:
         """Resolve type alias recursively."""
@@ -128,6 +152,37 @@ class TypeChecker:
                 array_size=t.array_size or resolved.array_size
             )
         return t
+
+    def validate_attributes(self, attributes: List[Attribute], context: str):
+        """Validate attributes make sense in context (function, struct, enum, ffi)."""
+        valid_attrs = {
+            'function': {'inline', 'no_mangle', 'cold', 'hot', 'obfuscate'},
+            'struct': {'repr', 'packed'},
+            'enum': {'repr', 'packed'},
+            'ffi': {'no_mangle'},
+        }
+
+        valid_for_context = valid_attrs.get(context, set())
+
+        for attr in attributes:
+            if attr.name not in valid_for_context:
+                raise TypeError(f"Attribute #{attr.name} not valid for {context} context")
+
+            if attr.name == 'inline' and attr.args:
+                valid_inline_args = {'never', 'always'}
+                if attr.args[0] not in valid_inline_args:
+                    raise TypeError(f"Invalid inline argument: {attr.args[0]}. Valid: {valid_inline_args}")
+
+            elif attr.name == 'obfuscate' and attr.args:
+                valid_obf_args = {'none', 'light', 'standard', 'aggressive'}
+                if attr.args[0] not in valid_obf_args:
+                    raise TypeError(f"Invalid obfuscate profile: {attr.args[0]}. Valid: {valid_obf_args}")
+
+            elif attr.name == 'packed' and attr.args:
+                try:
+                    int(attr.args[0])
+                except (ValueError, TypeError):
+                    raise TypeError(f"packed() expects integer alignment, got: {attr.args[0]}")
 
     def substitute_type(self, jtype: JType, context: GenericContext = None) -> JType:
         """Substitute type variables with concrete types using generic context."""
@@ -148,16 +203,6 @@ class TypeChecker:
                 )
         return jtype
 
-    def resolve_generic_call(self, base_name: str, type_args: List[JType]) -> str:
-        """Generate mangled name for a generic function call.
-
-        Example: max<i32> -> max_i32
-        """
-        if not type_args:
-            return base_name
-        type_names = [t.name for t in type_args]
-        return f"{base_name}_{'_'.join(type_names)}"
-
     def process_module_decl(self, mod_decl: ModDecl):
         """Process a module declaration."""
         module = Module(mod_decl.name)
@@ -169,11 +214,14 @@ class TypeChecker:
 
         for item in mod_decl.items:
             if isinstance(item, FuncDecl):
+                self.validate_attributes(item.attributes, 'function')
                 ptypes = [p.type for p in item.params]
                 module.add_symbol(item.name, (ptypes, item.ret_type, False), public=True)
             elif isinstance(item, StructDef):
+                self.validate_attributes(item.attributes, 'struct')
                 module.add_symbol(item.name, item, public=True)
             elif isinstance(item, EnumDef):
+                self.validate_attributes(item.attributes, 'enum')
                 module.add_symbol(item.name, item, public=True)
 
         self.current_module = old_module
@@ -215,6 +263,36 @@ class TypeChecker:
         self.locals = old_locals
         ptypes = [p.type for p in decl.params]
         self.functions[decl.name] = (ptypes, decl.ret_type, False)
+
+    def instantiate_and_check_generic(self, generic_func: FuncDecl, arg_types: List[JType]) -> str:
+        """
+        Instantiate a generic function with concrete type arguments.
+        Returns the monomorphic instance name.
+        """
+        # Infer type bindings from arguments
+        bindings = GenericTypeChecker.infer_type_bindings(generic_func, arg_types)
+
+        # Instantiate the function
+        instance = self.monomorphizer.instantiate(generic_func, bindings)
+
+        # Type-check the instance with its bindings in scope so that nested
+        # generic calls using type variables (e.g. id::<U>) resolve concretely
+        saved_ret = self.current_ret
+        saved_ctx = self.generic_context
+        inst_ctx = GenericContext()
+        for var_name, concrete in bindings.bindings.items():
+            inst_ctx.bind(var_name, concrete)
+        self.generic_context = inst_ctx
+        try:
+            self.check_func(instance)
+        finally:
+            self.current_ret = saved_ret
+            self.generic_context = saved_ctx
+
+        # Register the instance
+        self.monomorphic_instances[instance.name] = instance
+
+        return instance.name
 
     def check_block(self, block: Block):
         for stmt in block.stmts:
@@ -280,6 +358,9 @@ class TypeChecker:
         elif isinstance(stmt, ContinueStmt):
             if self.loop_depth == 0:
                 raise TypeError("'continue' outside loop")
+        else:
+            # Handle bare expressions (implicit returns)
+            self.typeof(stmt)
 
     def typeof(self, expr: Any, type_hint: Optional[JType] = None) -> JType:
         if isinstance(expr, IntLiteral):
@@ -347,13 +428,32 @@ class TypeChecker:
                 return t
             else:
                 raise TypeError(f"Unknown unary op: {expr.op}")
+        elif isinstance(expr, ClosureExpr):
+            return self.typeof_closure(expr)
         elif isinstance(expr, CallExpr):
-            # Handle generic function calls: func::<T1, T2>(args)
+            # Check for builtin functions first
+            if expr.name == "sizeof":
+                if len(expr.args) != 1:
+                    raise TypeError(f"sizeof expects 1 argument, got {len(expr.args)}")
+                _ = self.typeof(expr.args[0])
+                return JType("i32")
+            elif expr.name == "nameof":
+                if len(expr.args) != 1:
+                    raise TypeError(f"nameof expects 1 argument, got {len(expr.args)}")
+                arg = expr.args[0]
+                if not isinstance(arg, VarRef):
+                    raise TypeError("nameof requires a variable or type name")
+                return JType("string")
+
             if expr.generic_args:
-                if expr.name not in self.functions:
+                if expr.name in self.functions:
+                    base_sig = self.functions[expr.name]
+                elif expr.name in self.generic_functions:
+                    gdecl = self.generic_functions[expr.name]
+                    base_sig = ([p.type for p in gdecl.params], gdecl.ret_type, False)
+                else:
                     raise TypeError(f"Undefined generic function: {expr.name}")
 
-                base_sig = self.functions[expr.name]
                 if len(base_sig) == 3:
                     ptypes, ret, is_variadic = base_sig
                 else:
@@ -375,10 +475,13 @@ class TypeChecker:
                     raise TypeError(f"Function {expr.name} expects {len(generic_func.generic_params)} type args, got {len(expr.generic_args)}")
 
                 # Create type bindings: T -> i32, U -> string, etc.
+                # Type-var args (e.g. U inside an instance body) are resolved
+                # through the current instantiation context first.
                 type_context = GenericContext()
                 for param, arg_type in zip(generic_func.generic_params, expr.generic_args):
                     param_name = param if isinstance(param, str) else param.name
-                    type_context.bind(param_name, arg_type)
+                    type_context.bind(param_name,
+                                      self.substitute_type(arg_type, self.generic_context))
 
                 # Substitute types in function signature
                 substituted_ptypes = [self.substitute_type(pt, type_context) for pt in ptypes]
@@ -394,21 +497,52 @@ class TypeChecker:
                         raise TypeError(f"Arg {i} to {expr.name}: expected {pt}, got {at}")
 
                 # Record monomorphization for codegen
-                type_bindings = {}
-                for param, arg_type in zip(generic_func.generic_params, expr.generic_args):
-                    param_name = param if isinstance(param, str) else param.name
-                    type_bindings[param_name] = arg_type
+                type_bindings = dict(type_context.bindings)
                 mono = Monomorphization(expr.name, type_bindings)
                 self.monomorphizations.add(mono)
+
+                # Materialize a monomorphic instance for codegen
+                if mono.mangled_name not in self.monomorphic_instances:
+                    # Note: the instance shares the template body, so it is not
+                    # re-checked here; nested generic calls resolve at their own
+                    # concrete call sites.
+                    self.monomorphic_instances[mono.mangled_name] = FuncDecl(
+                        name=mono.mangled_name,
+                        params=[Param(p.name, self.substitute_type(p.type, type_context))
+                                for p in generic_func.params],
+                        ret_type=self.substitute_type(generic_func.ret_type, type_context),
+                        body=generic_func.body,
+                        attributes=generic_func.attributes,
+                        is_generic=False,
+                        location=generic_func.location,
+                    )
 
                 return substituted_ret
             else:
                 # Non-generic function call
+                if expr.name in self.generic_functions:
+                    # Call to a generic function without explicit type args:
+                    # infer type bindings from the arguments and instantiate
+                    gdecl = self.generic_functions[expr.name]
+                    arg_types = [self.typeof(arg) for arg in expr.args]
+                    saved_ret = self.current_ret
+                    try:
+                        instance_name = self.instantiate_and_check_generic(gdecl, arg_types)
+                    finally:
+                        self.current_ret = saved_ret
+                    return self.monomorphic_instances[instance_name].ret_type
+
                 if expr.name in self.functions:
                     sig = self.functions[expr.name]
                 elif expr.name in self.visible_symbols:
                     symbol = self.visible_symbols[expr.name]
                     sig = symbol.type_info
+                elif expr.name in self.locals:
+                    lt = self.locals[expr.name]
+                    if getattr(lt, "name", None) == "fn" and hasattr(lt, "param_types"):
+                        sig = (list(lt.param_types), lt.return_type, False)
+                    else:
+                        raise TypeError(f"Undefined function: {expr.name}")
                 else:
                     raise TypeError(f"Undefined function: {expr.name}")
 
@@ -640,10 +774,85 @@ class TypeChecker:
 
             return bindings
 
+    def typeof_closure(self, expr: ClosureExpr) -> JType:
+        """Type check a closure expression and return its function type."""
+        # Save current locals to check captures
+        outer_locals = self.locals.copy()
+
+        # Create new scope for closure body
+        closure_locals = {}
+
+        # Add parameters to closure locals
+        for param in expr.params:
+            closure_locals[param.name] = param.type
+
+        # Validate captures - all must exist in outer scope and add to closure locals
+        for capture_var in expr.captures:
+            if capture_var not in outer_locals:
+                raise TypeError(f"Captured variable '{capture_var}' not found in outer scope")
+            # Add captured variable to closure locals
+            closure_locals[capture_var] = outer_locals[capture_var]
+
+        # Switch to closure scope and check body type
+        old_locals = self.locals
+        self.locals = closure_locals
+
+        # Type check closure body
+        if isinstance(expr.body, Block):
+            # Block closure
+            body_type = JType("void")
+            for stmt in expr.body.stmts:
+                if isinstance(stmt, ReturnStmt):
+                    if stmt.value:
+                        body_type = self.typeof(stmt.value)
+                    else:
+                        body_type = JType("void")
+                elif isinstance(stmt, ExprStmt):
+                    body_type = self.typeof(stmt.expr)
+                else:
+                    # Raw expression (implicit return)
+                    body_type = self.typeof(stmt)
+        else:
+            # Expression closure
+            body_type = self.typeof(expr.body)
+
+        # Restore outer scope
+        self.locals = old_locals
+
+        # Validate return type if explicitly specified
+        if expr.ret_type:
+            if not self.types_equal(body_type, expr.ret_type):
+                raise TypeError(f"Closure body type {body_type} doesn't match declared return type {expr.ret_type}")
+            ret_type = expr.ret_type
+        else:
+            ret_type = body_type
+
+        # Build function type from parameters and return type
+        param_types = [p.type for p in expr.params]
+
+        # Create function pointer type representation
+        # For now, represent as a function type marker
+        func_type = JType("fn")
+        func_type.param_types = param_types
+        func_type.return_type = ret_type
+        func_type.captured_vars = expr.captures
+
+        return func_type
+
     def is_numeric(self, t: JType) -> bool:
         return t.name in ("i8", "i32", "i64", "f32", "f64") and not t.is_pointer
 
     def types_equal(self, a: JType, b: JType) -> bool:
+        cache_key = f"{str(a)}:{str(b)}"
+        cached = self.unification_cache.get(cache_key.split(':')[0], cache_key.split(':')[1])
+        if cached is not None:
+            return cached
+
+        result = self._types_equal_impl(a, b)
+        self.unification_cache.set(cache_key.split(':')[0], cache_key.split(':')[1], result)
+        return result
+
+    def _types_equal_impl(self, a: JType, b: JType) -> bool:
         if a.name != b.name:
             if a.is_pointer and b.is_pointer:
                 if a.name == "i8" or b.name == "i8":
@@ -656,15 +865,12 @@ class TypeChecker:
                 return True
             return False
 
-        # Check pointer
         if a.is_pointer != b.is_pointer:
             return False
 
-        # Check array
         if a.is_array != b.is_array:
             return False
 
-        # If both are arrays, sizes must match (or one is 0 = unspecified)
         if a.is_array and b.is_array:
             if a.array_size != 0 and b.array_size != 0:
                 if a.array_size != b.array_size:
