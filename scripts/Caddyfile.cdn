@@ -1,0 +1,25 @@
+:80 {
+	root * /usr/share/caddy/uploads
+
+	# POST endpoint for exfiltration
+	@upload {
+		method POST
+		path /upload*
+	}
+
+	handle @upload {
+		file_server {
+			hide .gitkeep
+		}
+	}
+
+	# GET for retrieving uploaded files
+	handle {
+		file_server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
