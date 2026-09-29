@@ -1,0 +1,189 @@
+{
+  "scopeName": "source.jocky",
+  "name": "JOCKY",
+  "fileTypes": [
+    "jky"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#functions"
+    },
+    {
+      "include": "#structs"
+    },
+    {
+      "include": "#enums"
+    },
+    {
+      "include": "#operators"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.jocky",
+          "begin": "//",
+          "end": "$",
+          "patterns": [
+            {
+              "name": "markup.bold.comment.jocky",
+              "match": "(?<=//\\s)FIXME|TODO|NOTE|HACK"
+            }
+          ]
+        },
+        {
+          "name": "comment.block.jocky",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "patterns": [
+            {
+              "include": "#comments"
+            }
+          ]
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.jocky",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.jocky",
+              "match": "\\\\([\\\\\"nrtbfv]|u[0-9a-fA-F]{4})"
+            },
+            {
+              "name": "invalid.illegal.jocky",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.jocky",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.jocky",
+              "match": "\\\\([\\\\\"nrtbfv]|u[0-9a-fA-F]{4})"
+            },
+            {
+              "name": "invalid.illegal.jocky",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.jocky",
+          "match": "\\b(0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*)[iI]?(8|16|32|64)?\\b"
+        },
+        {
+          "name": "constant.numeric.jocky",
+          "match": "\\b\\d+\\.\\d+\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.jocky",
+          "match": "\\b(if|else|while|for|return|break|continue|match)\\b"
+        },
+        {
+          "name": "keyword.declaration.jocky",
+          "match": "\\b(fn|struct|enum|type|mod|use|ffi|lambda)\\b"
+        },
+        {
+          "name": "keyword.operator.jocky",
+          "match": "\\b(and|or|not)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "support.type.jocky",
+          "match": "\\b(i8|i32|i64|bool|void|string)\\b"
+        },
+        {
+          "name": "storage.type.jocky",
+          "match": "(?<=:\\s*)([A-Z][a-zA-Z0-9_]*)"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.jocky",
+          "match": "\\b(true|false|null)\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.jocky",
+          "match": "(?<=fn\\s)([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*\\()",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.jocky"
+            }
+          }
+        },
+        {
+          "name": "entity.name.function.call.jocky",
+          "match": "([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*\\()"
+        }
+      ]
+    },
+    "structs": {
+      "patterns": [
+        {
+          "name": "entity.name.struct.jocky",
+          "match": "(?<=struct\\s)([A-Z][a-zA-Z0-9_]*)"
+        }
+      ]
+    },
+    "enums": {
+      "patterns": [
+        {
+          "name": "entity.name.enum.jocky",
+          "match": "(?<=enum\\s)([A-Z][a-zA-Z0-9_]*)"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.jocky",
+          "match": "(->|=>|\\+|-|\\*|/|%|==|!=|<|>|<=|>=|&&|\\|\\||!|&|\\||\\^|~|<<|>>|=)"
+        }
+      ]
+    }
+  }
+}

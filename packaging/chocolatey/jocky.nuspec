@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>jocky</id>
+    <version>0.1.0</version>
+    <title>JOCKY Compiler</title>
+    <authors>Deval Gupta</authors>
+    <owners>Deval Gupta</owners>
+    <licenseUrl>https://github.com/devalgupta/JOCKY/blob/main/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/devalgupta/JOCKY</projectUrl>
+    <projectSourceUrl>https://github.com/devalgupta/JOCKY</projectSourceUrl>
+    <docsUrl>https://github.com/devalgupta/JOCKY/blob/main/README.md</docsUrl>
+    <bugTrackerUrl>https://github.com/devalgupta/JOCKY/issues</bugTrackerUrl>
+    <description>JOCKY - Advanced obfuscating C++ compiler with sophisticated evasion techniques including anti-disassembly, anti-debugging, anti-analysis, anti-instrumentation, code mutation, and runtime obfuscation. Designed for robust malware obfuscation and advanced software protection.</description>
+    <summary>Obfuscating C++ compiler with advanced evasion techniques</summary>
+    <releaseNotes>https://github.com/devalgupta/JOCKY/releases/tag/v0.1.0</releaseNotes>
+    <tags>compiler obfuscation evasion c++ malware-protection security</tags>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <copyright>Copyright (c) Deval Gupta</copyright>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
