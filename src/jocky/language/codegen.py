@@ -145,23 +145,34 @@ class CodeGen:
         elif t.is_array or isinstance(decl.init, ArrayLiteralExpr):
             elem_type = JType(t.name) if t.is_array else self.infer_type(decl.init.elements[0]) if isinstance(decl.init, ArrayLiteralExpr) and decl.init.elements else JType("i32")
             array_size = t.array_size if t.is_array else (len(decl.init.elements) if isinstance(decl.init, ArrayLiteralExpr) else 0)
-            array_llvm_t = f"[{array_size} x {self.llvm_type(elem_type)}]"
 
-            if decl.init and isinstance(decl.init, ArrayLiteralExpr) and len(decl.init.elements) > 0:
-                values = []
-                for elem in decl.init.elements:
-                    if isinstance(elem, IntLiteral):
-                        values.append(f"{self.llvm_type(elem_type)} {elem.value}")
-                    elif isinstance(elem, FloatLiteral):
-                        values.append(f"{self.llvm_type(elem_type)} {elem.value:#.17g}")
-                    elif isinstance(elem, BoolLiteral):
-                        values.append(f"i1 {1 if elem.value else 0}")
-                    else:
-                        values.append(f"{self.llvm_type(elem_type)} 0")
-                init_val = "[" + ", ".join(values) + "]"
-                self.emit(f"@{decl.name} = global {array_llvm_t} {init_val}")
+            # Check if this is an array of tuples
+            is_tuple_array = isinstance(decl.init, ArrayLiteralExpr) and decl.init.elements and isinstance(decl.init.elements[0], TupleExpr)
+
+            if is_tuple_array:
+                # For tuple arrays, emit as pointer to first element (workaround)
+                # Store as global pointer initialized to null
+                self.emit(f"@{decl.name} = global i8* null")
+                stored_type = JType("i8", is_pointer=True, is_array=False)
+                self.globals[decl.name] = (f"@{decl.name}", stored_type)
+                return
             else:
-                self.emit(f"@{decl.name} = global {array_llvm_t} zeroinitializer")
+                array_llvm_t = f"[{array_size} x {self.llvm_type(elem_type)}]"
+                if decl.init and isinstance(decl.init, ArrayLiteralExpr) and len(decl.init.elements) > 0:
+                    values = []
+                    for elem in decl.init.elements:
+                        if isinstance(elem, IntLiteral):
+                            values.append(f"{self.llvm_type(elem_type)} {elem.value}")
+                        elif isinstance(elem, FloatLiteral):
+                            values.append(f"{self.llvm_type(elem_type)} {elem.value:#.17g}")
+                        elif isinstance(elem, BoolLiteral):
+                            values.append(f"i1 {1 if elem.value else 0}")
+                        else:
+                            values.append(f"{self.llvm_type(elem_type)} 0")
+                    init_val = "[" + ", ".join(values) + "]"
+                    self.emit(f"@{decl.name} = global {array_llvm_t} {init_val}")
+                else:
+                    self.emit(f"@{decl.name} = global {array_llvm_t} zeroinitializer")
 
             stored_type = JType(elem_type.name, is_pointer=False, is_array=True, array_size=array_size)
             self.globals[decl.name] = (f"@{decl.name}", stored_type)
