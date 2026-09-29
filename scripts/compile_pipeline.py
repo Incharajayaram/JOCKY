@@ -176,19 +176,30 @@ def stage_llvm_obfuscate(bc_path, build_dir):
     return obf_bc
 
 
-def stage_compile(bc_path, build_dir):
-    log("COMPILE", "Cross-compiling to Windows x86_64 COFF object")
-    obj_path = build_dir / "output.obj"
+def stage_compile(bc_path, build_dir, platform="windows"):
     clang = TOOLCHAIN / "bin" / "clang"
 
-    run([str(clang), "--target=x86_64-pc-windows-gnu", "-O2", "-c", str(bc_path), "-o", str(obj_path)],
-        "Bitcode -> Windows object")
-    log("COMPILE", f"Object file: {obj_path.stat().st_size} bytes")
+    if platform == "linux":
+        log("COMPILE", "Cross-compiling to Linux x86_64 ELF object")
+        obj_path = build_dir / "output.o"
+        run([str(clang), "--target=x86_64-linux-gnu", "-O2", "-c", str(bc_path), "-o", str(obj_path)],
+            "Bitcode -> Linux object")
+    else:
+        log("COMPILE", "Cross-compiling to Windows x86_64 COFF object")
+        obj_path = build_dir / "output.obj"
+        run([str(clang), "--target=x86_64-pc-windows-gnu", "-O2", "-c", str(bc_path), "-o", str(obj_path)],
+            "Bitcode -> Windows object")
 
+    log("COMPILE", f"Object file: {obj_path.stat().st_size} bytes")
     return obj_path
 
 
-def stage_compile_runtime(build_dir):
+def stage_compile_runtime(build_dir, platform="windows"):
+    if platform == "linux":
+        log("RUNTIME", "Compiling JOCKY runtime for Linux (stub - minimal runtime)")
+        # For now, return empty list for Linux - full runtime implementation pending
+        return []
+
     log("RUNTIME", "Compiling JOCKY runtime for Windows")
     mingw_gcc = "x86_64-w64-mingw32-gcc"
     include_dir = RUNTIME_DIR / "include"
@@ -409,10 +420,10 @@ def main():
     obf_bc = stage_llvm_obfuscate(mlir_bc, build_dir)
 
     log("PIPELINE", "Stage 5/6: Cross-Compile")
-    obj_path = stage_compile(obf_bc, build_dir)
+    obj_path = stage_compile(obf_bc, build_dir, args.platform)
 
     log("PIPELINE", "Stage 5b/6: Compile Runtime")
-    runtime_objs = stage_compile_runtime(build_dir)
+    runtime_objs = stage_compile_runtime(build_dir, args.platform)
 
     log("PIPELINE", "Stage 6/6: Link")
     stem = Path(source_file).stem
