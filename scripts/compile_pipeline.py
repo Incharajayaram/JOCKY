@@ -282,11 +282,24 @@ def stage_compile_runtime(build_dir, platform="windows"):
         return objs
 
     log("RUNTIME", "Compiling JOCKY runtime for Windows")
-    mingw_gcc = "x86_64-w64-mingw32-gcc"
-    cflags = ["-O2", "-c", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE",
-              "-I", str(include_dir),
-              "-I", str(RUNTIME_DIR),
-              "-I", str(RUNTIME_DIR / "windows")]
+    # Try MinGW, fallback to clang for Windows PE target
+    try:
+        subprocess.run(["x86_64-w64-mingw32-gcc", "--version"], capture_output=True, check=True)
+        mingw_gcc = "x86_64-w64-mingw32-gcc"
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        log("RUNTIME", "MinGW not found, using clang for Windows PE target")
+        mingw_gcc = "clang"
+
+    if mingw_gcc == "clang":
+        cflags = ["-O2", "-c", "--target=x86_64-pc-windows-gnu", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE",
+                  "-I", str(include_dir),
+                  "-I", str(RUNTIME_DIR),
+                  "-I", str(RUNTIME_DIR / "windows")]
+    else:
+        cflags = ["-O2", "-c", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE",
+                  "-I", str(include_dir),
+                  "-I", str(RUNTIME_DIR),
+                  "-I", str(RUNTIME_DIR / "windows")]
 
     WIN = RUNTIME_DIR / "windows"
     sources_win = [
@@ -373,16 +386,31 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
         return exe_path
 
     log("LINK", "Linking Windows PE executable")
-    mingw_gcc = "x86_64-w64-mingw32-gcc"
+    # Use clang if MinGW not available
+    try:
+        subprocess.run(["x86_64-w64-mingw32-gcc", "--version"], capture_output=True, check=True)
+        linker = "x86_64-w64-mingw32-gcc"
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        linker = "clang"
 
     all_objs = [str(obj_path)] + [str(o) for o in runtime_objs]
-    cmd = [
-        mingw_gcc,
-        *all_objs,
-        "-lntdll", "-lwinhttp", "-ldnsapi", "-lwevtapi",
-        "-ladvapi32", "-lkernel32", "-lws2_32",
-        "-o", str(exe_path),
-    ]
+    if linker == "clang":
+        cmd = [
+            linker,
+            "--target=x86_64-pc-windows-gnu",
+            *all_objs,
+            "-lntdll", "-lwinhttp", "-ldnsapi", "-lwevtapi",
+            "-ladvapi32", "-lkernel32", "-lws2_32",
+            "-o", str(exe_path),
+        ]
+    else:
+        cmd = [
+            linker,
+            *all_objs,
+            "-lntdll", "-lwinhttp", "-ldnsapi", "-lwevtapi",
+            "-ladvapi32", "-lkernel32", "-lws2_32",
+            "-o", str(exe_path),
+        ]
     run(cmd, "Link PE executable")
     log("LINK", f"Output: {exe_path} ({exe_path.stat().st_size} bytes)")
 
