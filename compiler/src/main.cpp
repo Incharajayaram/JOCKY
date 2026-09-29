@@ -2,6 +2,7 @@
 #include <string>
 #include <cstring>
 #include "pipeline.h"
+#include "forensic/forensic_analyzer.h"
 
 using namespace jocky;
 
@@ -112,9 +113,55 @@ int main(int argc, char** argv) {
 #endif
     }
 
+    // Handle analyze-only mode
+    if (opts.analyzeOnly) {
+        if (input.empty()) {
+            std::cerr << "[!] No binary file specified for analysis\n";
+            return 1;
+        }
+
+        jocky::forensic::ForensicAnalyzer analyzer;
+        jocky::forensic::ForensicReport report;
+
+        if (!analyzer.analyzeOnly(input, report)) {
+            return 1;
+        }
+
+        std::string reportPath = input + ".forensic." + opts.reportFormat;
+        if (opts.reportFormat == "html") {
+            analyzer.saveHtmlReport(report, reportPath);
+        } else {
+            analyzer.saveReport(report, reportPath);
+        }
+        std::cout << "[*] Report saved: " << reportPath << "\n";
+        return 0;
+    }
+
     Pipeline pipeline;
     if (!pipeline.run(opts)) {
         return 1;
+    }
+
+    // Run forensic analysis if requested
+    if (opts.runForensic) {
+        jocky::forensic::ForensicAnalyzer analyzer;
+        jocky::forensic::ForensicReport report;
+        report.profileUsed = opts.profile;
+
+        if (analyzer.analyze(opts.outputFile, report)) {
+            std::string reportPath = opts.outputFile + ".forensic." + opts.reportFormat;
+            if (opts.reportFormat == "html") {
+                analyzer.saveHtmlReport(report, reportPath);
+            } else {
+                analyzer.saveReport(report, reportPath);
+            }
+            std::cout << "[*] Forensic report saved: " << reportPath << "\n";
+
+            if (report.overallScore < 60) {
+                std::cerr << "[!] WARNING: Binary scored " << report.overallScore
+                         << "/100. Review recommendations.\n";
+            }
+        }
     }
 
     return 0;

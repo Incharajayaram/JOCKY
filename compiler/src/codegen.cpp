@@ -111,18 +111,26 @@ void CodeGen::declareFunc(FuncDecl& decl) {
         paramTypes.push_back(llvmType(p.type));
     }
     llvm::FunctionType* ft = llvm::FunctionType::get(llvmType(decl.retType), paramTypes, false);
-    llvm::Function* f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, decl.name, mod.get());
+    
+    // Diversify function name (but keep main as-is for linker)
+    std::string funcName = decl.name;
+    if (decl.name != "main") {
+        funcName = diversifier.diversify(decl.name);
+    }
+    
+    llvm::Function* f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, funcName, mod.get());
 
-    // Set parameter names
+    // Set parameter names (diversified)
     size_t i = 0;
     for (auto& arg : f->args()) {
-        arg.setName(decl.params[i++].name);
+        std::string paramName = diversifier.diversify(decl.params[i++].name);
+        arg.setName(paramName);
     }
 
     FuncSig sig;
     for (auto& p : decl.params) sig.params.push_back(p.type);
     sig.ret = decl.retType;
-    funcs[decl.name] = sig;
+    funcs[decl.name] = sig; // Store under original name for lookup
 }
 
 void CodeGen::declareFFI(FFIDecl& decl) {
@@ -140,11 +148,16 @@ void CodeGen::declareFFI(FFIDecl& decl) {
 }
 
 void CodeGen::emitFunc(FuncDecl& decl) {
-    llvm::Function* f = mod->getFunction(decl.name);
-    if (!f) throw CodeGenError("Function not found: " + decl.name);
+    std::string funcName = decl.name;
+    if (decl.name != "main") {
+        funcName = diversifier.diversify(decl.name);
+    }
+    
+    llvm::Function* f = mod->getFunction(funcName);
+    if (!f) throw CodeGenError("Function not found: " + funcName);
     currentFunc = f;
 
-    llvm::BasicBlock* entry = llvm::BasicBlock::Create(ctx, "entry", f);
+    llvm::BasicBlock* entry = llvm::BasicBlock::Create(ctx, diversifier.diversify("entry"), f);
     builder->SetInsertPoint(entry);
     locals.clear();
 
@@ -152,18 +165,19 @@ void CodeGen::emitFunc(FuncDecl& decl) {
     if (decl.name == "main") {
         llvm::Function* rtInit = mod->getFunction("jocky_runtime_init");
         if (rtInit) {
-            builder->CreateCall(rtInit, {}, "rt_init");
+            builder->CreateCall(rtInit, {}, diversifier.diversify("rt_init"));
         }
     }
 
     // Allocate and store parameters
     for (auto& arg : f->args()) {
         std::string name = arg.getName().str();
-        llvm::AllocaInst* alloca = builder->CreateAlloca(arg.getType(), nullptr, name + ".addr");
+        llvm::AllocaInst* alloca = builder->CreateAlloca(arg.getType(), nullptr, diversifier.diversify(name + ".addr"));
         builder->CreateStore(&arg, alloca);
         JType t;
         for (auto& p : decl.params) {
-            if (p.name == name) { t = p.type; break; }
+            std::string divName = diversifier.diversify(p.name);
+            if (divName == name || p.name == name) { t = p.type; break; }
         }
         locals[name] = {alloca, t};
     }
@@ -193,9 +207,10 @@ void CodeGen::emitStmt(Stmt& stmt) {
             t = JType::makeI32(); // default fallback
         }
         llvm::Value* val = emitExpr(*let->init);
-        llvm::AllocaInst* alloca = builder->CreateAlloca(llvmType(t), nullptr, let->name);
+        std::string divName = diversifier.diversify(let->name);
+        llvm::AllocaInst* alloca = builder->CreateAlloca(llvmType(t), nullptr, divName);
         builder->CreateStore(val, alloca);
-        locals[let->name] = {alloca, t};
+        locals[let->name] = {alloca, t}; // Store under original name for lookup
     }
     else if (auto* assign = dynamic_cast<AssignStmt*>(&stmt)) {
         if (auto* vr = dynamic_cast<VarRef*>(assign->target.get())) {
@@ -210,9 +225,9 @@ void CodeGen::emitStmt(Stmt& stmt) {
     else if (auto* ifs = dynamic_cast<IfStmt*>(&stmt)) {
         llvm::Value* cond = emitExpr(*ifs->cond);
         llvm::Function* f = builder->GetInsertBlock()->getParent();
-        llvm::BasicBlock* thenBB = llvm::BasicBlock::Create(ctx, "then", f);
-        llvm::BasicBlock* elseBB = ifs->elseBlock ? llvm::BasicBlock::Create(ctx, "else", f) : nullptr;
-        llvm::BasicBlock* mergeBB = llvm::BasicBlock::Create(ctx, "merge", f);
+        llvm::BasicBlock* thenBB = llvm::BasicBlock::Create(ctx, diversifier.diversify("then"), f);
+        llvm::BasicBlock* elseBB = ifs->elseBlock ? llvm::BasicBlock::Create(ctx, diversifier.diversify("else"), f) : nullptr;
+        llvm::BasicBlock* mergeBB = llvm::BasicBlock::Create(ctx, diversifier.diversify("merge"), f);
 
         if (elseBB) {
             builder->CreateCondBr(cond, thenBB, elseBB);
@@ -236,9 +251,9 @@ void CodeGen::emitStmt(Stmt& stmt) {
     }
     else if (auto* wh = dynamic_cast<WhileStmt*>(&stmt)) {
         llvm::Function* f = builder->GetInsertBlock()->getParent();
-        llvm::BasicBlock* headerBB = llvm::BasicBlock::Create(ctx, "while.cond", f);
-        llvm::BasicBlock* bodyBB = llvm::BasicBlock::Create(ctx, "while.body", f);
-        llvm::BasicBlock* endBB = llvm::BasicBlock::Create(ctx, "while.end", f);
+        llvm::BasicBlock* headerBB = llvm::BasicBlock::Create(ctx, diversifier.diversify("while.cond"), f);
+        llvm::BasicBlock* bodyBB = llvm::BasicBlock::Create(ctx, diversifier.diversify("while.body"), f);
+        llvm::BasicBlock* endBB = llvm::BasicBlock::Create(ctx, diversifier.diversify("while.end"), f);
 
         builder->CreateBr(headerBB);
         builder->SetInsertPoint(headerBB);
