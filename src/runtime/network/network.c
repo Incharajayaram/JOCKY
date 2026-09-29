@@ -121,7 +121,7 @@ int jocky_socket_bind(jocky_socket_t sock, const char* host, int port) {
         addr4->sin_family = AF_INET;
         addr4->sin_port = htons(port);
         if (host) {
-            inet_pton(AF_INET, host, &addr4->sin_addr);
+            if (inet_pton(AF_INET, host, &addr4->sin_addr) <= 0) return -1;
         } else {
             addr4->sin_addr.s_addr = htonl(INADDR_ANY);
         }
@@ -131,7 +131,7 @@ int jocky_socket_bind(jocky_socket_t sock, const char* host, int port) {
         addr6->sin6_family = AF_INET6;
         addr6->sin6_port = htons(port);
         if (host) {
-            inet_pton(AF_INET6, host, &addr6->sin6_addr);
+            if (inet_pton(AF_INET6, host, &addr6->sin6_addr) <= 0) return -1;
         } else {
             addr6->sin6_addr = in6addr_any;
         }

@@ -104,11 +104,11 @@ static size_t ptrace_read(pid_t pid, uint64_t addr, void* buf, size_t size) {
     unsigned char* p = (unsigned char*)buf;
     size_t read = 0;
 
-    // ptrace reads in word-sized chunks (8 bytes on x64)
     while (read < size) {
         size_t to_read = (size - read < sizeof(long)) ? (size - read) : sizeof(long);
+        errno = 0;
         long data = ptrace(PTRACE_PEEKDATA, pid, (void*)(addr + read), NULL);
-        if (data == -1) break;
+        if (data == -1 && errno != 0) break;
 
         memcpy(p + read, &data, to_read);
         read += to_read;
@@ -144,6 +144,8 @@ static size_t ptrace_write(pid_t pid, uint64_t addr, const void* data, size_t si
 
     return written;
 }
+
+#if defined(__x86_64__)
 
 /**
  * Get the current RIP (instruction pointer) of a traced process.
@@ -182,6 +184,8 @@ static bool ptrace_set_rip(pid_t pid, uint64_t rip) {
 
     return true;
 }
+
+#endif
 
 /**
  * Hollow out a target process and replace with payload.
