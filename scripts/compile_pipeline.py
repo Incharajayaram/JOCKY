@@ -12,6 +12,7 @@ Runs each compilation stage sequentially with detailed logging:
 import sys
 import os
 import time
+import argparse
 import subprocess
 from pathlib import Path
 
