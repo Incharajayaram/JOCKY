@@ -244,12 +244,16 @@ class TypeChecker:
             if not self.types_equal(lt, rt):
                 raise TypeError(f"Type mismatch in assignment: expected {lt}, got {rt}")
         elif isinstance(stmt, IfStmt):
-            self.typeof(stmt.cond)
+            ct = self.typeof(stmt.cond)
+            if ct.name != "bool":
+                raise TypeError("If condition must be bool")
             self.check_block(stmt.then_block)
             if stmt.else_block:
                 self.check_block(stmt.else_block)
         elif isinstance(stmt, WhileStmt):
-            self.typeof(stmt.cond)
+            ct = self.typeof(stmt.cond)
+            if ct.name != "bool":
+                raise TypeError("While condition must be bool")
             self.loop_depth += 1
             self.check_block(stmt.body)
             self.loop_depth -= 1
@@ -279,8 +283,17 @@ class TypeChecker:
             self.check_block(stmt.body)
             self.loop_depth -= 1
         elif isinstance(stmt, ReturnStmt):
-            if stmt.value is not None:
-                self.typeof(stmt.value)
+            if stmt.value is None:
+                # No return value
+                if self.current_ret.name != "void":
+                    raise TypeError(f"Non-void function must return {self.current_ret}, got nothing")
+            else:
+                # Has return value
+                if self.current_ret.name == "void":
+                    raise TypeError("void function cannot return a value")
+                ret_type = self.typeof(stmt.value)
+                if not self.types_equal(ret_type, self.current_ret):
+                    raise TypeError(f"Return type mismatch: expected {self.current_ret}, got {ret_type}")
         elif isinstance(stmt, ExprStmt):
             self.typeof(stmt.expr)
         elif isinstance(stmt, BreakStmt):
@@ -322,13 +335,19 @@ class TypeChecker:
             rt = self.typeof(expr.right)
             if expr.op in ("+", "-", "*", "/", "%"):
                 if lt.name == "string" or rt.name == "string":
+                    if expr.op != "+":
+                        raise TypeError(f"Arithmetic op {expr.op} only works with numbers, not strings")
                     return JType("string")
                 if not self.is_numeric(lt) or not self.is_numeric(rt):
-                    return lt
+                    raise TypeError(f"Arithmetic op {expr.op} requires numeric types, got {lt} and {rt}")
                 return lt
             elif expr.op in ("==", "!=", "<", ">", "<=", ">="):
+                if not self.types_equal(lt, rt):
+                    raise TypeError(f"Comparison {expr.op} requires matching types: {lt} vs {rt}")
                 return JType("bool")
             elif expr.op in ("&&", "||"):
+                if lt.name != "bool" or rt.name != "bool":
+                    raise TypeError(f"Logical op {expr.op} requires bool operands, got {lt} and {rt}")
                 return JType("bool")
             elif expr.op in ("|", "^", "&"):
                 if not self.is_numeric(lt) or not self.is_numeric(rt):
