@@ -95,16 +95,9 @@ int jocky_unhook_ntdll(void) { return 0; }
 /* RDLL injection (Windows only) */
 int jocky_rdll_inject(const char* dll, const char* func) { return -1; }
 
-/* Thread hijacking - requires detailed ptrace usage */
-int jocky_thread_hijack(int pid, void* func) { return -1; }
-
-/* Syscall spoofing - requires ptrace syscall interception */
-int jocky_spoof_syscall(int syscall, void* args) { return -1; }
-int jocky_spoof_call(void) { return 0; }
-
-/* Remaining process operations */
-int jocky_process_hollow(const char* path, const char* args) { return -1; }
-int jocky_process_hollow_linux(int pid, const char* elf_path) { return -1; }
+/* Thread hijacking and process operations implemented in separate files */
+/* See: thread_hijack.c for jocky_thread_hijack, jocky_spoof_syscall */
+/* See: process_hollow.c for jocky_process_hollow, jocky_process_hollow_linux */
 
 /* Helper function stubs */
 void jocky_sleep_and_recheck(void) { sleep(1); }
