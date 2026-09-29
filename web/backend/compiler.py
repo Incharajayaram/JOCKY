@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Optional
 
 from obfuscation import MLIR_PASSES, LLVM_PASSES
+from datetime import datetime as dt
+from metrics import get_metric
 
 
 class JobStatus(str, Enum):
@@ -86,6 +88,7 @@ async def run_compilation(
     obfuscation: dict,
     notify_callback=None,
     preset: str = "standard",
+    job_id: str = None,
 ):
     build_dir = None
     source_dir = None
@@ -96,7 +99,13 @@ async def run_compilation(
         if notify_callback:
             await notify_callback(job)
 
-        build_dir = tempfile.mkdtemp(prefix="jocky_build_")
+        # Use project-relative build directory (Docker-mountable)
+        project_root = Path(__file__).resolve().parent.parent.parent
+        build_base = project_root / "build"
+        build_base.mkdir(exist_ok=True)
+        build_dir = build_base / f"jocky_build_{uuid.uuid4().hex[:8]}"
+        build_dir.mkdir(parents=True, exist_ok=True)
+
         source_dir = tempfile.mkdtemp(prefix="jocky_src_")
         source_path = Path(source_dir) / "source.jky"
         source_path.write_text(source)
@@ -109,8 +118,7 @@ async def run_compilation(
 
         obf_cfg = _build_obfuscation_config(obfuscation)
 
-        # Get project root (backend is at web/backend, scripts is at root/scripts)
-        project_root = Path(__file__).resolve().parent.parent.parent
+        # Get compile script (already have project_root from build_dir setup)
         compile_script = project_root / "scripts" / "compile_pipeline.py"
 
         # Try Docker first, fall back to local compilation
@@ -224,17 +232,36 @@ async def run_compilation(
             output_name = "source"
 
         if output_file.exists():
+            # Save output to persistent location, cleanup temp build_dir
+            artifacts_dir = project_root / "build" / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+            persistent_output = artifacts_dir / f"{job.job_id}_{output_name}"
+            shutil.copy2(output_file, persistent_output)
+
             job.status = JobStatus.COMPLETED
             job.progress = 100
-            job.output_path = str(output_file)
+            job.output_path = str(persistent_output)
             job.output_name = output_name
-            file_size = output_file.stat().st_size
+            file_size = persistent_output.stat().st_size
             size_mb = file_size / (1024 * 1024)
             job.logs.append(f"[PIPELINE] Build complete: {output_name} ({size_mb:.2f} MB)")
+
+            # Finalize metrics
+            if job_id:
+                metric = get_metric(job_id)
+                if metric:
+                    metric.finalize(dt.utcnow(), file_size, True)
         else:
             job.status = JobStatus.FAILED
             job.progress = 100
             job.logs.append("[PIPELINE] Build produced no output binary")
+
+            # Finalize metrics as failed
+            if job_id:
+                metric = get_metric(job_id)
+                if metric:
+                    metric.finalize(dt.utcnow(), 0, False)
 
         if notify_callback:
             await notify_callback(job)
@@ -243,9 +270,18 @@ async def run_compilation(
         job.status = JobStatus.FAILED
         job.progress = 100
         job.logs.append(f"[PIPELINE] Error: {str(e)}")
+
+        # Finalize metrics on exception
+        if job_id:
+            metric = get_metric(job_id)
+            if metric:
+                metric.finalize(dt.utcnow(), 0, False)
+
         if notify_callback:
             await notify_callback(job)
 
     finally:
         if source_dir:
             shutil.rmtree(source_dir, ignore_errors=True)
+        if build_dir:
+            shutil.rmtree(build_dir, ignore_errors=True)
