@@ -99,6 +99,7 @@ async def run_compilation(
         if notify_callback:
             await notify_callback(job)
 
+<<<<<<< HEAD
         # Use project-relative directories (Docker-mountable)
         project_root = Path(__file__).resolve().parent.parent.parent
         build_base = project_root / "build"
