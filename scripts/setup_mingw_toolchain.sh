@@ -58,16 +58,30 @@ for bin in gcc g++ ar as ld ranlib strip objcopy objdump; do
 done
 
 # Copy MinGW libraries and headers
-echo -e "${BLUE}Copying MinGW libraries...${NC}"
+echo -e "${BLUE}Copying MinGW target libraries and headers...${NC}"
 if [ -d "/usr/x86_64-w64-mingw32/lib" ]; then
-    cp -r /usr/x86_64-w64-mingw32/lib/* "$TOOLCHAIN/mingw/x86_64-w64-mingw32/lib/"
-    echo "  ✓ Libraries copied"
+    cp -r /usr/x86_64-w64-mingw32/lib/* "$TOOLCHAIN/mingw/x86_64-w64-mingw32/lib/" 2>/dev/null || true
+    echo "  ✓ Target libraries copied"
 fi
 
-echo -e "${BLUE}Copying MinGW headers...${NC}"
 if [ -d "/usr/x86_64-w64-mingw32/include" ]; then
-    cp -r /usr/x86_64-w64-mingw32/include/* "$TOOLCHAIN/mingw/x86_64-w64-mingw32/include/"
-    echo "  ✓ Headers copied"
+    cp -r /usr/x86_64-w64-mingw32/include/* "$TOOLCHAIN/mingw/x86_64-w64-mingw32/include/" 2>/dev/null || true
+    echo "  ✓ Target headers copied"
+fi
+
+# Copy GCC compiler backend and plugins (critical for compilation)
+echo -e "${BLUE}Copying GCC compiler backend...${NC}"
+mkdir -p "$TOOLCHAIN/mingw/lib"
+if [ -d "/usr/lib/gcc/x86_64-w64-mingw32" ]; then
+    cp -r /usr/lib/gcc/x86_64-w64-mingw32/* "$TOOLCHAIN/mingw/lib/" 2>/dev/null || true
+    echo "  ✓ GCC backend copied"
+fi
+
+# Copy lib64 if it exists
+if [ -d "/usr/lib64" ]; then
+    mkdir -p "$TOOLCHAIN/mingw/lib64"
+    cp -r /usr/lib64/* "$TOOLCHAIN/mingw/lib64/" 2>/dev/null || true
+    echo "  ✓ lib64 copied"
 fi
 
 # Create symlinks with simple names for easy access
