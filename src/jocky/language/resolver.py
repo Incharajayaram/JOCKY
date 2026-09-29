@@ -39,6 +39,9 @@ class ModuleResolver:
 
         Returns:
             Parsed Program from the module, or None if not found.
+
+        Raises:
+            RuntimeError: If circular import is detected.
         """
         if hasattr(module_path, 'components'):
             components = module_path.components
@@ -51,7 +54,7 @@ class ModuleResolver:
             return self._resolved[key]
 
         if key in self._resolving:
-            return None
+            raise RuntimeError(f"Circular module import detected: {key}")
 
         self._resolving.add(key)
 
