@@ -345,7 +345,11 @@ def stage_compile_runtime(build_dir):
         '}\n'
         'int jocky_setenv(const char* var_name, const char* value) { \n'
         '  if (!var_name || !value) return -1; \n'
+        '#ifdef _WIN32\n'
+        '  return _putenv_s(var_name, value); \n'
+        '#else\n'
         '  return setenv(var_name, value, 1); \n'
+        '#endif\n'
         '}\n'
     )
     stub.write_text(stub_src)
