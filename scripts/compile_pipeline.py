@@ -16,8 +16,10 @@ import argparse
 import subprocess
 from pathlib import Path
 
-TOOLCHAIN = Path(os.environ.get("TOOLCHAIN_PATH", "toolchain"))
-SRC_DIR = Path(__file__).resolve().parent.parent / "src"
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+TOOLCHAIN = Path(os.environ.get("TOOLCHAIN_PATH", str(PROJECT_ROOT / "toolchain")))
+SRC_DIR = PROJECT_ROOT / "src"
 RUNTIME_DIR = SRC_DIR / "runtime"
 
 sys.path.insert(0, str(SRC_DIR))
