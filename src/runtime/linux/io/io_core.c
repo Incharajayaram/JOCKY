@@ -24,10 +24,6 @@ const char* string(int64_t val) {
     return buf;
 }
 
-void jocky_sleep_and_recheck(void) {
-    sleep(1);
-}
-
 /* Array utilities */
 int64_t array_len(void* arr) {
     if (!arr) return 0;
