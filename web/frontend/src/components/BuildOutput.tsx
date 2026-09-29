@@ -134,7 +134,7 @@ export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOu
               style={downloadButtonStyle(dlHovered)}
               onClick={(e) => {
                 e.stopPropagation();
-                window.open(`http://localhost:8000/api/download/${jobId}`, '_blank');
+                window.open(`/api/download/${jobId}`, '_blank');
               }}
               onMouseEnter={() => setDlHovered(true)}
               onMouseLeave={() => setDlHovered(false)}

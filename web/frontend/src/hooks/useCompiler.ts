@@ -1,8 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { CompileRequest, LogEntry, ObfuscationState } from '../types';
 
-const API_BASE = 'http://localhost:8000';
-
 function parseLogLevel(text: string): LogEntry['level'] {
   if (text.startsWith('[ERROR]') || text.startsWith('error:')) return 'error';
   if (text.startsWith('[WARN]') || text.startsWith('warning:')) return 'warn';
@@ -53,6 +51,7 @@ export function useCompiler() {
       source,
       platform,
       obfuscation: { mlir: mlirMap, llvm: llvmMap },
+      preset: 'standard',
     };
 
     const enabledPasses = [
@@ -63,7 +62,7 @@ export function useCompiler() {
     addLog(`[INFO] Obfuscation passes: ${enabledPasses.join(', ') || 'none'}`, 'info');
 
     try {
-      const res = await fetch(`${API_BASE}/api/compile`, {
+      const res = await fetch('/api/compile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
@@ -86,7 +85,7 @@ export function useCompiler() {
       }
 
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const ws = new WebSocket(`${wsProtocol}//localhost:8000/ws/logs/${id}`);
+      const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/logs/${id}`);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {
@@ -113,7 +112,7 @@ export function useCompiler() {
 
   async function pollStatus(id: string) {
     try {
-      const res = await fetch(`${API_BASE}/api/status/${id}`);
+      const res = await fetch(`/api/status/${id}`);
       if (!res.ok) return;
       const data = await res.json();
       if (data.logs) {
