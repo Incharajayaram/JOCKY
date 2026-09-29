@@ -13,8 +13,6 @@ PASS_REGISTRY = {
     "pdata_strip": "pdata-strip",
     "anti_debug": "anti-debug",
     "virtualize": "virtualize",
-    # Runtime passes
-    "polymorphic_mutation": "polymorphic",
     # MLIR passes
     "string_encrypt": "string-encrypt",
     "constant_obfuscate": "constant-obfuscate",
