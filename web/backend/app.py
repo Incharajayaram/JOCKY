@@ -1,4 +1,5 @@
 import asyncio
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
@@ -12,11 +13,18 @@ from obfuscation import MLIR_PASSES, LLVM_PASSES
 from demo_scripts import WINDOWS_DEMO, LINUX_DEMO
 
 
-app = FastAPI(title="JOCKY Compiler API", version="1.0.0")
+app = FastAPI(
+    title="JOCKY Compiler API",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
 
+# CORS configuration - support localhost for dev, but allow production origins via env var
+allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,6 +57,7 @@ class CompileRequest(BaseModel):
     source: str
     platform: str = "windows"
     obfuscation: ObfuscationConfig = Field(default_factory=ObfuscationConfig)
+    preset: str = "standard"
 
 
 class CompileResponse(BaseModel):
@@ -65,6 +74,8 @@ class StatusResponse(BaseModel):
 async def compile_source(request: CompileRequest):
     if request.platform not in ("windows", "linux"):
         raise HTTPException(status_code=400, detail="Platform must be 'windows' or 'linux'")
+    if request.preset not in ("none", "light", "standard", "aggressive"):
+        raise HTTPException(status_code=400, detail="Preset must be 'none', 'light', 'standard', or 'aggressive'")
     if not request.source.strip():
         raise HTTPException(status_code=400, detail="Source code cannot be empty")
 
@@ -90,7 +101,7 @@ async def compile_source(request: CompileRequest):
         for ws in dead:
             conns.remove(ws)
 
-    asyncio.create_task(run_compilation(job, request.source, obf_dict, notify))
+    asyncio.create_task(run_compilation(job, request.source, obf_dict, notify, request.preset))
     return CompileResponse(job_id=job.job_id)
 
 
@@ -172,6 +183,19 @@ async def websocket_logs(websocket: WebSocket, job_id: str):
             ws_connections.pop(job_id, None)
 
 
+@app.get("/api/config")
+async def get_config():
+    """Get backend configuration for frontend"""
+    return {
+        "api_version": "1.0.0",
+        "supported_platforms": ["windows", "linux"],
+        "obfuscation_presets": ["none", "light", "standard", "aggressive"],
+        "docs_url": "/docs",
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    host = os.getenv("BACKEND_HOST", "0.0.0.0")
+    port = int(os.getenv("BACKEND_PORT", "8000"))
+    uvicorn.run(app, host=host, port=port)
