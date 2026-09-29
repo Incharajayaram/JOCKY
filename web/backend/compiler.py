@@ -106,6 +106,8 @@ async def run_compilation(
         if notify_callback:
             await notify_callback(job)
 
+        obf_cfg = _build_obfuscation_config(obfuscation)
+
         cmd = [
             "docker", "run", "--rm",
             "-v", f"{build_dir}:/workspace/build",
@@ -117,6 +119,11 @@ async def run_compilation(
             "--platform", job.platform,
             "--preset", preset,
         ]
+
+        if obf_cfg.get("mlir_flags"):
+            cmd.extend(["--mlir-passes", ",".join(obf_cfg["mlir_flags"])])
+        if obf_cfg.get("llvm_passes"):
+            cmd.extend(["--llvm-passes", obf_cfg["llvm_passes"]])
 
         job.progress = 15
         job.logs.append("[PIPELINE] Launching Docker container")
