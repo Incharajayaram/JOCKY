@@ -1,7 +1,7 @@
 import { Clock, Check, AlertCircle, Loader } from 'lucide-react';
 import { useJobHistory } from '../hooks/useJobHistory';
 import type { CSSProperties } from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 const styles: Record<string, CSSProperties> = {
   container: {
