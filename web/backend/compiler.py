@@ -84,6 +84,7 @@ async def run_compilation(
     source: str,
     obfuscation: dict,
     notify_callback=None,
+    preset: str = "standard",
 ):
     build_dir = None
     source_dir = None
@@ -99,31 +100,22 @@ async def run_compilation(
         source_path = Path(source_dir) / "source.jky"
         source_path.write_text(source)
 
-        obf_config = _build_obfuscation_config(obfuscation)
-        config_path = Path(build_dir) / "obf_config.json"
-        config_path.write_text(json.dumps(obf_config))
-
         job.progress = 10
         job.logs.append(f"[PIPELINE] Platform: {job.platform}")
-        job.logs.append(f"[PIPELINE] MLIR flags: {obf_config['mlir_flags']}")
-        job.logs.append(f"[PIPELINE] LLVM passes: {obf_config['llvm_passes']}")
+        job.logs.append(f"[PIPELINE] Obfuscation preset: {preset}")
         if notify_callback:
             await notify_callback(job)
-
-        target_env = "windows" if job.platform == "windows" else "linux"
 
         cmd = [
             "docker", "run", "--rm",
             "-v", f"{build_dir}:/workspace/build",
             "-v", f"{source_path}:/workspace/jocky/source.jky:ro",
-            "-v", f"{config_path}:/workspace/build/obf_config.json:ro",
-            "-e", f"JOCKY_TARGET={target_env}",
-            "-e", f"JOCKY_MLIR_FLAGS={' '.join(obf_config['mlir_flags'])}",
-            "-e", f"JOCKY_LLVM_PASSES={obf_config['llvm_passes']}",
-            "jocky",
+            "jocky-compiler:latest",
             "python3", "scripts/compile_pipeline.py",
             "/workspace/jocky/source.jky",
             "/workspace/build",
+            "--platform", job.platform,
+            "--preset", preset,
         ]
 
         job.progress = 15
@@ -139,7 +131,7 @@ async def run_compilation(
 
         stage_progress = {
             "PARSE": 30,
-            "CODEGEN": 45,
+            "CodeGen": 45,
             "MLIR": 55,
             "LLVM-OBF": 65,
             "COMPILE": 75,
@@ -184,7 +176,9 @@ async def run_compilation(
             job.progress = 100
             job.output_path = str(output_file)
             job.output_name = output_name
-            job.logs.append(f"[PIPELINE] Build complete: {output_name} ({output_file.stat().st_size} bytes)")
+            file_size = output_file.stat().st_size
+            size_mb = file_size / (1024 * 1024)
+            job.logs.append(f"[PIPELINE] Build complete: {output_name} ({size_mb:.2f} MB)")
         else:
             job.status = JobStatus.FAILED
             job.progress = 100
