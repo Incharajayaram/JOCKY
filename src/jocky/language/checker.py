@@ -275,8 +275,19 @@ class TypeChecker:
         # Instantiate the function
         instance = self.monomorphizer.instantiate(generic_func, bindings)
 
-        # Type-check the instance
-        self.check_func(instance)
+        # Type-check the instance with its bindings in scope so that nested
+        # generic calls using type variables (e.g. id::<U>) resolve concretely
+        saved_ret = self.current_ret
+        saved_ctx = self.generic_context
+        inst_ctx = GenericContext()
+        for var_name, concrete in bindings.bindings.items():
+            inst_ctx.bind(var_name, concrete)
+        self.generic_context = inst_ctx
+        try:
+            self.check_func(instance)
+        finally:
+            self.current_ret = saved_ret
+            self.generic_context = saved_ctx
 
         # Register the instance
         self.monomorphic_instances[instance.name] = instance
@@ -435,10 +446,14 @@ class TypeChecker:
                 return JType("string")
 
             if expr.generic_args:
-                if expr.name not in self.functions:
+                if expr.name in self.functions:
+                    base_sig = self.functions[expr.name]
+                elif expr.name in self.generic_functions:
+                    gdecl = self.generic_functions[expr.name]
+                    base_sig = ([p.type for p in gdecl.params], gdecl.ret_type, False)
+                else:
                     raise TypeError(f"Undefined generic function: {expr.name}")
 
-                base_sig = self.functions[expr.name]
                 if len(base_sig) == 3:
                     ptypes, ret, is_variadic = base_sig
                 else:
@@ -460,10 +475,13 @@ class TypeChecker:
                     raise TypeError(f"Function {expr.name} expects {len(generic_func.generic_params)} type args, got {len(expr.generic_args)}")
 
                 # Create type bindings: T -> i32, U -> string, etc.
+                # Type-var args (e.g. U inside an instance body) are resolved
+                # through the current instantiation context first.
                 type_context = GenericContext()
                 for param, arg_type in zip(generic_func.generic_params, expr.generic_args):
                     param_name = param if isinstance(param, str) else param.name
-                    type_context.bind(param_name, arg_type)
+                    type_context.bind(param_name,
+                                      self.substitute_type(arg_type, self.generic_context))
 
                 # Substitute types in function signature
                 substituted_ptypes = [self.substitute_type(pt, type_context) for pt in ptypes]
@@ -479,21 +497,52 @@ class TypeChecker:
                         raise TypeError(f"Arg {i} to {expr.name}: expected {pt}, got {at}")
 
                 # Record monomorphization for codegen
-                type_bindings = {}
-                for param, arg_type in zip(generic_func.generic_params, expr.generic_args):
-                    param_name = param if isinstance(param, str) else param.name
-                    type_bindings[param_name] = arg_type
+                type_bindings = dict(type_context.bindings)
                 mono = Monomorphization(expr.name, type_bindings)
                 self.monomorphizations.add(mono)
+
+                # Materialize a monomorphic instance for codegen
+                if mono.mangled_name not in self.monomorphic_instances:
+                    # Note: the instance shares the template body, so it is not
+                    # re-checked here; nested generic calls resolve at their own
+                    # concrete call sites.
+                    self.monomorphic_instances[mono.mangled_name] = FuncDecl(
+                        name=mono.mangled_name,
+                        params=[Param(p.name, self.substitute_type(p.type, type_context))
+                                for p in generic_func.params],
+                        ret_type=self.substitute_type(generic_func.ret_type, type_context),
+                        body=generic_func.body,
+                        attributes=generic_func.attributes,
+                        is_generic=False,
+                        location=generic_func.location,
+                    )
 
                 return substituted_ret
             else:
                 # Non-generic function call
+                if expr.name in self.generic_functions:
+                    # Call to a generic function without explicit type args:
+                    # infer type bindings from the arguments and instantiate
+                    gdecl = self.generic_functions[expr.name]
+                    arg_types = [self.typeof(arg) for arg in expr.args]
+                    saved_ret = self.current_ret
+                    try:
+                        instance_name = self.instantiate_and_check_generic(gdecl, arg_types)
+                    finally:
+                        self.current_ret = saved_ret
+                    return self.monomorphic_instances[instance_name].ret_type
+
                 if expr.name in self.functions:
                     sig = self.functions[expr.name]
                 elif expr.name in self.visible_symbols:
                     symbol = self.visible_symbols[expr.name]
                     sig = symbol.type_info
+                elif expr.name in self.locals:
+                    lt = self.locals[expr.name]
+                    if getattr(lt, "name", None) == "fn" and hasattr(lt, "param_types"):
+                        sig = (list(lt.param_types), lt.return_type, False)
+                    else:
+                        raise TypeError(f"Undefined function: {expr.name}")
                 else:
                     raise TypeError(f"Undefined function: {expr.name}")
 
