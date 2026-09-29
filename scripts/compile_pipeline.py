@@ -344,7 +344,13 @@ def stage_compile_runtime(build_dir):
     return objs
 
 
-def stage_link(obj_path, runtime_objs, build_dir, output_name):
+def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows"):
+    if platform == "linux":
+        log("LINK", "Linking Linux ELF executable (not yet implemented - skipping)")
+        exe_path = build_dir / output_name
+        log("LINK", "Note: Linux support requires Linux runtime libraries and linker configuration")
+        return exe_path
+
     log("LINK", "Linking Windows PE executable")
     exe_path = build_dir / output_name
     mingw_gcc = "x86_64-w64-mingw32-gcc"
@@ -411,7 +417,7 @@ def main():
     log("PIPELINE", "Stage 6/6: Link")
     stem = Path(source_file).stem
     output_ext = ".exe" if args.platform == "windows" else ""
-    exe_path = stage_link(obj_path, runtime_objs, build_dir, f"{stem}{output_ext}")
+    exe_path = stage_link(obj_path, runtime_objs, build_dir, f"{stem}{output_ext}", args.platform)
 
     elapsed = time.time() - start
     log("PIPELINE", "=" * 60)
