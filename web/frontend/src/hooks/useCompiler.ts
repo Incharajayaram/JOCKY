@@ -40,15 +40,27 @@ export function useCompiler() {
     setBuildDone(false);
     setLogs([]);
 
-    const obfMap: Record<string, boolean> = {};
-    [...obfuscation.mlir, ...obfuscation.llvm].forEach((p) => {
-      obfMap[p.id] = p.enabled;
+    const mlirMap: Record<string, boolean> = {};
+    const llvmMap: Record<string, boolean> = {};
+    obfuscation.mlir.forEach((p) => {
+      mlirMap[p.id] = p.enabled;
+    });
+    obfuscation.llvm.forEach((p) => {
+      llvmMap[p.id] = p.enabled;
     });
 
-    const request: CompileRequest = { source, platform, obfuscation: obfMap };
+    const request: CompileRequest = {
+      source,
+      platform,
+      obfuscation: { mlir: mlirMap, llvm: llvmMap },
+    };
 
+    const enabledPasses = [
+      ...obfuscation.mlir.filter((p) => p.enabled).map((p) => p.id),
+      ...obfuscation.llvm.filter((p) => p.enabled).map((p) => p.id),
+    ];
     addLog(`[INFO] Starting ${platform} compilation...`, 'info');
-    addLog(`[INFO] Obfuscation passes: ${Object.entries(obfMap).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none'}`, 'info');
+    addLog(`[INFO] Obfuscation passes: ${enabledPasses.join(', ') || 'none'}`, 'info');
 
     try {
       const res = await fetch(`${API_BASE}/api/compile`, {

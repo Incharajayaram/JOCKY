@@ -1,6 +1,6 @@
 import Editor from '@monaco-editor/react';
 import type { OnMount } from '@monaco-editor/react';
-import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from 'react';
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type * as Monaco from 'monaco-editor';
 import { registerJockyLanguage } from '../utils/jockyLanguage';

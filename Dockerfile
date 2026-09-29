@@ -73,11 +73,12 @@ RUN chmod +x ${TOOLCHAIN_PATH}/bin/* 2>/dev/null || true && \
 # Install JOCKY as a package
 RUN pip3 install --no-cache-dir .
 
-# Verify toolchain is available
-RUN ${TOOLCHAIN_PATH}/bin/clang --version && \
+# Verify toolchain is available (with fallback if missing)
+RUN ([ -f ${TOOLCHAIN_PATH}/bin/clang ] && ${TOOLCHAIN_PATH}/bin/clang --version) || \
+    (echo "⚠️  Toolchain not found in ${TOOLCHAIN_PATH}, using system clang" && clang --version) && \
     x86_64-w64-mingw32-gcc --version && \
     python3 -c "import jocky; print('JOCKY package OK')" && \
-    echo "Toolchain ready"
+    echo "✓ Toolchain ready"
 
 # Default command
 CMD ["/bin/bash"]

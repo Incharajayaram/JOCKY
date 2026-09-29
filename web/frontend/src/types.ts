@@ -27,7 +27,10 @@ export interface ObfuscationState {
 export interface CompileRequest {
   source: string;
   platform: Platform;
-  obfuscation: Record<string, boolean>;
+  obfuscation: {
+    mlir: Record<string, boolean>;
+    llvm: Record<string, boolean>;
+  };
 }
 
 export interface CompileResponse {

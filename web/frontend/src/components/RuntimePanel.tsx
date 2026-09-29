@@ -6,7 +6,9 @@ import { categoryColors } from '../theme';
 
 const styles: Record<string, CSSProperties> = {
   container: {
-    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
     overflow: 'auto',
     padding: '12px 16px',
   },
