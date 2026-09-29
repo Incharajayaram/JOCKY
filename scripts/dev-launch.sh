@@ -28,6 +28,29 @@ echo ""
 # Setup environments
 echo -e "${CYAN}Setting up environments...${NC}"
 
+# Check compilation mode (Docker or Local)
+COMPILE_MODE="local"
+if command -v docker &> /dev/null; then
+    if docker ps &>/dev/null 2>&1; then
+        if docker images -q jocky-compiler:latest &>/dev/null 2>&1; then
+            COMPILE_MODE="docker"
+            echo -e "${GREEN}✓ Docker available - will use Docker for compilation${NC}"
+        else
+            echo -e "${YELLOW}⚠️  Docker found but jocky-compiler image missing - using local compilation${NC}"
+        fi
+    fi
+else
+    echo -e "${YELLOW}⚠️  Docker not available - using local compilation${NC}"
+fi
+
+# Setup toolchain for local compilation
+if [ "$COMPILE_MODE" = "local" ]; then
+    if [ ! -d "$JOCKY_ROOT/toolchain/bin/clang" ] && [ ! -f "$JOCKY_ROOT/toolchain/bin/clang" ]; then
+        echo -e "${YELLOW}Setting up toolchain...${NC}"
+        bash "$JOCKY_ROOT/scripts/setup_toolchain.sh" || true
+    fi
+fi
+
 # Backend setup
 cd "$JOCKY_ROOT/web/backend"
 if [ ! -d "venv" ]; then
@@ -47,7 +70,7 @@ if [ ! -d "node_modules" ]; then
     npm install --silent
 fi
 
-echo -e "${GREEN}✓ Environments ready${NC}"
+echo -e "${GREEN}✓ Environments ready (Compilation mode: $COMPILE_MODE)${NC}"
 echo ""
 
 # Check if tmux is available

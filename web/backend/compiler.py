@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -108,32 +109,76 @@ async def run_compilation(
 
         obf_cfg = _build_obfuscation_config(obfuscation)
 
-        cmd = [
-            "docker", "run", "--rm",
-            "-v", f"{build_dir}:/workspace/build",
-            "-v", f"{source_path}:/workspace/jocky/source.jky:ro",
-            "jocky-compiler:latest",
-            "python3", "scripts/compile_pipeline.py",
-            "/workspace/jocky/source.jky",
-            "/workspace/build",
-            "--platform", job.platform,
-            "--preset", preset,
-        ]
+        # Get project root (backend is at web/backend, scripts is at root/scripts)
+        project_root = Path(__file__).resolve().parent.parent.parent
+        compile_script = project_root / "scripts" / "compile_pipeline.py"
 
-        if obf_cfg.get("mlir_flags"):
-            cmd.extend(["--mlir-passes", ",".join(obf_cfg["mlir_flags"])])
-        if obf_cfg.get("llvm_passes"):
-            cmd.extend(["--llvm-passes", obf_cfg["llvm_passes"]])
+        # Try Docker first, fall back to local compilation
+        use_docker = False
+        try:
+            result = subprocess.run(["docker", "ps"], capture_output=True, timeout=5)
+            if result.returncode == 0:
+                use_docker = True
+                # Verify jocky-compiler image exists
+                result = subprocess.run(["docker", "images", "-q", "jocky-compiler:latest"],
+                                       capture_output=True, timeout=5)
+                use_docker = bool(result.stdout.strip())
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            use_docker = False
 
-        job.progress = 15
-        job.logs.append("[PIPELINE] Launching Docker container")
-        if notify_callback:
-            await notify_callback(job)
+        if use_docker:
+            job.progress = 15
+            job.logs.append("[PIPELINE] Launching Docker container")
+            if notify_callback:
+                await notify_callback(job)
+
+            cmd = [
+                "docker", "run", "--rm",
+                "-v", f"{build_dir}:/workspace/build",
+                "-v", f"{source_path}:/workspace/jocky/source.jky:ro",
+                "jocky-compiler:latest",
+                "python3", "scripts/compile_pipeline.py",
+                "/workspace/jocky/source.jky",
+                "/workspace/build",
+                "--platform", job.platform,
+                "--preset", preset,
+            ]
+
+            if obf_cfg.get("mlir_flags"):
+                cmd.extend(["--mlir-passes", ",".join(obf_cfg["mlir_flags"])])
+            if obf_cfg.get("llvm_passes"):
+                cmd.extend(["--llvm-passes", obf_cfg["llvm_passes"]])
+        else:
+            job.progress = 15
+            job.logs.append("[PIPELINE] Using local compile pipeline (Docker not available)")
+            if notify_callback:
+                await notify_callback(job)
+
+            cmd = [
+                "python3",
+                str(compile_script),
+                str(source_path),
+                build_dir,
+                "--platform", job.platform,
+                "--preset", preset,
+            ]
+
+            if obf_cfg.get("mlir_flags"):
+                cmd.extend(["--mlir-passes", ",".join(obf_cfg["mlir_flags"])])
+            if obf_cfg.get("llvm_passes"):
+                cmd.extend(["--llvm-passes", obf_cfg["llvm_passes"]])
+
+        # Set up environment with proper paths
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(project_root / "src")
+        env["TOOLCHAIN_PATH"] = str(project_root / "toolchain")
 
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
+            cwd=str(project_root) if not use_docker else None,
+            env=env,
         )
 
         stage_progress = {
