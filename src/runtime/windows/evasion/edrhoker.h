@@ -29,7 +29,7 @@ typedef struct {
 } EDR_PROCESS_INFO;
 
 typedef struct {
-    char* names[32];        /* EDR process names to target */
+    WCHAR* names[32];       /* EDR process names to target */
     int count;
     uint32_t throttle_kbps; /* Throttle rate in KB/s */
 } EDR_PROFILE;
