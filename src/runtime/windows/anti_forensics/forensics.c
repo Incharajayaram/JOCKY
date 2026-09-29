@@ -641,6 +641,35 @@ int jocky_delete_file_securely(const char* path, int passes)
     return DeleteFileA(path) ? 0 : -1;
 }
 
+/* ── Wipe runtime artifacts ─────────────────────────────────────────── */
+
+bool jocky_wipe_artifacts(void) {
+    wchar_t sysroot[MAX_PATH];
+    GetWindowsDirectoryW(sysroot, MAX_PATH);
+
+    /* Prefetch .pf files */
+    wchar_t pf[MAX_PATH];
+    _snwprintf_s(pf, MAX_PATH, _TRUNCATE, L"%s\\Prefetch\\*.pf", sysroot);
+    wipe_glob(pf);
+
+    /* %TEMP% contents */
+    wchar_t tmp[MAX_PATH];
+    GetTempPathW(MAX_PATH, tmp);
+    wchar_t tmp_glob[MAX_PATH];
+    _snwprintf_s(tmp_glob, MAX_PATH, _TRUNCATE, L"%s*", tmp);
+    wipe_glob(tmp_glob);
+
+    /* Recent shortcuts */
+    wchar_t appdata[MAX_PATH];
+    GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH);
+    wchar_t recent[MAX_PATH];
+    _snwprintf_s(recent, MAX_PATH, _TRUNCATE,
+                 L"%s\\Microsoft\\Windows\\Recent\\*.lnk", appdata);
+    wipe_glob(recent);
+
+    return true;
+}
+
 /* ── Cleanup orchestrator ───────────────────────────────────────────── */
 
 /*

