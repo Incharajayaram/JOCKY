@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional, Any
 from enum import Enum, auto
-from .optimizations import CharacterClassLookup, TokenPositionCache
 
 class TokenType(Enum):
     # Literals
@@ -29,7 +28,6 @@ class TokenType(Enum):
     TYPE = auto()
     MATCH = auto()
     MOD = auto()
-    LAMBDA = auto()
     CONST = auto()
     VAR = auto()
     IN = auto()
@@ -108,11 +106,9 @@ KEYWORDS = {
     "type": TokenType.TYPE,
     "match": TokenType.MATCH,
     "mod": TokenType.MOD,
-    "lambda": TokenType.LAMBDA,
     "const": TokenType.CONST,
     "var": TokenType.VAR,
     "in": TokenType.IN,
-    "use": TokenType.USE,
     "i8": TokenType.I8,
     "i32": TokenType.I32,
     "i64": TokenType.I64,
@@ -135,15 +131,12 @@ class LexerError(Exception):
     pass
 
 class Lexer:
-    _char_lookup = CharacterClassLookup()
-
     def __init__(self, source: str):
         self.source = source
         self.pos = 0
         self.line = 1
         self.column = 1
         self.tokens: list[Token] = []
-        self.pos_cache = TokenPositionCache()
 
     def error(self, msg: str):
         raise LexerError(f"{msg} at line {self.line}, column {self.column}")
@@ -165,7 +158,7 @@ class Lexer:
         return ch
 
     def skip_whitespace(self):
-        while self.peek() and self._char_lookup.is_whitespace(self.peek()):
+        while self.peek() in " \t\r\n":
             self.advance()
 
     def skip_comment(self):
@@ -205,12 +198,10 @@ class Lexer:
         if self.peek() == "0" and self.peek(1) in "xX":
             value += self.advance()
             value += self.advance()
-            while self.peek() and self._char_lookup.is_hex_digit(self.peek()):
+            while self.peek() in "0123456789abcdefABCDEF":
                 value += self.advance()
-            if len(value) == 2:
-                self.error("Hexadecimal literal requires at least one digit")
             return int(value, 16)
-        while self.peek() and self._char_lookup.is_digit(self.peek()):
+        while self.peek() in "0123456789":
             value += self.advance()
         if self.peek() == "." and self.peek(1) in "0123456789":
             value += self.advance()
@@ -221,7 +212,7 @@ class Lexer:
 
     def read_ident(self) -> str:
         value = ""
-        while self.peek() and self._char_lookup.is_identifier_cont(self.peek()):
+        while self.peek().isalnum() or self.peek() == "_":
             value += self.advance()
         return value
 
@@ -243,9 +234,9 @@ class Lexer:
                 break
             elif ch == '"':
                 self.tokens.append(Token(TokenType.STRING, self.read_string(), start_line, start_col))
-            elif self._char_lookup.is_digit(ch):
+            elif ch.isdigit():
                 self.tokens.append(Token(TokenType.NUMBER, self.read_number(), start_line, start_col))
-            elif self._char_lookup.is_identifier_start(ch):
+            elif ch.isalpha() or ch == "_":
                 ident = self.read_ident()
                 tok_type = KEYWORDS.get(ident, TokenType.IDENT)
                 self.tokens.append(Token(tok_type, ident, start_line, start_col))

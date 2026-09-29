@@ -61,7 +61,7 @@ def test_unterminated_string():
 
 def test_unexpected_char():
     with pytest.raises(LexerError, match="Unexpected character"):
-        Lexer("§foo").tokenize()
+        Lexer("@foo").tokenize()
 
 
 # --- New keywords ---

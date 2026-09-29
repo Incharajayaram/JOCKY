@@ -1,22 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional, Any, List
 
-# --- Source Location ---
-
-@dataclass
-class SourceLocation:
-    """Track source file location for debugging."""
-    filename: str
-    line: int
-    column: int
-    end_line: Optional[int] = None
-    end_column: Optional[int] = None
-
-    def __str__(self):
-        if self.end_line:
-            return f"{self.filename}:{self.line}:{self.column}-{self.end_line}:{self.end_column}"
-        return f"{self.filename}:{self.line}:{self.column}"
-
 # --- Types ---
 
 @dataclass
@@ -33,8 +17,6 @@ class JType:
     is_pointer: bool = False
     is_array: bool = False
     array_size: int = 0  # 0 means not an array or unsized
-    is_type_var: bool = False  # True for type variables like T, U
-    type_var_name: Optional[str] = None  # Name of the type variable if is_type_var
     is_generic: bool = False  # True if this is a type variable like T, U, etc.
 
     def __str__(self):
@@ -109,24 +91,6 @@ class JType:
 
 # --- AST Nodes ---
 
-    def __post_init__(self):
-        if self.is_generic and not self.is_type_var:
-            self.is_type_var = True
-            if not self.type_var_name:
-                self.type_var_name = self.name
-        elif self.is_type_var and not self.is_generic:
-            self.is_generic = True
-
-@dataclass
-class Attribute:
-    """Function/type attribute: #[name(args)]"""
-    name: str
-    args: List[str] = None  # Optional arguments
-
-    def __post_init__(self):
-        if self.args is None:
-            self.args = []
-
 @dataclass
 class Program:
     decls: List[Any]
@@ -142,23 +106,14 @@ class FuncDecl:
     params: List[Param]
     ret_type: JType
     body: "Block"
-    attributes: List[Attribute] = None  # #[inline], #[no_mangle], etc.
-    type_params: Optional[List[str]] = None  # Generic type parameters: ['T', 'U']
-    is_generic: bool = False  # True if this function has type parameters
+    attributes: List["Attribute"] = None  # #[inline], #[no_mangle], etc.
     generic_params: List[str] = None  # Type parameter names: [T, U, V]
 
-    location: Optional["SourceLocation"] = None  # Source code location for debugging
     def __post_init__(self):
         if self.attributes is None:
             self.attributes = []
-        if self.type_params is None:
-            self.type_params = []
-        self.is_generic = len(self.type_params) > 0
         if self.generic_params is None:
-            self.generic_params = list(self.type_params)
-        elif not self.type_params:
-            self.type_params = list(self.generic_params)
-            self.is_generic = len(self.type_params) > 0
+            self.generic_params = []
 
 @dataclass
 class FFIDecl:
@@ -166,11 +121,6 @@ class FFIDecl:
     params: List[Param]
     ret_type: JType
     variadic: bool = False
-    attributes: List[Attribute] = None  # #[no_mangle], etc.
-
-    def __post_init__(self):
-        if self.attributes is None:
-            self.attributes = []
 
 @dataclass
 class StructField:
@@ -182,13 +132,10 @@ class StructDef:
     name: str
     fields: List[StructField]
     generic_params: List[str] = None  # Type parameter names: [T, U, V]
-    attributes: List[Attribute] = None  # #[packed], #[repr], etc.
 
     def __post_init__(self):
         if self.generic_params is None:
             self.generic_params = []
-        if self.attributes is None:
-            self.attributes = []
 
 @dataclass
 class ArrayType:
@@ -206,13 +153,10 @@ class EnumDef:
     name: str
     variants: List[EnumVariant]
     generic_params: List[str] = None  # Type parameter names: [T, U, V]
-    attributes: List[Attribute] = None  # #[repr], etc.
 
     def __post_init__(self):
         if self.generic_params is None:
             self.generic_params = []
-        if self.attributes is None:
-            self.attributes = []
 
 @dataclass
 class TypeAlias:
@@ -228,7 +172,6 @@ class LetStmt:
     name: str
     type: Optional[JType]
     init: Any
-    location: Optional["SourceLocation"] = None  # Source code location for debugging
 
 @dataclass
 class ConstDecl:
@@ -241,20 +184,17 @@ class VarDecl:
     name: str
     type: Optional[JType]
     init: Any
-    location: Optional["SourceLocation"] = None  # Source code location for debugging
 
 @dataclass
 class AssignStmt:
     target: Any
     value: Any
-    location: Optional["SourceLocation"] = None  # Source code location for debugging
 
 @dataclass
 class IfStmt:
     cond: Any
     then_block: Block
     else_block: Optional[Block]
-    location: Optional["SourceLocation"] = None  # Source code location for debugging
 
 @dataclass
 class WhileStmt:
@@ -445,6 +385,13 @@ class ModDecl:
     name: str
     items: List[Any]  # Functions, structs, enums, other modules
     public: bool = False  # pub mod vs private mod
+
+
+@dataclass
+class Attribute:
+    """Function/type attribute: #[inline], #[no_mangle], #[packed]"""
+    name: str
+    args: Optional[List[Any]] = None  # Arguments to attribute (e.g., #[packed(2)])
 
 
 @dataclass
