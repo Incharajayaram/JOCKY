@@ -128,15 +128,16 @@ def stage_mlir_obfuscate(ir_path, build_dir):
     log("MLIR", f"MLIR: {mlir_path.stat().st_size} bytes, {len(mlir_path.read_text().splitlines())} lines")
 
     plugin = TOOLCHAIN / "lib" / "MLIRObfuscationPlugin.so"
-    # MLIR obfuscation passes (3/6 available - symbol-obfuscate fixed!)
+    # MLIR obfuscation passes (6/6 ALL AVAILABLE!)
     passes = [
         "--string-encrypt",           # Encrypt string literals
         "--constant-obfuscate",       # Obfuscate numeric constants
-        "--symbol-obfuscate",         # Mangle function/variable names (FIXED!)
-        # Note: crypto-hash, scf-obfuscate, import-obfuscate need further work
+        "--symbol-obfuscate",         # Mangle function/variable names
+        "--crypto-hash",              # Cryptographic hashing of symbols
+        "--scf-obfuscate",            # Opaque predicates on SCF regions
+        "--import-obfuscate",         # Hide imports behind wrappers
     ]
-    log("MLIR", f"Running MLIR obfuscation passes: {', '.join(p.lstrip('-') for p in passes)}")
-    log("MLIR", "  Symbol reference issue fixed! Full LLVM suite (anti-debug, virtualize, mba, etc.) applied at LLVM stage")
+    log("MLIR", f"Running MLIR obfuscation passes (6/6 ALL): {', '.join(p.lstrip('-') for p in passes)}")
 
     mlir_opt = TOOLCHAIN / "bin" / "run-mlir-opt.sh"
     if not mlir_opt.exists():
@@ -170,25 +171,23 @@ def stage_llvm_obfuscate(bc_path, build_dir):
     if not opt.exists():
         opt = TOOLCHAIN / "bin" / "opt"
 
-    # LLVM obfuscation passes (13 available, using compatible ones)
-    # Function-level passes: applied to each function
+    # LLVM obfuscation passes from OBFUSCATION.md recommended ordering
+    # 1. Strip metadata first: strip-signature, pdata-strip
+    # 2. Virtualize whole functions: virtualize
+    # 3. Function-level rewrites (wrapped in function()): opaque-pred, substitution, boguscf, flattening, linear-mba
+    # 4. Anti-debug injected check: anti-debug
+    # 5. Indirect calls last (blocks inlining): indirect-call
     function_passes = [
-        "boguscf",                # Bogus control flow injection ✅
-        "flattening",             # Control flow flattening ✅
-        "substitution",           # Instruction substitution ✅
-        "split",                  # Basic block splitting ✅
-        # Anti-debug, virtualize, opaque-predicates, mba need newer toolchain
-    ]
-    # Module-level passes: applied to entire module
-    module_passes = [
-        "indirect-call",          # Indirect function calls ✅
-        "strip-signature",        # Strip function signatures ✅
-        # pdata-strip needs newer toolchain
+        "opaque-pred",            # Opaque predicates
+        "substitution",           # Instruction substitution
+        "boguscf",                # Bogus control flow injection
+        "flattening",             # Control flow flattening
+        "linear-mba",             # Linear MBA
     ]
 
-    passes = f"function({','.join(function_passes)}),module({','.join(module_passes)})"
-    log("LLVM-OBF", f"Passes ({len(function_passes)} function + {len(module_passes)} module = 6 total): {passes}")
-    log("LLVM-OBF", f"  NOTE: 7 additional passes (anti-debug, virtualize, mba, opaque-predicates, pdata-strip, etc.) available in full OLLVM suite but require toolchain update")
+    passes = f"strip-signature,pdata-strip,virtualize,function({','.join(function_passes)}),anti-debug,indirect-call"
+    log("LLVM-OBF", f"Passes ({len(function_passes) + 4} total - FULL OLLVM SUITE): {passes}")
+    log("LLVM-OBF", f"  Recommended order: strip metadata, virtualize, function rewrites, anti-debug, indirect-call last")
 
     run([str(opt), f"-load-pass-plugin={plugin}", f"-passes={passes}", str(bc_path), "-o", str(obf_bc)],
         "LLVM obfuscation")
