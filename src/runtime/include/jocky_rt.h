@@ -39,6 +39,8 @@ bool jocky_check_timing_api(void);
  * ============================================================================ */
 
 #ifdef _WIN32
+#include <windows.h>
+#include <winternl.h>
 
 /* ── ntdll unhooking ─────────────────────────────────────────────────── */
 
@@ -154,7 +156,6 @@ NTSTATUS jocky_nt_create_thread          (HANDLE* handle, ACCESS_MASK access,
  * ============================================================================ */
 
 #ifdef _WIN32
-#include <windows.h>
 
 /* State returned by jocky_byovd_load; pass to jocky_byovd_unload. */
 typedef struct {
@@ -589,6 +590,7 @@ bool jocky_module_has_symbol(void* handle, const char* symbol_name);
  */
 uintptr_t jocky_module_base(const char* path);
 
+#ifndef _WIN32
 /* ============================================================================
  * Kernel Exploitation Primitives (Linux only)
  * ============================================================================ */
@@ -654,6 +656,8 @@ bool jocky_process_hollow_linux(uint32_t pid, const void* payload, uint64_t payl
  * Returns PID of hollowed process, -1 on failure
  */
 uint32_t jocky_spawn_hollow_linux(const char* target_path, const void* payload, uint64_t payload_size);
+
+#endif /* !_WIN32 */
 
 #ifdef __cplusplus
 }

@@ -1,13 +1,13 @@
 from .lexer import Token, TokenType, Lexer
 from .ast import (
     Program, FuncDecl, FFIDecl, Param, Block,
-    LetStmt, AssignStmt, IfStmt, WhileStmt, ForStmt,
+    LetStmt, ConstDecl, VarDecl, AssignStmt, IfStmt, WhileStmt, ForStmt, ForInStmt,
     ReturnStmt, ExprStmt, BreakStmt, ContinueStmt,
-    IntLiteral, BoolLiteral, StringLiteral, VarRef, NullLiteral,
+    IntLiteral, FloatLiteral, BoolLiteral, StringLiteral, VarRef, NullLiteral,
     BinaryOp, UnaryOp, CallExpr, DerefExpr, AddrOfExpr,
     CastExpr, IndexExpr,
     StructDef, StructField, StructLiteralExpr, FieldAccessExpr,
-    ArrayType, ArrayLiteralExpr,
+    ArrayType, ArrayLiteralExpr, TupleExpr,
     EnumDef, EnumVariant,
     TypeAlias,
     Pattern, WildcardPattern, LiteralPattern, VariantPattern, MatchArm, MatchExpr,
@@ -49,9 +49,18 @@ class Parser:
     def match(self, *types: TokenType) -> bool:
         return self.peek().type in types
 
+    def consume_semicolon(self):
+        if self.match(TokenType.SEMICOLON):
+            self.advance()
+
     def parse_type(self) -> JType:
         tok = self.peek()
-        if tok.type == TokenType.I8:
+        if tok.type == TokenType.LBRACKET:
+            self.advance()
+            inner = self.parse_type()
+            self.expect(TokenType.RBRACKET)
+            return JType(inner.name, is_pointer=True, is_array=True, array_size=0)
+        elif tok.type == TokenType.I8:
             self.advance()
             t = JType("i8")
         elif tok.type == TokenType.I32:
@@ -60,6 +69,12 @@ class Parser:
         elif tok.type == TokenType.I64:
             self.advance()
             t = JType("i64")
+        elif tok.type == TokenType.F32:
+            self.advance()
+            t = JType("f32")
+        elif tok.type == TokenType.F64:
+            self.advance()
+            t = JType("f64")
         elif tok.type == TokenType.BOOL:
             self.advance()
             t = JType("bool")
@@ -70,7 +85,6 @@ class Parser:
             self.advance()
             t = JType("string")
         elif tok.type == TokenType.IDENT:
-            # User-defined type (struct or enum)
             name = self.advance().value
             t = JType(name)
         else:
@@ -114,10 +128,14 @@ class Parser:
             return self.parse_use_stmt()
         elif self.match(TokenType.MOD):
             return self.parse_mod_decl()
+        elif self.match(TokenType.CONST):
+            return self.parse_const_decl()
+        elif self.match(TokenType.VAR):
+            return self.parse_var_decl()
         else:
             tok = self.peek()
             source_range = SourceRange.at(tok.line, tok.column)
-            raise ParseError(f"Unexpected token {tok.type.name}; expected fn, ffi, struct, enum, type, mod, or use", source_range)
+            raise ParseError(f"Unexpected token {tok.type.name}; expected fn, ffi, struct, enum, type, mod, use, const, or var", source_range)
 
     def parse_func_decl(self) -> FuncDecl:
         self.expect(TokenType.FN)
@@ -136,7 +154,14 @@ class Parser:
 
     def parse_ffi_decl(self) -> FFIDecl:
         self.expect(TokenType.FFI)
-        name = self.expect(TokenType.IDENT).value
+        tok = self.peek()
+        if tok.type == TokenType.IDENT:
+            name = self.advance().value
+        elif tok.type == TokenType.STRING_KW:
+            name = "string"
+            self.advance()
+        else:
+            name = self.expect(TokenType.IDENT).value
         self.expect(TokenType.LPAREN)
         params, variadic = self.parse_params_variadic()
         self.expect(TokenType.RPAREN)
@@ -247,15 +272,44 @@ class Parser:
         self.expect(TokenType.SEMICOLON)
         return TypeAlias(name, target_type)
 
+    def parse_const_decl(self) -> ConstDecl:
+        self.expect(TokenType.CONST)
+        name = self.expect(TokenType.IDENT).value
+        typ: Optional[JType] = None
+        if self.match(TokenType.COLON):
+            self.advance()
+            typ = self.parse_type()
+        self.expect(TokenType.EQ)
+        init = self.parse_expr()
+        if self.match(TokenType.SEMICOLON):
+            self.advance()
+        return ConstDecl(name, typ, init)
+
+    def parse_var_decl(self) -> VarDecl:
+        self.expect(TokenType.VAR)
+        name = self.expect(TokenType.IDENT).value
+        typ: Optional[JType] = None
+        if self.match(TokenType.COLON):
+            self.advance()
+            typ = self.parse_type()
+        self.expect(TokenType.EQ)
+        init = self.parse_expr()
+        if self.match(TokenType.SEMICOLON):
+            self.advance()
+        return VarDecl(name, typ, init)
+
     def parse_use_stmt(self) -> UseStmt:
         self.expect(TokenType.USE)
         components = []
         components.append(self.expect(TokenType.IDENT).value)
 
         all_flag = False
-        while self.match(TokenType.COLON):
-            self.advance()
-            self.expect(TokenType.COLON)
+        while self.match(TokenType.DOT) or self.match(TokenType.COLON):
+            if self.match(TokenType.DOT):
+                self.advance()
+            else:
+                self.advance()
+                self.expect(TokenType.COLON)
             if self.match(TokenType.STAR):
                 self.advance()
                 all_flag = True
@@ -263,7 +317,11 @@ class Parser:
             else:
                 components.append(self.expect(TokenType.IDENT).value)
 
-        self.expect(TokenType.SEMICOLON)
+        if not all_flag:
+            all_flag = True
+
+        if self.match(TokenType.SEMICOLON):
+            self.advance()
         return UseStmt(ModulePath(components), all=all_flag)
 
     def parse_mod_decl(self) -> ModDecl:
@@ -420,6 +478,8 @@ class Parser:
     def parse_stmt(self) -> Any:
         if self.match(TokenType.LET):
             return self.parse_let_stmt()
+        elif self.match(TokenType.VAR):
+            return self.parse_var_stmt()
         elif self.match(TokenType.IF):
             return self.parse_if_stmt()
         elif self.match(TokenType.WHILE):
@@ -430,14 +490,26 @@ class Parser:
             return self.parse_return_stmt()
         elif self.match(TokenType.BREAK):
             self.advance()
-            self.expect(TokenType.SEMICOLON)
+            self.consume_semicolon()
             return BreakStmt()
         elif self.match(TokenType.CONTINUE):
             self.advance()
-            self.expect(TokenType.SEMICOLON)
+            self.consume_semicolon()
             return ContinueStmt()
         else:
             return self.parse_expr_or_assign_stmt()
+
+    def parse_var_stmt(self) -> LetStmt:
+        self.expect(TokenType.VAR)
+        name = self.expect(TokenType.IDENT).value
+        typ: Optional[JType] = None
+        if self.match(TokenType.COLON):
+            self.advance()
+            typ = self.parse_type()
+        self.expect(TokenType.EQ)
+        init = self.parse_expr()
+        self.consume_semicolon()
+        return LetStmt(name, typ, init)
 
     def parse_let_stmt(self) -> LetStmt:
         self.expect(TokenType.LET)
@@ -448,7 +520,7 @@ class Parser:
             typ = self.parse_type()
         self.expect(TokenType.EQ)
         init = self.parse_expr()
-        self.expect(TokenType.SEMICOLON)
+        self.consume_semicolon()
         return LetStmt(name, typ, init)
 
     def parse_if_stmt(self) -> IfStmt:
@@ -471,16 +543,22 @@ class Parser:
         body = self.parse_block()
         return WhileStmt(cond, body)
 
-    def parse_for_stmt(self) -> ForStmt:
+    def parse_for_stmt(self):
         self.expect(TokenType.FOR)
-        self.expect(TokenType.LPAREN)
-        init = self.parse_for_init()
-        cond = self.parse_expr()
-        self.expect(TokenType.SEMICOLON)
-        step = self.parse_for_step()
-        self.expect(TokenType.RPAREN)
+        if self.match(TokenType.LPAREN):
+            self.expect(TokenType.LPAREN)
+            init = self.parse_for_init()
+            cond = self.parse_expr()
+            self.expect(TokenType.SEMICOLON)
+            step = self.parse_for_step()
+            self.expect(TokenType.RPAREN)
+            body = self.parse_block()
+            return ForStmt(init, cond, step, body)
+        var_name = self.expect(TokenType.IDENT).value
+        self.expect(TokenType.IN)
+        iterable = self.parse_expr()
         body = self.parse_block()
-        return ForStmt(init, cond, step, body)
+        return ForInStmt(var_name, iterable, body)
 
     def parse_for_init(self) -> Any:
         if self.match(TokenType.LET):
@@ -492,14 +570,14 @@ class Parser:
                 typ = self.parse_type()
             self.expect(TokenType.EQ)
             init = self.parse_expr()
-            self.expect(TokenType.SEMICOLON)
+            self.consume_semicolon()
             return LetStmt(name, typ, init)
         elif self.match(TokenType.SEMICOLON):
             self.advance()
             return ExprStmt(IntLiteral(0))
         else:
             expr = self.parse_expr()
-            self.expect(TokenType.SEMICOLON)
+            self.consume_semicolon()
             return ExprStmt(expr)
 
     def parse_for_step(self) -> Any:
@@ -515,9 +593,9 @@ class Parser:
     def parse_return_stmt(self) -> ReturnStmt:
         self.expect(TokenType.RETURN)
         val = None
-        if not self.match(TokenType.SEMICOLON):
+        if not self.match(TokenType.SEMICOLON) and not self.match(TokenType.RBRACE):
             val = self.parse_expr()
-        self.expect(TokenType.SEMICOLON)
+        self.consume_semicolon()
         return ReturnStmt(val)
 
     def parse_expr_or_assign_stmt(self) -> Any:
@@ -525,14 +603,10 @@ class Parser:
         if self.match(TokenType.EQ):
             self.advance()
             rhs = self.parse_expr()
-            self.expect(TokenType.SEMICOLON)
+            self.consume_semicolon()
             return AssignStmt(expr, rhs)
-        # Match expressions consume their own braces, so no semicolon needed
-        # Also allow last expression in block to omit semicolon
-        if not isinstance(expr, MatchExpr) and not self.match(TokenType.RBRACE):
-            self.expect(TokenType.SEMICOLON)
-        elif isinstance(expr, MatchExpr):
-            pass  # MatchExpr already consumed its braces
+        if not isinstance(expr, MatchExpr):
+            self.consume_semicolon()
         return ExprStmt(expr)
 
     # ---- Expression parsing with precedence climbing ----
@@ -688,6 +762,8 @@ class Parser:
         tok = self.peek()
         if tok.type == TokenType.NUMBER:
             self.advance()
+            if isinstance(tok.value, float):
+                return FloatLiteral(tok.value)
             return IntLiteral(tok.value)
         elif tok.type == TokenType.STRING:
             self.advance()
@@ -704,11 +780,13 @@ class Parser:
         elif tok.type == TokenType.IDENT:
             self.advance()
             return VarRef(tok.value)
+        elif tok.type == TokenType.STRING_KW:
+            self.advance()
+            return VarRef("string")
         elif tok.type == TokenType.MATCH:
             # Match expression: match expr { pattern => body, ... }
             return self.parse_match_expr()
         elif tok.type == TokenType.LBRACKET:
-            # Array literal: [1, 2, 3]
             self.advance()
             elements = []
             if not self.match(TokenType.RBRACKET):
@@ -716,13 +794,14 @@ class Parser:
                     elements.append(self.parse_expr())
                     if self.match(TokenType.COMMA):
                         self.advance()
+                        if self.match(TokenType.RBRACKET):
+                            break
                     else:
                         break
             self.expect(TokenType.RBRACKET)
             return ArrayLiteralExpr(elements)
         elif tok.type == TokenType.LPAREN:
             self.advance()
-            # Check for cast: ( type ) expr
             saved_pos = self.pos
             try:
                 typ = self.parse_type()
@@ -733,9 +812,17 @@ class Parser:
             except ParseError:
                 pass
             self.pos = saved_pos
-            expr = self.parse_expr()
+            first = self.parse_expr()
+            if self.match(TokenType.COMMA):
+                elements = [first]
+                while self.match(TokenType.COMMA):
+                    self.advance()
+                    if not self.match(TokenType.RPAREN):
+                        elements.append(self.parse_expr())
+                self.expect(TokenType.RPAREN)
+                return TupleExpr(elements)
             self.expect(TokenType.RPAREN)
-            return expr
+            return first
         elif tok.type == TokenType.PIPE:
             # Closure expression: |params| body
             return self.parse_closure_expr()

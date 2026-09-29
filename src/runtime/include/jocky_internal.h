@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdio.h>
 
 /* Fill buf with len cryptographically random bytes.
  * Uses advapi32!SystemFunction036 (RtlGenRandom). */

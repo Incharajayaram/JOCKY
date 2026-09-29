@@ -35,7 +35,7 @@ class LinkStage(Stage):
         if target_os == "windows":
             # Compile bitcode to Windows COFF object file
             run_cmd([
-                str(tc.clang()), "--target=x86_64-pc-windows-msvc", "-ffreestanding", "-c", str(obf_bc), "-o", str(obj_path)
+                str(tc.clang()), "--target=x86_64-pc-windows-gnu", "-c", str(obf_bc), "-o", str(obj_path)
             ], "Bitcode to Windows object")
 
             runtime_objs = self._compile_runtime(tc, out_dir, target_os)
@@ -116,7 +116,7 @@ class LinkStage(Stage):
 
         include_dir = runtime_dir / "include"
         objs = []
-        target_flag = "--target=x86_64-pc-windows-msvc" if target_os == "windows" else "--target=x86_64-pc-linux-gnu"
+        target_flag = "--target=x86_64-pc-windows-gnu" if target_os == "windows" else "--target=x86_64-pc-linux-gnu"
         for src in all_sources:
             obj = out_dir / f"{src.stem}.o"
             cmd = [
@@ -124,8 +124,6 @@ class LinkStage(Stage):
                 "-I", str(include_dir),
                 str(src), "-o", str(obj)
             ]
-            if target_os == "windows":
-                cmd.insert(2, "-ffreestanding")
             try:
                 run_cmd(cmd, f"Compile runtime {src.name} ({target_os})")
                 objs.append(str(obj))
@@ -136,29 +134,20 @@ class LinkStage(Stage):
         # Add compatibility symbols stub for missing FFI declarations
         compat_c = out_dir / "compat_stub.c"
         compat_o = out_dir / "compat_stub.o"
-        compat_c.write_text(
-            "int puts(const char* s) { (void)s; return 0; }\n"
-            "int printf(const char* fmt, ...) { (void)fmt; return 0; }\n"
-            "void _exit(int code) { (void)code; }\n"
-            "long ptrace(int req, int pid, void* addr, void* data) { (void)req; (void)pid; (void)addr; (void)data; return 0; }\n"
-            "int MessageBoxA(long long h, const char* t, const char* c, int u) { (void)h; (void)t; (void)c; (void)u; return 0; }\n"
-            "int GetCurrentProcessId(void) { return 1234; }\n"
-            "int GetTickCount(void) { return 5678; }\n"
-            "long long GetStdHandle(int n) { (void)n; return 1; }\n"
-            "int WriteFile(long long h, const char* b, int l, int* w, int r) { (void)h; (void)b; (void)l; if(w)*w=l; (void)r; return 1; }\n"
-            "int jocky_win_get_process_id(void) { return 1234; }\n"
-            "int jocky_win_get_system_info(char* b, int m) { (void)b; (void)m; return 0; }\n"
-            "long long jocky_win_get_tick_count(void) { return 5678; }\n"
-            "int jocky_win_get_computer_name(char* b, int m) { (void)b; (void)m; return 0; }\n"
-            "int jocky_win_get_memory_status(char* b, int m) { (void)b; (void)m; return 0; }\n"
-            "int jocky_win_get_temp_path(char* b, int m) { (void)b; (void)m; return 0; }\n"
-            "int jocky_win_file_exists(const char* f) { (void)f; return 0; }\n"
-            "int jocky_win_show_msgbox(const char* t, const char* m, int f) { (void)t; (void)m; (void)f; return 0; }\n"
-        )
-        target_flag = "--target=x86_64-pc-windows-msvc" if target_os == "windows" else "--target=x86_64-pc-linux-gnu"
-        cmd = [str(tc.clang()), target_flag, "-c", str(compat_c), "-o", str(compat_o)]
         if target_os == "windows":
-            cmd.insert(2, "-ffreestanding")
+            compat_c.write_text(
+                "#include <stddef.h>\n"
+                "long ptrace(int req, int pid, void* addr, void* data) { (void)req; (void)pid; (void)addr; (void)data; return 0; }\n"
+                "int jocky_manifest_load(const char* p) { (void)p; return 0; }\n"
+                "void jocky_byovd_unload(void* ctx) { (void)ctx; }\n"
+            )
+        else:
+            compat_c.write_text(
+                "#include <stddef.h>\n"
+                "long ptrace(int req, int pid, void* addr, void* data) { (void)req; (void)pid; (void)addr; (void)data; return 0; }\n"
+            )
+        target_flag = "--target=x86_64-pc-windows-gnu" if target_os == "windows" else "--target=x86_64-pc-linux-gnu"
+        cmd = [str(tc.clang()), target_flag, "-c", str(compat_c), "-o", str(compat_o)]
         run_cmd(cmd, f"Compile compatibility stub ({target_os})")
         objs.append(str(compat_o))
 

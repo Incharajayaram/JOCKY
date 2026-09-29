@@ -1,0 +1,5 @@
+// JOCKY Network Module
+
+ffi exfil_dns_tunnel(domain: string, data: string) -> i32;
+ffi exfil_discord_webhook(url: string, message: string) -> i32;
+ffi exfil_local_cdn(endpoint: string, payload_id: string, auth_token: string, metadata: string) -> i32;
