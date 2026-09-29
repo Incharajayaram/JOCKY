@@ -299,11 +299,11 @@ class TypeChecker:
             self.check_stmt(stmt)
 
     def check_stmt(self, stmt: Any):
-        if isinstance(stmt, LetStmt):
+        if isinstance(stmt, (LetStmt, VarDecl)):
             init_type = self.typeof(stmt.init, type_hint=stmt.type)
             if stmt.type is not None:
                 if not self.types_equal(stmt.type, init_type):
-                    raise TypeError(f"Type mismatch in let: expected {stmt.type}, got {init_type}")
+                    raise TypeError(f"Type mismatch in {'let' if isinstance(stmt, LetStmt) else 'var'}: expected {stmt.type}, got {init_type}")
                 self.locals[stmt.name] = stmt.type
             else:
                 self.locals[stmt.name] = init_type
