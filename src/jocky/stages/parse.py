@@ -23,7 +23,7 @@ class ParseStage(Stage):
 
         lexer = Lexer(src)
         tokens = lexer.tokenize()
-        parser = Parser(tokens)
+        parser = Parser(tokens, source_file=str(ctx.input_file))
         ast = parser.parse()
 
         # Resolve modules

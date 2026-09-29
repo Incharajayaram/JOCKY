@@ -1,0 +1,3 @@
+/home/deval/JOCKY/src/runtime/build/CMakeFiles/jocky_rt.dir
+/home/deval/JOCKY/src/runtime/build/CMakeFiles/edit_cache.dir
+/home/deval/JOCKY/src/runtime/build/CMakeFiles/rebuild_cache.dir

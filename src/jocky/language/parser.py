@@ -13,7 +13,9 @@ from .ast import (
     Pattern, WildcardPattern, LiteralPattern, VariantPattern, MatchArm, MatchExpr,
     ModulePath, UseStmt, ModDecl,
     ClosureExpr, CaptureVar,
+    Attribute,
     JType,
+    SourceLocation,
 )
 from .errors import ParseError as BaseParseError, SourceRange
 from typing import Optional, Any, List
@@ -22,9 +24,10 @@ class ParseError(BaseParseError):
     pass
 
 class Parser:
-    def __init__(self, tokens: List[Token]):
+    def __init__(self, tokens: List[Token], source_file: str = "<unknown>"):
         self.tokens = tokens
         self.pos = 0
+        self.source_file = source_file
 
     def peek(self) -> Token:
         if self.pos < len(self.tokens):
@@ -49,11 +52,19 @@ class Parser:
     def match(self, *types: TokenType) -> bool:
         return self.peek().type in types
 
-    def consume_semicolon(self):
-        if self.match(TokenType.SEMICOLON):
-            self.advance()
+    def make_location(self, start_tok: Token, end_tok: Optional[Token] = None) -> SourceLocation:
+        """Create a SourceLocation from token(s)."""
+        if end_tok is None:
+            end_tok = start_tok
+        return SourceLocation(
+            filename=self.source_file,
+            line=start_tok.line,
+            column=start_tok.column,
+            end_line=end_tok.line,
+            end_column=end_tok.column
+        )
 
-    def parse_type(self) -> JType:
+    def parse_type(self, allow_type_vars: bool = False) -> JType:
         tok = self.peek()
         if tok.type == TokenType.LBRACKET:
             self.advance()
@@ -85,8 +96,11 @@ class Parser:
             self.advance()
             t = JType("string")
         elif tok.type == TokenType.IDENT:
+            # Could be user-defined type or type variable
             name = self.advance().value
-            t = JType(name)
+            # Type variables are single uppercase letters (T, U, V, etc.)
+            is_type_var = allow_type_vars and name[0].isupper() and len(name) == 1
+            t = JType(name, is_type_var=is_type_var, type_var_name=name if is_type_var else None)
         else:
             source_range = SourceRange.at(tok.line, tok.column)
             raise ParseError(f"Expected type, got {tok.type.name}", source_range)
@@ -98,14 +112,52 @@ class Parser:
             if self.match(TokenType.NUMBER):
                 size = self.advance().value
             self.expect(TokenType.RBRACKET)
-            t = JType(t.name, is_array=True, array_size=size)
+            t = JType(t.name, is_array=True, array_size=size, is_type_var=t.is_type_var, type_var_name=t.type_var_name)
 
         # Pointer type
         while self.match(TokenType.STAR):
             self.advance()
-            t = JType(t.name, is_pointer=True, is_array=t.is_array, array_size=t.array_size)
+            t = JType(t.name, is_pointer=True, is_array=t.is_array, array_size=t.array_size, is_type_var=t.is_type_var, type_var_name=t.type_var_name)
 
         return t
+
+    def parse_attributes(self) -> List[Attribute]:
+        """Parse attributes: #[name], #[name(arg1, arg2)], etc."""
+        attributes = []
+
+        while self.match(TokenType.HASH):
+            self.advance()
+            self.expect(TokenType.LBRACKET)
+
+            attr_name = self.expect(TokenType.IDENT).value
+
+            attr_args = []
+            if self.match(TokenType.LPAREN):
+                self.advance()
+                while not self.match(TokenType.RPAREN):
+                    if self.match(TokenType.STRING):
+                        attr_args.append(self.advance().value)
+                    elif self.match(TokenType.IDENT):
+                        attr_args.append(self.advance().value)
+                    elif self.match(TokenType.NUMBER):
+                        attr_args.append(self.advance().value)
+                    elif self.match(TokenType.I8, TokenType.I32, TokenType.I64,
+                                   TokenType.BOOL, TokenType.VOID, TokenType.STRING_KW):
+                        attr_args.append(self.advance().value)
+                    else:
+                        tok = self.peek()
+                        source_range = SourceRange.at(tok.line, tok.column)
+                        raise ParseError(f"Invalid attribute argument: {tok.type.name}", source_range)
+
+                    if self.match(TokenType.COMMA):
+                        self.advance()
+
+                self.expect(TokenType.RPAREN)
+
+            self.expect(TokenType.RBRACKET)
+            attributes.append(Attribute(attr_name, attr_args))
+
+        return attributes
 
     def parse(self) -> Program:
         decls = []
@@ -114,45 +166,63 @@ class Parser:
         return Program(decls)
 
     def parse_decl(self) -> Any:
+        attributes = self.parse_attributes()
+
         if self.match(TokenType.FN):
-            return self.parse_func_decl()
+            return self.parse_func_decl_with_attributes(attributes)
         elif self.match(TokenType.FFI):
-            return self.parse_ffi_decl()
+            return self.parse_ffi_decl_with_attributes(attributes)
         elif self.match(TokenType.STRUCT):
-            return self.parse_struct_decl()
+            return self.parse_struct_decl_with_attributes(attributes)
         elif self.match(TokenType.ENUM):
-            return self.parse_enum_decl()
+            return self.parse_enum_decl_with_attributes(attributes)
         elif self.match(TokenType.TYPE):
             return self.parse_type_alias()
         elif self.match(TokenType.USE):
             return self.parse_use_stmt()
         elif self.match(TokenType.MOD):
             return self.parse_mod_decl()
-        elif self.match(TokenType.CONST):
-            return self.parse_const_decl()
-        elif self.match(TokenType.VAR):
-            return self.parse_var_decl()
+        elif attributes:
+            tok = self.peek()
+            source_range = SourceRange.at(tok.line, tok.column)
+            raise ParseError(f"Attributes can only be applied to fn, ffi, struct, or enum declarations", source_range)
         else:
             tok = self.peek()
             source_range = SourceRange.at(tok.line, tok.column)
             raise ParseError(f"Unexpected token {tok.type.name}; expected fn, ffi, struct, enum, type, mod, use, const, or var", source_range)
 
-    def parse_func_decl(self) -> FuncDecl:
+    def parse_func_decl_with_attributes(self, attributes: List[Attribute]) -> FuncDecl:
+        start_tok = self.peek()
         self.expect(TokenType.FN)
         name = self.expect(TokenType.IDENT).value
-        # Parse generic parameters: <T, U, V>
-        generic_params = self.parse_generic_params()
+
+        # Parse optional type parameters: <T, U, V>
+        type_params = []
+        if self.match(TokenType.LT):
+            self.advance()
+            while not self.match(TokenType.GT):
+                param_name = self.expect(TokenType.IDENT).value
+                type_params.append(param_name)
+                if self.match(TokenType.COMMA):
+                    self.advance()
+            self.expect(TokenType.GT)
+
         self.expect(TokenType.LPAREN)
-        params = self.parse_params()
+        params = self.parse_params(allow_type_vars=len(type_params) > 0)
         self.expect(TokenType.RPAREN)
         ret_type = JType("void")
         if self.match(TokenType.ARROW):
             self.advance()
-            ret_type = self.parse_type()
+            ret_type = self.parse_type(allow_type_vars=len(type_params) > 0)
         body = self.parse_block()
-        return FuncDecl(name, params, ret_type, body, generic_params=generic_params)
 
-    def parse_ffi_decl(self) -> FFIDecl:
+        location = self.make_location(start_tok)
+        return FuncDecl(name, params, ret_type, body, attributes, type_params=type_params if type_params else None, location=location)
+
+    def parse_func_decl(self) -> FuncDecl:
+        return self.parse_func_decl_with_attributes([])
+
+    def parse_ffi_decl_with_attributes(self, attributes: List[Attribute]) -> FFIDecl:
         self.expect(TokenType.FFI)
         tok = self.peek()
         if tok.type == TokenType.IDENT:
@@ -168,49 +238,12 @@ class Parser:
         self.expect(TokenType.ARROW)
         ret_type = self.parse_type()
         self.expect(TokenType.SEMICOLON)
-        return FFIDecl(name, params, ret_type, variadic)
+        return FFIDecl(name, params, ret_type, variadic, attributes)
 
-    def parse_generic_params(self) -> List[str]:
-        """Parse generic type parameters: <T, U, V>
-        Returns empty list if no generics present."""
-        if not self.match(TokenType.LT):
-            return []
+    def parse_ffi_decl(self) -> FFIDecl:
+        return self.parse_ffi_decl_with_attributes([])
 
-        self.advance()  # consume <
-        params = []
-        while not self.match(TokenType.GT):
-            param_name = self.expect(TokenType.IDENT).value
-            params.append(param_name)
-            if self.match(TokenType.COMMA):
-                self.advance()
-            elif not self.match(TokenType.GT):
-                raise ParseError(f"Expected '>' or ',' in generic parameters at line {self.peek().line}")
-
-        self.expect(TokenType.GT)
-        return params
-
-    def parse_type_args(self) -> List[JType]:
-        """Parse type arguments in generic function calls: <i32, string>"""
-        args = []
-        if not self.match(TokenType.LT):
-            tok = self.peek()
-            source_range = SourceRange.at(tok.line, tok.column)
-            raise ParseError("Expected '<' for type arguments", source_range)
-
-        self.advance()  # consume <
-        while not self.match(TokenType.GT):
-            args.append(self.parse_type())
-            if self.match(TokenType.COMMA):
-                self.advance()
-            elif not self.match(TokenType.GT):
-                tok = self.peek()
-                source_range = SourceRange.at(tok.line, tok.column)
-                raise ParseError("Expected '>' or ',' in type arguments", source_range)
-
-        self.expect(TokenType.GT)
-        return args
-
-    def parse_struct_decl(self) -> StructDef:
+    def parse_struct_decl_with_attributes(self, attributes: List[Attribute]) -> StructDef:
         self.expect(TokenType.STRUCT)
         name = self.expect(TokenType.IDENT).value
         # Parse generic parameters: <T, U, V>
@@ -226,9 +259,12 @@ class Parser:
                 self.advance()
         self.expect(TokenType.RBRACE)
         self.expect(TokenType.SEMICOLON)
-        return StructDef(name, fields, generic_params=generic_params)
+        return StructDef(name, fields, attributes)
 
-    def parse_enum_decl(self) -> EnumDef:
+    def parse_struct_decl(self) -> StructDef:
+        return self.parse_struct_decl_with_attributes([])
+
+    def parse_enum_decl_with_attributes(self, attributes: List[Attribute]) -> EnumDef:
         self.expect(TokenType.ENUM)
         name = self.expect(TokenType.IDENT).value
         # Parse generic parameters: <T, U, V>
@@ -262,7 +298,10 @@ class Parser:
                 self.advance()
         self.expect(TokenType.RBRACE)
         self.expect(TokenType.SEMICOLON)
-        return EnumDef(name, variants, generic_params=generic_params)
+        return EnumDef(name, variants, attributes)
+
+    def parse_enum_decl(self) -> EnumDef:
+        return self.parse_enum_decl_with_attributes([])
 
     def parse_type_alias(self) -> TypeAlias:
         self.expect(TokenType.TYPE)
@@ -362,6 +401,46 @@ class Parser:
         self.expect(TokenType.RBRACE)
         return MatchExpr(scrutinee, arms)
 
+    def parse_closure_or_expr_block(self) -> Block:
+        """Parse block allowing implicit return (last expr without semicolon)."""
+        self.expect(TokenType.LBRACE)
+        stmts = []
+        while not self.match(TokenType.RBRACE):
+            if self.match(TokenType.LET):
+                stmts.append(self.parse_let_stmt())
+            elif self.match(TokenType.IF):
+                stmts.append(self.parse_if_stmt())
+            elif self.match(TokenType.WHILE):
+                stmts.append(self.parse_while_stmt())
+            elif self.match(TokenType.FOR):
+                stmts.append(self.parse_for_stmt())
+            elif self.match(TokenType.RETURN):
+                stmts.append(self.parse_return_stmt())
+            elif self.match(TokenType.BREAK):
+                self.advance()
+                self.expect(TokenType.SEMICOLON)
+                stmts.append(BreakStmt())
+            elif self.match(TokenType.CONTINUE):
+                self.advance()
+                self.expect(TokenType.SEMICOLON)
+                stmts.append(ContinueStmt())
+            else:
+                # Expression statement - might be implicit return if last
+                expr = self.parse_expr()
+                if self.match(TokenType.SEMICOLON):
+                    # Explicit semicolon - this is a statement
+                    self.advance()
+                    stmts.append(ExprStmt(expr))
+                elif self.match(TokenType.RBRACE):
+                    # No semicolon before closing brace - implicit return expression
+                    stmts.append(expr)
+                    break
+                else:
+                    # No semicolon and not at closing brace - error
+                    self.expect(TokenType.SEMICOLON)
+        self.expect(TokenType.RBRACE)
+        return Block(stmts)
+
     def parse_closure_expr(self) -> ClosureExpr:
         """Parse closure expression: |params| { body } or |params| expr"""
         self.expect(TokenType.PIPE)
@@ -379,7 +458,6 @@ class Parser:
                 by_ref = True
 
             name = self.expect(TokenType.IDENT).value
-            captures.append(CaptureVar(name, by_ref))
 
             # Optional type annotation: var: Type
             if self.match(TokenType.COLON):
@@ -387,8 +465,8 @@ class Parser:
                 param_type = self.parse_type()
                 params.append(Param(name, param_type))
             else:
-                # Type will be inferred later
-                params.append(Param(name, None))
+                # No type annotation means it's a capture
+                captures.append(name)
 
             if self.match(TokenType.COMMA):
                 self.advance()
@@ -407,6 +485,101 @@ class Parser:
         else:
             # Single expression body
             body = self.parse_expr()
+
+        return ClosureExpr(params, ret_type, captures, body)
+
+    def collect_free_variables(self, expr: Any, bound_vars: set) -> set:
+        """Collect all free variables (not in bound_vars) referenced in expression."""
+        free_vars = set()
+
+        if isinstance(expr, VarRef):
+            if expr.name not in bound_vars:
+                free_vars.add(expr.name)
+        elif isinstance(expr, BinaryOp):
+            free_vars.update(self.collect_free_variables(expr.left, bound_vars))
+            free_vars.update(self.collect_free_variables(expr.right, bound_vars))
+        elif isinstance(expr, UnaryOp):
+            free_vars.update(self.collect_free_variables(expr.operand, bound_vars))
+        elif isinstance(expr, CallExpr):
+            for arg in expr.args:
+                free_vars.update(self.collect_free_variables(arg, bound_vars))
+        elif isinstance(expr, FieldAccessExpr):
+            free_vars.update(self.collect_free_variables(expr.object, bound_vars))
+        elif isinstance(expr, IndexExpr):
+            free_vars.update(self.collect_free_variables(expr.base, bound_vars))
+            free_vars.update(self.collect_free_variables(expr.index, bound_vars))
+        elif isinstance(expr, CastExpr):
+            free_vars.update(self.collect_free_variables(expr.operand, bound_vars))
+        elif isinstance(expr, DerefExpr):
+            free_vars.update(self.collect_free_variables(expr.operand, bound_vars))
+        elif isinstance(expr, AddrOfExpr):
+            free_vars.update(self.collect_free_variables(expr.operand, bound_vars))
+        elif isinstance(expr, StructLiteralExpr):
+            for field_val in expr.fields.values():
+                free_vars.update(self.collect_free_variables(field_val, bound_vars))
+        elif isinstance(expr, ArrayLiteralExpr):
+            for elem in expr.elements:
+                free_vars.update(self.collect_free_variables(elem, bound_vars))
+        elif isinstance(expr, Block):
+            for stmt in expr.stmts:
+                if isinstance(stmt, ExprStmt):
+                    free_vars.update(self.collect_free_variables(stmt.expr, bound_vars))
+                elif isinstance(stmt, LetStmt):
+                    if stmt.init:
+                        free_vars.update(self.collect_free_variables(stmt.init, bound_vars))
+                    bound_vars = bound_vars | {stmt.name}
+                elif isinstance(stmt, AssignStmt):
+                    free_vars.update(self.collect_free_variables(stmt.value, bound_vars))
+                elif isinstance(stmt, ReturnStmt):
+                    if stmt.value:
+                        free_vars.update(self.collect_free_variables(stmt.value, bound_vars))
+                else:
+                    # Raw expression (implicit return)
+                    free_vars.update(self.collect_free_variables(stmt, bound_vars))
+        elif isinstance(expr, MatchExpr):
+            free_vars.update(self.collect_free_variables(expr.scrutinee, bound_vars))
+            for arm in expr.arms:
+                arm_bound = bound_vars.copy()
+                if isinstance(arm.pattern, VariantPattern) and arm.pattern.bindings:
+                    arm_bound.update(arm.pattern.bindings)
+                free_vars.update(self.collect_free_variables(arm.body, arm_bound))
+
+        return free_vars
+
+    def parse_lambda_expr(self) -> ClosureExpr:
+        """Parse lambda expression: lambda(params) -> type { body }"""
+        self.expect(TokenType.LAMBDA)
+        self.expect(TokenType.LPAREN)
+
+        # Parse parameters (all have type annotations)
+        params = []
+        while not self.match(TokenType.RPAREN):
+            name = self.expect(TokenType.IDENT).value
+            self.expect(TokenType.COLON)
+            param_type = self.parse_type()
+            params.append(Param(name, param_type))
+
+            if self.match(TokenType.COMMA):
+                self.advance()
+
+        self.expect(TokenType.RPAREN)
+
+        # Parse return type annotation
+        ret_type = None
+        if self.match(TokenType.ARROW):
+            self.advance()
+            ret_type = self.parse_type()
+
+        # Parse body (block or expression)
+        if self.match(TokenType.LBRACE):
+            body = self.parse_block()
+        else:
+            body = self.parse_expr()
+
+        # Infer captures from free variables in body
+        param_names = {p.name for p in params}
+        free_vars = self.collect_free_variables(body, param_names)
+        captures = sorted(free_vars)  # Sort for deterministic output
 
         return ClosureExpr(params, ret_type, captures, body)
 
@@ -443,11 +616,11 @@ class Parser:
             source_range = SourceRange.at(tok.line, tok.column)
             raise ParseError(f"Expected pattern, got {tok.type.name}", source_range)
 
-    def parse_params(self) -> List[Param]:
-        params, _ = self.parse_params_variadic()
+    def parse_params(self, allow_type_vars: bool = False) -> List[Param]:
+        params, _ = self.parse_params_variadic(allow_type_vars)
         return params
 
-    def parse_params_variadic(self) -> (List[Param], bool):
+    def parse_params_variadic(self, allow_type_vars: bool = False) -> (List[Param], bool):
         params = []
         variadic = False
         if self.match(TokenType.RPAREN):
@@ -459,7 +632,7 @@ class Parser:
                 break
             name = self.expect(TokenType.IDENT).value
             self.expect(TokenType.COLON)
-            ptype = self.parse_type()
+            ptype = self.parse_type(allow_type_vars)
             params.append(Param(name, ptype))
             if self.match(TokenType.COMMA):
                 self.advance()
@@ -468,10 +641,42 @@ class Parser:
         return params, variadic
 
     def parse_block(self) -> Block:
+        """Parse block with implicit returns (last expr without semicolon)."""
         self.expect(TokenType.LBRACE)
         stmts = []
         while not self.match(TokenType.RBRACE):
-            stmts.append(self.parse_stmt())
+            if self.match(TokenType.LET):
+                stmts.append(self.parse_let_stmt())
+            elif self.match(TokenType.IF):
+                stmts.append(self.parse_if_stmt())
+            elif self.match(TokenType.WHILE):
+                stmts.append(self.parse_while_stmt())
+            elif self.match(TokenType.FOR):
+                stmts.append(self.parse_for_stmt())
+            elif self.match(TokenType.RETURN):
+                stmts.append(self.parse_return_stmt())
+            elif self.match(TokenType.BREAK):
+                self.advance()
+                self.expect(TokenType.SEMICOLON)
+                stmts.append(BreakStmt())
+            elif self.match(TokenType.CONTINUE):
+                self.advance()
+                self.expect(TokenType.SEMICOLON)
+                stmts.append(ContinueStmt())
+            else:
+                # Expression statement - might be implicit return if last
+                expr = self.parse_expr()
+                if self.match(TokenType.SEMICOLON):
+                    # Explicit semicolon - this is a statement
+                    self.advance()
+                    stmts.append(ExprStmt(expr))
+                elif self.match(TokenType.RBRACE):
+                    # No semicolon before closing brace - implicit return expression
+                    stmts.append(expr)
+                    break
+                else:
+                    # No semicolon and not at closing brace - error
+                    self.expect(TokenType.SEMICOLON)
         self.expect(TokenType.RBRACE)
         return Block(stmts)
 
@@ -512,6 +717,7 @@ class Parser:
         return VarDecl(name, typ, init)
 
     def parse_let_stmt(self) -> LetStmt:
+        start_tok = self.peek()
         self.expect(TokenType.LET)
         name = self.expect(TokenType.IDENT).value
         typ: Optional[JType] = None
@@ -520,10 +726,13 @@ class Parser:
             typ = self.parse_type()
         self.expect(TokenType.EQ)
         init = self.parse_expr()
-        self.consume_semicolon()
-        return LetStmt(name, typ, init)
+        end_tok = self.peek()
+        self.expect(TokenType.SEMICOLON)
+        location = self.make_location(start_tok, end_tok)
+        return LetStmt(name, typ, init, location=location)
 
     def parse_if_stmt(self) -> IfStmt:
+        start_tok = self.peek()
         self.expect(TokenType.IF)
         cond = self.parse_expr()
         then_block = self.parse_block()
@@ -535,7 +744,8 @@ class Parser:
                 else_block = Block([self.parse_if_stmt()])
             else:
                 else_block = self.parse_block()
-        return IfStmt(cond, then_block, else_block)
+        location = self.make_location(start_tok)
+        return IfStmt(cond, then_block, else_block, location=location)
 
     def parse_while_stmt(self) -> WhileStmt:
         self.expect(TokenType.WHILE)
@@ -826,24 +1036,9 @@ class Parser:
         elif tok.type == TokenType.PIPE:
             # Closure expression: |params| body
             return self.parse_closure_expr()
-        elif tok.type == TokenType.OROR:
-            # Handle || as closure with no parameters
-            # Need to manually parse since tokenizer gives us OROR not two PIPEs
-            self.advance()  # consume ||
-
-            # Parse return type annotation if present: | -> Type
-            ret_type = None
-            if self.match(TokenType.ARROW):
-                self.advance()
-                ret_type = self.parse_type()
-
-            # Parse body (block or expression)
-            if self.match(TokenType.LBRACE):
-                body = self.parse_block()
-            else:
-                body = self.parse_expr()
-
-            return ClosureExpr([], ret_type, [], body)
+        elif tok.type == TokenType.LAMBDA:
+            # Lambda expression: lambda(params) -> type { body }
+            return self.parse_lambda_expr()
         else:
             source_range = SourceRange.at(tok.line, tok.column)
             raise ParseError(f"Unexpected token {tok.type.name} in expression", source_range)

@@ -1,71 +1,63 @@
-# JOCKY Compiler - Portable LLVM/MLIR Toolchain Environment
-# Uses pre-built toolchain from ./toolchain/
-# Supports: Linux ELF, Windows PE (x86-64) cross-compilation
+# Build stage
+FROM ubuntu:22.04 as builder
 
-FROM ubuntu:22.04
-
-# Prevent interactive prompts
-ENV DEBIAN_FRONTEND=noninteractive
-ENV JOCKY_VERSION=0.1.0
-ENV TOOLCHAIN_PATH=/workspace/jocky/toolchain
-ENV PATH="${TOOLCHAIN_PATH}/bin:${PATH}"
-ENV LD_LIBRARY_PATH="${TOOLCHAIN_PATH}/lib"
-ENV PYTHONPATH=/workspace/jocky/src
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
-    python3 \
-    python3-pip \
     git \
-    curl \
-    wget \
-    file \
-    unzip \
-    openjdk-17-jre-headless \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    python3-pip \
+    python3-dev \
+    llvm-14-dev \
+    clang-14 \
+    libelf-dev \
+    libz-dev \
+    libbpf-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install MinGW-w64 for Windows cross-compilation
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    mingw-w64 \
-    mingw-w64-tools \
-    mingw-w64-x86-64-dev \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install Ghidra: use local copy if available, otherwise download
-COPY tools/ghidra_install.sh /tmp/ghidra_install.sh
-COPY tools/ghidra*.zip* /tmp/ghidra_local/
-RUN chmod +x /tmp/ghidra_install.sh && /tmp/ghidra_install.sh && rm -rf /tmp/ghidra_*
-ENV PATH="/opt/ghidra/support:${PATH}"
-
-# Install Python dependencies for JOCKY compiler
-RUN pip3 install --no-cache-dir \
-    click==8.1.6 \
-    rich==13.5.2 \
-    pyyaml==6.0 \
-    tomli==2.0.1
-
-# Setup workspace
-RUN mkdir -p /workspace/build /workspace/output
-
-WORKDIR /workspace/jocky
-
-# Copy JOCKY source (including pre-built toolchain)
+WORKDIR /build
 COPY . .
 
-# Make toolchain and scripts executable
-RUN chmod +x ${TOOLCHAIN_PATH}/bin/* 2>/dev/null || true && \
-    chmod +x scripts/*.py 2>/dev/null || true
+# Build C++ compiler
+RUN mkdir -p compiler/build && \
+    cd compiler/build && \
+    cmake .. -DLLVM_ROOT=/usr/lib/llvm-14 && \
+    make -j$(nproc)
 
-# Install JOCKY as a package
-RUN pip3 install --no-cache-dir .
+# Install Python dependencies
+RUN pip3 install -e .
 
-# Verify toolchain is available
-RUN ${TOOLCHAIN_PATH}/bin/clang --version && \
-    x86_64-w64-mingw32-gcc --version && \
-    python3 -c "import jocky; print('JOCKY package OK')" && \
-    echo "Toolchain ready"
+# Runtime stage
+FROM ubuntu:22.04
 
-# Default command
-CMD ["/bin/bash"]
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    llvm-14 \
+    clang-14 \
+    git \
+    gdb \
+    strace \
+    ltrace \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /jocky
+
+# Copy built compiler from builder
+COPY --from=builder /build/compiler/build/jockyc /usr/local/bin/
+COPY --from=builder /build . .
+
+# Install Python CLI
+RUN pip3 install -e .
+
+# Set up environment
+ENV JOCKY_LLVM_TOOLCHAIN=/usr/lib/llvm-14
+ENV PATH="/usr/local/bin:${PATH}"
+
+# Create non-root user
+RUN useradd -m -s /bin/bash jocky && \
+    chown -R jocky:jocky /jocky
+
+USER jocky
+
+ENTRYPOINT ["jocky"]
+CMD ["--help"]
