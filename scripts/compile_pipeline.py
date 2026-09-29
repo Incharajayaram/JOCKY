@@ -118,7 +118,7 @@ def stage_codegen(ast, build_dir):
     return ir_path
 
 
-def stage_mlir_obfuscate(ir_path, build_dir):
+def stage_mlir_obfuscate(ir_path, build_dir, custom_passes=None):
     log("MLIR", "Converting LLVM IR to MLIR")
     mlir_path = build_dir / "output.mlir"
     mlir_obf_path = build_dir / "output_obf.mlir"
@@ -128,16 +128,15 @@ def stage_mlir_obfuscate(ir_path, build_dir):
     log("MLIR", f"MLIR: {mlir_path.stat().st_size} bytes, {len(mlir_path.read_text().splitlines())} lines")
 
     plugin = TOOLCHAIN / "lib" / "MLIRObfuscationPlugin.so"
-    # MLIR obfuscation passes (6/6 ALL AVAILABLE!)
-    passes = [
-        "--string-encrypt",           # Encrypt string literals
-        "--constant-obfuscate",       # Obfuscate numeric constants
-        "--symbol-obfuscate",         # Mangle function/variable names
-        "--crypto-hash",              # Cryptographic hashing of symbols
-        "--scf-obfuscate",            # Opaque predicates on SCF regions
-        "--import-obfuscate",         # Hide imports behind wrappers
-    ]
-    log("MLIR", f"Running MLIR obfuscation passes (6/6 ALL): {', '.join(p.lstrip('-') for p in passes)}")
+
+    if custom_passes:
+        passes = [p.strip() for p in custom_passes.split(",") if p.strip()]
+        if not passes:
+            passes = ["--string-encrypt", "--constant-obfuscate", "--symbol-obfuscate", "--crypto-hash", "--scf-obfuscate", "--import-obfuscate"]
+    else:
+        passes = ["--string-encrypt", "--constant-obfuscate", "--symbol-obfuscate", "--crypto-hash", "--scf-obfuscate", "--import-obfuscate"]
+
+    log("MLIR", f"Running MLIR obfuscation passes ({len(passes)} total): {', '.join(p.lstrip('-') for p in passes)}")
 
     mlir_opt = TOOLCHAIN / "bin" / "run-mlir-opt.sh"
     if not mlir_opt.exists():
@@ -162,7 +161,7 @@ def stage_mlir_obfuscate(ir_path, build_dir):
     return obf_bc
 
 
-def stage_llvm_obfuscate(bc_path, build_dir):
+def stage_llvm_obfuscate(bc_path, build_dir, custom_passes=None):
     log("LLVM-OBF", "Running LLVM IR obfuscation passes")
     plugin = TOOLCHAIN / "lib" / "LLVMObfuscationPlugin.so"
     obf_bc = build_dir / "output_full_obf.bc"
@@ -171,23 +170,14 @@ def stage_llvm_obfuscate(bc_path, build_dir):
     if not opt.exists():
         opt = TOOLCHAIN / "bin" / "opt"
 
-    # LLVM obfuscation passes from OBFUSCATION.md recommended ordering
-    # 1. Strip metadata first: strip-signature, pdata-strip
-    # 2. Virtualize whole functions: virtualize
-    # 3. Function-level rewrites (wrapped in function()): opaque-pred, substitution, boguscf, flattening, linear-mba
-    # 4. Anti-debug injected check: anti-debug
-    # 5. Indirect calls last (blocks inlining): indirect-call
-    function_passes = [
-        "opaque-pred",            # Opaque predicates
-        "substitution",           # Instruction substitution
-        "boguscf",                # Bogus control flow injection
-        "flattening",             # Control flow flattening
-        "linear-mba",             # Linear MBA
-    ]
-
-    passes = f"strip-signature,pdata-strip,virtualize,function({','.join(function_passes)}),anti-debug,indirect-call"
-    log("LLVM-OBF", f"Passes ({len(function_passes) + 4} total - FULL OLLVM SUITE): {passes}")
-    log("LLVM-OBF", f"  Recommended order: strip metadata, virtualize, function rewrites, anti-debug, indirect-call last")
+    if custom_passes:
+        passes = custom_passes
+        log("LLVM-OBF", f"Using custom passes: {passes}")
+    else:
+        function_passes = ["opaque-pred", "substitution", "boguscf", "flattening", "linear-mba"]
+        passes = f"strip-signature,pdata-strip,virtualize,function({','.join(function_passes)}),anti-debug,indirect-call"
+        log("LLVM-OBF", f"Passes ({len(function_passes) + 5} total - FULL OLLVM SUITE): {passes}")
+        log("LLVM-OBF", f"  Recommended order: strip metadata, virtualize, function rewrites, anti-debug, indirect-call last")
 
     run([str(opt), f"-load-pass-plugin={plugin}", f"-passes={passes}", str(bc_path), "-o", str(obf_bc)],
         "LLVM obfuscation")
@@ -426,6 +416,8 @@ def main():
     parser.add_argument("output_dir", nargs="?", default="/workspace/build", help="Output directory (default: /workspace/build)")
     parser.add_argument("--platform", choices=["windows", "linux"], default="windows", help="Target platform (default: windows)")
     parser.add_argument("--preset", choices=["none", "light", "standard", "aggressive"], default="standard", help="Obfuscation preset (default: standard)")
+    parser.add_argument("--mlir-passes", type=str, default="", help="Custom MLIR passes (comma-separated flags, overrides preset)")
+    parser.add_argument("--llvm-passes", type=str, default="", help="Custom LLVM passes (comma-separated, overrides preset)")
 
     args = parser.parse_args()
 
@@ -451,10 +443,10 @@ def main():
     ir_path = stage_codegen(ast, build_dir)
 
     log("PIPELINE", "Stage 3/6: MLIR Obfuscation")
-    mlir_bc = stage_mlir_obfuscate(ir_path, build_dir)
+    mlir_bc = stage_mlir_obfuscate(ir_path, build_dir, args.mlir_passes if args.mlir_passes else None)
 
     log("PIPELINE", "Stage 4/6: LLVM Obfuscation")
-    obf_bc = stage_llvm_obfuscate(mlir_bc, build_dir)
+    obf_bc = stage_llvm_obfuscate(mlir_bc, build_dir, args.llvm_passes if args.llvm_passes else None)
 
     log("PIPELINE", "Stage 5/6: Cross-Compile")
     obj_path = stage_compile(obf_bc, build_dir, args.platform)

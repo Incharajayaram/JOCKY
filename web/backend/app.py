@@ -50,15 +50,22 @@ class MLIRConfig(BaseModel):
     string_encrypt: bool = True
     constant_obfuscate: bool = True
     symbol_obfuscate: bool = True
+    crypto_hash: bool = True
+    scf_obfuscate: bool = True
+    import_obfuscate: bool = True
 
 
 class LLVMConfig(BaseModel):
+    strip_signature: bool = True
+    pdata_strip: bool = True
+    virtualize: bool = True
+    opaque_pred: bool = True
+    substitution: bool = True
     boguscf: bool = True
     flattening: bool = True
-    substitution: bool = True
-    split: bool = True
+    linear_mba: bool = True
+    anti_debug: bool = True
     indirect_call: bool = True
-    strip_signature: bool = True
 
 
 class ObfuscationConfig(BaseModel):
