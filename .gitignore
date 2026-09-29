@@ -34,4 +34,6 @@ toolchain/
 
 # C++ compiler build directory
 compiler/build/
-ghidra_11.1.2_PUBLIC/
+tools/ghidra_*_PUBLIC/
+tools/ghidra*.zip
+node_modules/

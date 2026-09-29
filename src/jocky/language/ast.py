@@ -44,6 +44,10 @@ class JType:
             base = "i32"
         elif self.name == "i64":
             base = "i64"
+        elif self.name == "f32":
+            base = "float"
+        elif self.name == "f64":
+            base = "double"
         elif self.name == "string":
             base = "i8"
         else:
@@ -67,9 +71,9 @@ class JType:
         """Estimate size in bytes. Requires struct_defs for user-defined types."""
         if self.name in ("i8", "bool"):
             size = 1
-        elif self.name == "i32":
+        elif self.name in ("i32", "f32"):
             size = 4
-        elif self.name == "i64":
+        elif self.name in ("i64", "f64"):
             size = 8
         elif self.name == "string":
             size = 8
@@ -170,6 +174,18 @@ class LetStmt:
     init: Any
 
 @dataclass
+class ConstDecl:
+    name: str
+    type: Optional[JType]
+    init: Any
+
+@dataclass
+class VarDecl:
+    name: str
+    type: Optional[JType]
+    init: Any
+
+@dataclass
 class AssignStmt:
     target: Any
     value: Any
@@ -193,6 +209,12 @@ class ForStmt:
     body: Block
 
 @dataclass
+class ForInStmt:
+    var_name: str
+    iterable: Any
+    body: Block
+
+@dataclass
 class ReturnStmt:
     value: Optional[Any]
 
@@ -203,6 +225,10 @@ class ExprStmt:
 @dataclass
 class IntLiteral:
     value: int
+
+@dataclass
+class FloatLiteral:
+    value: float
 
 @dataclass
 class BoolLiteral:
@@ -275,6 +301,10 @@ class StructLiteralExpr:
 
 @dataclass
 class ArrayLiteralExpr:
+    elements: List[Any]
+
+@dataclass
+class TupleExpr:
     elements: List[Any]
 
 @dataclass
