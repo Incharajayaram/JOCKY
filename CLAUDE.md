@@ -236,6 +236,10 @@ git push -f origin feature/pattern-matching
 - ❌ Merge without CI passing
 - ❌ Leave dead code or TODOs without context
 - ❌ Use vague commit messages
+- ❌ Commit Docker/infrastructure code without testing first
+  - **Rule:** Test Docker images, build scripts, and CI/CD changes before committing
+  - **Why:** Broken infrastructure affects all developers and wastes time on rebuilds
+  - **How:** Build Docker image locally, test compilation pipeline, verify outputs work
 
 ---
 
@@ -251,6 +255,11 @@ git push -f origin feature/pattern-matching
 - ✅ Run full test suite before PR
 - ✅ Squash fixup commits into logical units
 - ✅ Provide detailed PR descriptions
+- ✅ Test infrastructure changes before committing
+  - **Docker/Build scripts:** Build image and test compilation pipeline
+  - **CMakeLists.txt:** Verify build succeeds with all source files
+  - **Runtime APIs:** Compile test suite and verify all tests pass
+  - **CLI changes:** Test `jocky build` with sample JOCKY scripts
 
 ---
 

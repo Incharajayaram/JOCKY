@@ -1,0 +1,4 @@
+// JOCKY Cryptography Module
+
+ffi crypto_generate_key(size: i32) -> i8*;
+ffi crypto_aes256_encrypt(data: i8*, key: i8*) -> i8*;

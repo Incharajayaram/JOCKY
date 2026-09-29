@@ -1,0 +1,10 @@
+.git
+__pycache__
+*.pyc
+.claude
+build/
+dist/
+*.egg-info
+.env
+tools/ghidra_*_PUBLIC/
+tools/__pycache__/

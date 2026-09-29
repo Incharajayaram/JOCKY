@@ -15,14 +15,16 @@ class CodeGen:
         self.current_func = ""
         self.current_block = "entry"
         self.locals: Dict[str, Tuple[str, JType]] = {}
+        self.globals: Dict[str, Tuple[str, JType]] = {}
         self.functions: Dict[str, (List[JType], JType)] = {}
-        self.structs: Dict[str, StructDef] = {}  # struct_name -> StructDef
-        self.enums: Dict[str, EnumDef] = {}      # enum_name -> EnumDef
-        self.type_aliases: Dict[str, JType] = {} # alias_name -> JType
-        self.loop_stack: List[Tuple[str, str]] = []  # [(continue_label, break_label)]
-        self._all_funcs: List[FuncDecl] = []  # For generic resolution
-        self.monomorphizations: set = set()  # Track monomorphizations to generate
-        self.type_context = None  # Current type substitution context for generics
+        self.structs: Dict[str, StructDef] = {}
+        self.enums: Dict[str, EnumDef] = {}
+        self.type_aliases: Dict[str, JType] = {}
+        self.loop_stack: List[Tuple[str, str]] = []
+        self._all_funcs: List[FuncDecl] = []
+        self.monomorphizations: set = set()
+        self.global_inits: Dict[str, Any] = {}
+        self.type_context = None
 
     def next_reg(self) -> str:
         r = f"%{self.reg_counter}"
@@ -71,10 +73,18 @@ class CodeGen:
             elif isinstance(decl, FFIDecl):
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, decl.variadic)
+            elif isinstance(decl, (ConstDecl, VarDecl)):
+                t = self.infer_global_type(decl)
+                self.globals[decl.name] = (f"@{decl.name}", t)
 
         # Emit struct type definitions
         for struct_name, struct_def in self.structs.items():
             self.emit_struct_def(struct_def)
+
+        # Emit global variables
+        for decl in prog.decls:
+            if isinstance(decl, (ConstDecl, VarDecl)):
+                self.emit_global_decl(decl)
 
         # Emit FFI declarations (deduplicated)
         emitted_ffis: set = set()
@@ -99,9 +109,16 @@ class CodeGen:
         # Prepend string constants
         prelude = []
         for s, name in self.string_constants.items():
-            length = len(s.encode("utf-8")) + 1
-            escaped = s.encode("utf-8").replace(b"\\", b"\\5C").replace(b"\n", b"\\0A").replace(b"\t", b"\\09").replace(b'"', b'\\22')
-            prelude.append(f'{name} = private constant [{length} x i8] c"{escaped.decode("latin-1")}\\00"')
+            raw = s.encode("utf-8")
+            length = len(raw) + 1
+            parts = []
+            for b in raw:
+                if 32 <= b < 127 and b != ord('\\') and b != ord('"'):
+                    parts.append(chr(b))
+                else:
+                    parts.append(f"\\{b:02X}")
+            escaped = "".join(parts)
+            prelude.append(f'{name} = private constant [{length} x i8] c"{escaped}\\00"')
 
         return "\n".join(prelude + [""] + self.output_lines)
 
@@ -109,6 +126,44 @@ class CodeGen:
         """Emit LLVM struct type definition."""
         field_types = ", ".join(self.llvm_type(f.type) for f in struct_def.fields)
         self.emit(f"%{struct_def.name} = type {{ {field_types} }}")
+
+    def infer_global_type(self, decl) -> JType:
+        if decl.type:
+            return decl.type
+        try:
+            return self.infer_type(decl.init)
+        except Exception:
+            return JType("i64")
+
+    def emit_global_decl(self, decl):
+        t = self.infer_global_type(decl)
+        llvm_t = self.llvm_type(t)
+        if t.name == "string" and not t.is_array:
+            self.emit(f"@{decl.name} = global i8* null")
+            if decl.init:
+                self.global_inits[decl.name] = decl.init
+        elif t.is_array or isinstance(decl.init, ArrayLiteralExpr):
+            self.emit(f"@{decl.name} = global i8* null")
+            stored_type = JType("i8", is_pointer=True)
+            self.globals[decl.name] = (f"@{decl.name}", stored_type)
+            if decl.init and isinstance(decl.init, ArrayLiteralExpr) and len(decl.init.elements) > 0:
+                self.global_inits[decl.name] = decl.init
+            return
+        elif t.name in ("f32", "f64"):
+            init_val = "0.0"
+            if isinstance(decl.init, FloatLiteral):
+                init_val = f"{decl.init.value:#.17g}"
+            elif isinstance(decl.init, IntLiteral):
+                init_val = f"{float(decl.init.value):#.17g}"
+            self.emit(f"@{decl.name} = global {llvm_t} {init_val}")
+        elif t.name == "bool":
+            init_val = "1" if isinstance(decl.init, BoolLiteral) and decl.init.value else "0"
+            self.emit(f"@{decl.name} = global i1 {init_val}")
+        else:
+            init_val = "0"
+            if isinstance(decl.init, IntLiteral):
+                init_val = str(decl.init.value)
+            self.emit(f"@{decl.name} = global {llvm_t} {init_val}")
 
     def emit_ffi_decl(self, decl: FFIDecl):
         params = ", ".join(self.llvm_type(t) for t in [p.type for p in decl.params])
@@ -121,9 +176,11 @@ class CodeGen:
         self.emit(f"declare {ret} @{decl.name}({params})")
 
     def llvm_type(self, t: JType) -> str:
-        # Resolve type aliases before getting LLVM type
         resolved = self.resolve_type_alias(t)
-        return resolved.llvm_type()
+        result = resolved.llvm_type()
+        if result == "i8**" and resolved.is_array:
+            return "i8*"
+        return result
 
     def resolve_type_alias(self, t: JType) -> JType:
         """Resolve type alias recursively."""
@@ -220,10 +277,13 @@ class CodeGen:
         result = []
         for stmt in stmts:
             if isinstance(stmt, LetStmt):
-                t = stmt.type if stmt.type else self.infer_type(stmt.init)
-                # Resolve type aliases
+                try:
+                    t = stmt.type if stmt.type else self.infer_type(stmt.init)
+                except Exception:
+                    t = JType("i64")
                 t = self.resolve_type_alias(t)
                 result.append((stmt.name, t))
+                self.locals[stmt.name] = (f"%{stmt.name}", t)
             elif isinstance(stmt, IfStmt):
                 result.extend(self.collect_lets(stmt.then_block.stmts))
                 if stmt.else_block:
@@ -233,9 +293,23 @@ class CodeGen:
             elif isinstance(stmt, ForStmt):
                 if isinstance(stmt.init, LetStmt):
                     t = stmt.init.type if stmt.init.type else self.infer_type(stmt.init.init)
-                    # Resolve type aliases
                     t = self.resolve_type_alias(t)
                     result.append((stmt.init.name, t))
+                result.extend(self.collect_lets(stmt.body.stmts))
+            elif isinstance(stmt, ForInStmt):
+                elem_type = JType("i8", is_pointer=True)
+                if isinstance(stmt.iterable, VarRef) and stmt.iterable.name in self.global_inits:
+                    elem_type = JType("i8", is_pointer=True)
+                else:
+                    try:
+                        iter_type = self.infer_type(stmt.iterable)
+                        if iter_type.name == "string" or iter_type.is_pointer:
+                            elem_type = JType("i8", is_pointer=True)
+                        else:
+                            elem_type = JType(iter_type.name, is_pointer=False, is_array=False)
+                    except Exception:
+                        pass
+                self.locals[stmt.var_name] = (f"%{stmt.var_name}", elem_type)
                 result.extend(self.collect_lets(stmt.body.stmts))
         return result
 
@@ -260,7 +334,9 @@ class CodeGen:
             self.locals[p.name] = (alloca, p.type)
 
         # Hoist all LetStmt allocas to the entry block for mem2reg compatibility
+        saved_locals = dict(self.locals)
         all_lets = self.collect_lets(decl.body.stmts)
+        self.locals = saved_locals
         seen_names: set = set()
         for name, t in all_lets:
             if name not in seen_names and name not in self.locals:
@@ -312,12 +388,18 @@ class CodeGen:
             self.locals[stmt.name] = (alloca, t)
         elif isinstance(stmt, AssignStmt):
             if isinstance(stmt.target, VarRef):
-                if stmt.target.name not in self.locals:
+                if stmt.target.name in self.locals:
+                    alloca, t = self.locals[stmt.target.name]
+                elif stmt.target.name in self.globals:
+                    alloca, t = self.globals[stmt.target.name]
+                else:
                     raise CodeGenError(f"Undefined variable: {stmt.target.name}")
-                alloca, t = self.locals[stmt.target.name]
                 val, vt = self.emit_expr(stmt.value)
                 if t.name != vt.name or t.is_pointer != vt.is_pointer:
-                    val = self.emit_cast(val, vt, t)
+                    try:
+                        val = self.emit_cast(val, vt, t)
+                    except CodeGenError:
+                        pass
                 self.emit(f"  store {self.llvm_type(t)} {val}, {self.llvm_type(t)}* {alloca}")
             elif isinstance(stmt.target, DerefExpr):
                 ptr, pt = self.emit_expr(stmt.target.operand)
@@ -344,6 +426,8 @@ class CodeGen:
             self.emit_while(stmt)
         elif isinstance(stmt, ForStmt):
             self.emit_for(stmt)
+        elif isinstance(stmt, ForInStmt):
+            self.emit_for_in(stmt)
         elif isinstance(stmt, ReturnStmt):
             if stmt.value is None:
                 self.emit("  ret void")
@@ -448,15 +532,86 @@ class CodeGen:
 
         self.emit_label(exit_block)
 
+    def emit_for_in(self, stmt: ForInStmt):
+        iter_val, iter_type = self.emit_expr(stmt.iterable)
+        if iter_type.is_array and iter_type.array_size > 0:
+            arr_len = iter_type.array_size
+        else:
+            len_reg = self.next_reg()
+            self.emit(f"  {len_reg} = call i64 @array_len(i8* {iter_val})")
+            arr_len = len_reg
+
+        if iter_type.name == "string" or iter_type.is_pointer:
+            elem_type = JType("i8", is_pointer=True)
+        else:
+            elem_type = JType(iter_type.name, is_pointer=False, is_array=False)
+        elem_llvm = self.llvm_type(elem_type)
+
+        idx_alloca = self.next_reg()
+        self.emit(f"  {idx_alloca} = alloca i64")
+        self.emit(f"  store i64 0, i64* {idx_alloca}")
+
+        elem_alloca = self.next_reg()
+        self.emit(f"  {elem_alloca} = alloca {elem_llvm}")
+        self.locals[stmt.var_name] = (elem_alloca, elem_type)
+
+        header = self.next_label("forin_cond")
+        body_lbl = self.next_label("forin_body")
+        exit_lbl = self.next_label("forin_exit")
+
+        self.emit(f"  br label %{header}")
+        self.emit_label(header)
+        idx_val = self.next_reg()
+        self.emit(f"  {idx_val} = load i64, i64* {idx_alloca}")
+        cond = self.next_reg()
+        self.emit(f"  {cond} = icmp slt i64 {idx_val}, {arr_len}")
+        self.emit(f"  br i1 {cond}, label %{body_lbl}, label %{exit_lbl}")
+
+        self.emit_label(body_lbl)
+        if elem_llvm == "i8*":
+            cast = self.next_reg()
+            self.emit(f"  {cast} = bitcast i8* {iter_val} to i8**")
+            gep = self.next_reg()
+            self.emit(f"  {gep} = getelementptr i8*, i8** {cast}, i64 {idx_val}")
+            elem_val = self.next_reg()
+            self.emit(f"  {elem_val} = load i8*, i8** {gep}")
+        else:
+            gep = self.next_reg()
+            self.emit(f"  {gep} = getelementptr {elem_llvm}, {elem_llvm}* {iter_val}, i64 {idx_val}")
+            elem_val = self.next_reg()
+            self.emit(f"  {elem_val} = load {elem_llvm}, {elem_llvm}* {gep}")
+        self.emit(f"  store {elem_llvm} {elem_val}, {elem_llvm}* {elem_alloca}")
+
+        step_lbl = self.next_label("forin_step")
+        self.loop_stack.append((step_lbl, exit_lbl))
+        self.emit_block(stmt.body)
+        self.loop_stack.pop()
+        if not self.last_line_is_terminator():
+            self.emit(f"  br label %{step_lbl}")
+
+        self.emit_label(step_lbl)
+        next_idx = self.next_reg()
+        self.emit(f"  {next_idx} = add i64 {idx_val}, 1")
+        self.emit(f"  store i64 {next_idx}, i64* {idx_alloca}")
+        self.emit(f"  br label %{header}")
+
+        self.emit_label(exit_lbl)
+
     def emit_to_bool(self, val: str, t: JType) -> str:
+        if self.is_float(t):
+            r = self.next_reg()
+            self.emit(f"  {r} = fcmp one {self.llvm_type(t)} {val}, 0.0")
+            return r
         if self.is_numeric(t):
             r = self.next_reg()
             self.emit(f"  {r} = icmp ne {self.llvm_type(t)} {val}, 0")
             return r
-        if t.name == "string":
+        if t.name == "string" or t.is_pointer:
             r = self.next_reg()
-            self.emit(f"  {r} = icmp ne i8* {val}, null")
+            self.emit(f"  {r} = icmp ne {self.llvm_type(t)} {val}, null")
             return r
+        if t.name == "bool":
+            return val
         raise CodeGenError(f"Cannot convert {t} to bool")
 
     def emit_cast(self, val: str, from_t: JType, to_t: JType) -> str:
@@ -469,6 +624,21 @@ class CodeGen:
         if self.is_numeric(from_t) and to_t.name == "bool":
             r = self.next_reg()
             self.emit(f"  {r} = icmp ne {self.llvm_type(from_t)} {val}, 0")
+            return r
+        if self.is_float(from_t) and self.is_integer(to_t):
+            r = self.next_reg()
+            self.emit(f"  {r} = fptosi {self.llvm_type(from_t)} {val} to {self.llvm_type(to_t)}")
+            return r
+        if self.is_integer(from_t) and self.is_float(to_t):
+            r = self.next_reg()
+            self.emit(f"  {r} = sitofp {self.llvm_type(from_t)} {val} to {self.llvm_type(to_t)}")
+            return r
+        if self.is_float(from_t) and self.is_float(to_t):
+            r = self.next_reg()
+            if from_t.size_bytes() < to_t.size_bytes():
+                self.emit(f"  {r} = fpext {self.llvm_type(from_t)} {val} to {self.llvm_type(to_t)}")
+            else:
+                self.emit(f"  {r} = fptrunc {self.llvm_type(from_t)} {val} to {self.llvm_type(to_t)}")
             return r
         if self.is_numeric(from_t) and self.is_numeric(to_t):
             fsize = from_t.size_bytes()
@@ -488,14 +658,45 @@ class CodeGen:
             r = self.next_reg()
             self.emit(f"  {r} = inttoptr {self.llvm_type(from_t)} {val} to {self.llvm_type(to_t)}")
             return r
-        raise CodeGenError(f"Cannot cast {from_t} to {to_t}")
+        # Fallback: bitcast between pointer types or inttoptr/ptrtoint
+        from_llvm = self.llvm_type(from_t)
+        to_llvm = self.llvm_type(to_t)
+        if from_llvm == to_llvm:
+            return val
+        if '*' in from_llvm and '*' in to_llvm:
+            r = self.next_reg()
+            self.emit(f"  {r} = bitcast {from_llvm} {val} to {to_llvm}")
+        elif '*' in to_llvm:
+            if 'i' in from_llvm:
+                ext = self.next_reg()
+                self.emit(f"  {ext} = sext {from_llvm} {val} to i64")
+                r = self.next_reg()
+                self.emit(f"  {r} = inttoptr i64 {ext} to {to_llvm}")
+            else:
+                r = self.next_reg()
+                self.emit(f"  {r} = inttoptr i64 0 to {to_llvm}")
+        elif '*' in from_llvm:
+            r = self.next_reg()
+            self.emit(f"  {r} = ptrtoint {from_llvm} {val} to {to_llvm}")
+        else:
+            r = self.next_reg()
+            self.emit(f"  {r} = bitcast {from_llvm} {val} to {to_llvm}")
+        return r
 
     def is_numeric(self, t: JType) -> bool:
+        return t.name in ("i8", "i32", "i64", "f32", "f64") and not t.is_pointer
+
+    def is_float(self, t: JType) -> bool:
+        return t.name in ("f32", "f64") and not t.is_pointer
+
+    def is_integer(self, t: JType) -> bool:
         return t.name in ("i8", "i32", "i64") and not t.is_pointer
 
     def infer_type(self, expr: Any) -> JType:
         if isinstance(expr, IntLiteral):
             return JType("i32")
+        elif isinstance(expr, FloatLiteral):
+            return JType("f64")
         elif isinstance(expr, BoolLiteral):
             return JType("bool")
         elif isinstance(expr, StringLiteral):
@@ -505,12 +706,13 @@ class CodeGen:
         elif isinstance(expr, VarRef):
             if expr.name in self.locals:
                 return self.locals[expr.name][1]
-            # Check if this is an enum variant reference
+            if expr.name in self.globals:
+                return self.globals[expr.name][1]
             for enum_name, enum_def in self.enums.items():
                 for variant in enum_def.variants:
                     if variant.name == expr.name:
                         return JType(enum_name)
-            raise CodeGenError(f"Undefined variable: {expr.name}")
+            return JType("i64")
         elif isinstance(expr, BinaryOp):
             if expr.op in ("+", "-", "*", "/", "%", "|", "^", "&", "<<", ">>"):
                 return self.infer_type(expr.left)
@@ -534,6 +736,8 @@ class CodeGen:
             return expr.target_type
         elif isinstance(expr, IndexExpr):
             t = self.infer_type(expr.base)
+            if t.is_pointer and t.name == "i8":
+                return JType("i8", is_pointer=True)
             return JType(t.name, is_pointer=False, is_array=False)
         elif isinstance(expr, FieldAccessExpr):
             obj_type = self.infer_type(expr.object)
@@ -544,11 +748,10 @@ class CodeGen:
                 if field.name == expr.field:
                     return field.type
             raise CodeGenError(f"Struct {obj_type.name} has no field {expr.field}")
+        elif isinstance(expr, TupleExpr):
+            return JType("i8", is_pointer=True)
         elif isinstance(expr, ArrayLiteralExpr):
-            if len(expr.elements) == 0:
-                raise CodeGenError("Cannot infer type of empty array")
-            elem_type = self.infer_type(expr.elements[0])
-            return JType(elem_type.name, is_array=True, array_size=len(expr.elements))
+            return JType("i8", is_pointer=True)
         elif isinstance(expr, StructLiteralExpr):
             return JType(expr.struct_type, is_pointer=False)
         elif isinstance(expr, MatchExpr):
@@ -568,6 +771,8 @@ class CodeGen:
     def emit_expr(self, expr: Any) -> Tuple[str, JType]:
         if isinstance(expr, IntLiteral):
             return (str(expr.value), JType("i32"))
+        elif isinstance(expr, FloatLiteral):
+            return (f"{expr.value:#.17g}", JType("f64"))
         elif isinstance(expr, BoolLiteral):
             return ("1" if expr.value else "0", JType("bool"))
         elif isinstance(expr, NullLiteral):
@@ -583,7 +788,15 @@ class CodeGen:
                 r = self.next_reg()
                 self.emit(f"  {r} = load {self.llvm_type(t)}, {self.llvm_type(t)}* {alloca}")
                 return (r, t)
-            # Check if this is an enum variant reference
+            if expr.name in self.globals:
+                gname, t = self.globals[expr.name]
+                if expr.name in self.global_inits:
+                    init_expr = self.global_inits[expr.name]
+                    val, vt = self.emit_expr(init_expr)
+                    return (val, vt)
+                r = self.next_reg()
+                self.emit(f"  {r} = load {self.llvm_type(t)}, {self.llvm_type(t)}* {gname}")
+                return (r, t)
             for enum_name, enum_def in self.enums.items():
                 for variant in enum_def.variants:
                     if variant.name == expr.name:
@@ -617,7 +830,14 @@ class CodeGen:
         elif isinstance(expr, IndexExpr):
             base, bt = self.emit_expr(expr.base)
             idx, _ = self.emit_expr(expr.index)
-            # For arrays, element type is stored in the base name
+            if bt.is_pointer and not bt.is_array and bt.name == "i8":
+                cast = self.next_reg()
+                self.emit(f"  {cast} = bitcast i8* {base} to i8**")
+                gep = self.next_reg()
+                self.emit(f"  {gep} = getelementptr i8*, i8** {cast}, i32 {idx}")
+                r = self.next_reg()
+                self.emit(f"  {r} = load i8*, i8** {gep}")
+                return (r, JType("i8", is_pointer=True))
             elem_type = JType(bt.name, is_pointer=False, is_array=False)
             gep = self.next_reg()
             self.emit(f"  {gep} = getelementptr {self.llvm_type(elem_type)}, {self.llvm_type(bt)} {base}, i32 {idx}")
@@ -646,22 +866,53 @@ class CodeGen:
             r = self.next_reg()
             self.emit(f"  {r} = load {self.llvm_type(field_type)}, {self.llvm_type(field_type)}* {gep}")
             return (r, field_type)
-        elif isinstance(expr, ArrayLiteralExpr):
-            # Allocate array on stack and initialize elements
-            elem_type = JType("i32")  # Will be inferred from first element
-            if len(expr.elements) > 0:
-                elem_val, elem_type = self.emit_expr(expr.elements[0])
-            # Allocate array
-            array_type = JType(elem_type.name, is_array=True, array_size=len(expr.elements))
+        elif isinstance(expr, TupleExpr):
+            n = len(expr.elements)
+            elem_type = JType("i8", is_pointer=True)
+            array_type = JType("i8", is_array=True, array_size=n, is_pointer=True)
             alloca = self.next_reg()
-            self.emit(f"  {alloca} = alloca {self.llvm_type(array_type)}")
-            # Initialize elements
+            self.emit(f"  {alloca} = alloca [{n} x i8*]")
             for i, elem_expr in enumerate(expr.elements):
-                elem_val, elem_type = self.emit_expr(elem_expr)
+                elem_val, et = self.emit_expr(elem_expr)
+                elem_llvm = self.llvm_type(et)
+                if elem_llvm != "i8*":
+                    if '*' in elem_llvm:
+                        cast = self.next_reg()
+                        self.emit(f"  {cast} = bitcast {elem_llvm} {elem_val} to i8*")
+                    else:
+                        ext = self.next_reg()
+                        self.emit(f"  {ext} = sext {elem_llvm} {elem_val} to i64")
+                        cast = self.next_reg()
+                        self.emit(f"  {cast} = inttoptr i64 {ext} to i8*")
+                    elem_val = cast
                 gep = self.next_reg()
-                self.emit(f"  {gep} = getelementptr {self.llvm_type(elem_type)}, {self.llvm_type(array_type)} {alloca}, i32 0, i32 {i}")
-                self.emit(f"  store {self.llvm_type(elem_type)} {elem_val}, {self.llvm_type(elem_type)}* {gep}")
-            return (alloca, array_type)
+                self.emit(f"  {gep} = getelementptr [{n} x i8*], [{n} x i8*]* {alloca}, i32 0, i32 {i}")
+                self.emit(f"  store i8* {elem_val}, i8** {gep}")
+            ptr = self.next_reg()
+            self.emit(f"  {ptr} = bitcast [{n} x i8*]* {alloca} to i8*")
+            return (ptr, JType("i8", is_pointer=True))
+        elif isinstance(expr, ArrayLiteralExpr):
+            if len(expr.elements) == 0:
+                return ("null", JType("i8", is_pointer=True))
+            n = len(expr.elements)
+            first_val, first_type = self.emit_expr(expr.elements[0])
+            elem_llvm = self.llvm_type(first_type)
+            alloca = self.next_reg()
+            self.emit(f"  {alloca} = alloca [{n} x {elem_llvm}]")
+            gep = self.next_reg()
+            self.emit(f"  {gep} = getelementptr [{n} x {elem_llvm}], [{n} x {elem_llvm}]* {alloca}, i32 0, i32 0")
+            self.emit(f"  store {elem_llvm} {first_val}, {elem_llvm}* {gep}")
+            for i, elem_expr in enumerate(expr.elements[1:], 1):
+                ev, et = self.emit_expr(elem_expr)
+                ev_llvm = self.llvm_type(et)
+                if ev_llvm != elem_llvm:
+                    ev = self.emit_cast(ev, et, first_type)
+                g = self.next_reg()
+                self.emit(f"  {g} = getelementptr [{n} x {elem_llvm}], [{n} x {elem_llvm}]* {alloca}, i32 0, i32 {i}")
+                self.emit(f"  store {elem_llvm} {ev}, {elem_llvm}* {g}")
+            ptr = self.next_reg()
+            self.emit(f"  {ptr} = bitcast [{n} x {elem_llvm}]* {alloca} to i8*")
+            return (ptr, JType("i8", is_pointer=True))
         elif isinstance(expr, StructLiteralExpr):
             # Allocate struct on stack and initialize fields
             if expr.struct_type not in self.structs:
@@ -762,34 +1013,63 @@ class CodeGen:
 
         return (r, JType("bool"))
 
+    def is_string_type(self, t: JType) -> bool:
+        return t.name == "string" or (t.name == "i8" and t.is_pointer and not t.is_array)
+
     def emit_binary(self, expr: BinaryOp) -> Tuple[str, JType]:
         left, lt = self.emit_expr(expr.left)
         right, rt = self.emit_expr(expr.right)
 
+        op = expr.op
+
+        # String concatenation
+        if self.is_string_type(lt) and op == "+":
+            if not self.is_string_type(rt):
+                right = self.emit_cast(right, rt, JType("i64"))
+                right_str = self.next_reg()
+                self.emit(f"  {right_str} = call i8* @string(i64 {right})")
+                right = right_str
+            r = self.next_reg()
+            self.emit(f"  {r} = call i8* @jocky_str_concat(i8* {left}, i8* {right})")
+            return (r, JType("string"))
+
         # Promote to common type for arithmetic / bitwise
         if self.is_numeric(lt) and self.is_numeric(rt):
             if lt.name != rt.name:
-                if lt.size_bytes() < rt.size_bytes():
+                if self.is_float(lt) or self.is_float(rt):
+                    target = lt if self.is_float(lt) else rt
+                    if lt.name != target.name:
+                        left = self.emit_cast(left, lt, target)
+                        lt = target
+                    if rt.name != target.name:
+                        right = self.emit_cast(right, rt, target)
+                        rt = target
+                elif lt.size_bytes() < rt.size_bytes():
                     left = self.emit_cast(left, lt, rt)
                     lt = rt
                 else:
                     right = self.emit_cast(right, rt, lt)
                     rt = lt
 
-        op = expr.op
         r = self.next_reg()
         typ = lt
+        use_float = self.is_float(typ)
 
         if op == "+":
-            self.emit(f"  {r} = add {self.llvm_type(typ)} {left}, {right}")
+            instr = "fadd" if use_float else "add"
+            self.emit(f"  {r} = {instr} {self.llvm_type(typ)} {left}, {right}")
         elif op == "-":
-            self.emit(f"  {r} = sub {self.llvm_type(typ)} {left}, {right}")
+            instr = "fsub" if use_float else "sub"
+            self.emit(f"  {r} = {instr} {self.llvm_type(typ)} {left}, {right}")
         elif op == "*":
-            self.emit(f"  {r} = mul {self.llvm_type(typ)} {left}, {right}")
+            instr = "fmul" if use_float else "mul"
+            self.emit(f"  {r} = {instr} {self.llvm_type(typ)} {left}, {right}")
         elif op == "/":
-            self.emit(f"  {r} = sdiv {self.llvm_type(typ)} {left}, {right}")
+            instr = "fdiv" if use_float else "sdiv"
+            self.emit(f"  {r} = {instr} {self.llvm_type(typ)} {left}, {right}")
         elif op == "%":
-            self.emit(f"  {r} = srem {self.llvm_type(typ)} {left}, {right}")
+            instr = "frem" if use_float else "srem"
+            self.emit(f"  {r} = {instr} {self.llvm_type(typ)} {left}, {right}")
         elif op == "|":
             self.emit(f"  {r} = or {self.llvm_type(typ)} {left}, {right}")
         elif op == "^":
@@ -800,23 +1080,13 @@ class CodeGen:
             self.emit(f"  {r} = shl {self.llvm_type(typ)} {left}, {right}")
         elif op == ">>":
             self.emit(f"  {r} = lshr {self.llvm_type(typ)} {left}, {right}")
-        elif op == "==":
-            self.emit(f"  {r} = icmp eq {self.llvm_type(typ)} {left}, {right}")
-            typ = JType("bool")
-        elif op == "!=":
-            self.emit(f"  {r} = icmp ne {self.llvm_type(typ)} {left}, {right}")
-            typ = JType("bool")
-        elif op == "<":
-            self.emit(f"  {r} = icmp slt {self.llvm_type(typ)} {left}, {right}")
-            typ = JType("bool")
-        elif op == ">":
-            self.emit(f"  {r} = icmp sgt {self.llvm_type(typ)} {left}, {right}")
-            typ = JType("bool")
-        elif op == "<=":
-            self.emit(f"  {r} = icmp sle {self.llvm_type(typ)} {left}, {right}")
-            typ = JType("bool")
-        elif op == ">=":
-            self.emit(f"  {r} = icmp sge {self.llvm_type(typ)} {left}, {right}")
+        elif op in ("==", "!=", "<", ">", "<=", ">="):
+            if use_float:
+                cmp_map = {"==": "oeq", "!=": "one", "<": "olt", ">": "ogt", "<=": "ole", ">=": "oge"}
+                self.emit(f"  {r} = fcmp {cmp_map[op]} {self.llvm_type(typ)} {left}, {right}")
+            else:
+                cmp_map = {"==": "eq", "!=": "ne", "<": "slt", ">": "sgt", "<=": "sle", ">=": "sge"}
+                self.emit(f"  {r} = icmp {cmp_map[op]} {self.llvm_type(typ)} {left}, {right}")
             typ = JType("bool")
         else:
             raise CodeGenError(f"Unknown binary op: {op}")
@@ -885,9 +1155,13 @@ class CodeGen:
         for i, arg in enumerate(expr.args):
             val, vt = self.emit_expr(arg)
             vt = self.resolve_type_alias(vt)
-            if i < len(ptypes) and (ptypes[i].name != vt.name or ptypes[i].is_pointer != vt.is_pointer):
-                val = self.emit_cast(val, vt, ptypes[i])
-                vt = ptypes[i]
+            if i < len(ptypes):
+                pt = ptypes[i]
+                pt_llvm = self.llvm_type(pt)
+                vt_llvm = self.llvm_type(vt)
+                if vt_llvm != pt_llvm:
+                    val = self.emit_cast(val, vt, pt)
+                vt = pt
             args.append(f"{self.llvm_type(vt)} {val}")
         arg_str = ", ".join(args)
         if ret.name == "void":

@@ -1,0 +1,91 @@
+services:
+  # JOCKY Compiler Service - Full LLVM/MLIR Toolchain
+  jocky-compiler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jocky-compiler
+    image: jocky:latest
+
+    # Volume mounts for source, output, and cache
+    volumes:
+      # Source code
+      - .:/workspace/jocky
+      # Build output
+      - ./build:/workspace/build
+      # Compiled executables
+      - ./dist:/workspace/output
+      # Cache for faster rebuilds
+      - jocky-cache:/root/.cache
+      # ML models
+      - ~/.jocky/models:/root/.jocky/models:ro
+
+    environment:
+      - TOOLCHAIN_PATH=/workspace/jocky/toolchain
+      - JOCKY_OPT_LEVEL=2
+      - JOCKY_LTO=thin
+      - JOCKY_PROFILE=standard
+      - JOCKY_TARGETS=linux,windows
+      - JOCKY_KEEP_INTERMEDIATES=false
+      - JOCKY_ENABLE_OBFUSCATION=true
+      - JOCKY_ENABLE_PACKING=true
+      - PYTHONPATH=/workspace/jocky/src
+
+    # Network configuration
+    networks:
+      - jocky-network
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+
+    # Keep container running
+    stdin_open: true
+    tty: true
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python3", "-m", "jocky", "--version"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Wine container for testing Windows binaries on Linux
+  jocky-wine:
+    image: jocky:latest
+    container_name: jocky-wine
+    depends_on:
+      - jocky-compiler
+
+    volumes:
+      - ./dist:/workspace/output:ro
+      - wine-prefix:/root/.wine
+
+    environment:
+      - WINEPREFIX=/root/.wine
+      - WINEARCH=win64
+      - DISPLAY=${DISPLAY:-:0}
+
+    networks:
+      - jocky-network
+
+    # Only start if explicitly requested
+    profiles:
+      - test-windows
+
+networks:
+  jocky-network:
+    driver: bridge
+
+volumes:
+  jocky-cache:
+    driver: local
+  wine-prefix:
+    driver: local

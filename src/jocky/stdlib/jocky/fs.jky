@@ -1,0 +1,6 @@
+// JOCKY Filesystem Module
+
+ffi fs_exists(path: string) -> bool;
+ffi fs_list_files(path: string, recursive: bool) -> i8*;
+ffi fs_file_size(path: string) -> i64;
+ffi fs_read_file(path: string) -> i8*;

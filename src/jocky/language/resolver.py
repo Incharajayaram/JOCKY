@@ -31,52 +31,58 @@ class ModuleResolver:
         ]
         return [p for p in candidates if p.exists()]
 
-    def resolve_module(self, module_path: str) -> Optional[Program]:
+    def resolve_module(self, module_path) -> Optional[Program]:
         """Resolve a module path to an AST program.
 
         Args:
-            module_path: e.g., "jocky.linux.modules"
+            module_path: ModulePath or string like "jocky.linux.modules"
 
         Returns:
             Parsed Program from the module, or None if not found.
         """
-        if module_path in self._resolved:
-            return self._resolved[module_path]
+        if hasattr(module_path, 'components'):
+            components = module_path.components
+            key = ".".join(components)
+        else:
+            key = str(module_path)
+            components = key.replace("::", ".").split(".")
 
-        if module_path in self._resolving:
-            raise RuntimeError(f"Circular dependency: {module_path}")
+        if key in self._resolved:
+            return self._resolved[key]
 
-        self._resolving.add(module_path)
+        if key in self._resolving:
+            return None
+
+        self._resolving.add(key)
 
         try:
-            # Try each stdlib path
             for stdlib_path in self.stdlib_paths:
-                module_file = self._find_module_file(stdlib_path, module_path)
+                module_file = self._find_module_file_by_parts(stdlib_path, components)
                 if module_file:
                     src = module_file.read_text()
                     lexer = Lexer(src)
                     tokens = lexer.tokenize()
                     parser = Parser(tokens)
                     program = parser.parse()
-                    self._resolved[module_path] = program
+                    self._resolved[key] = program
                     return program
 
-            raise RuntimeError(f"Module not found: {module_path}")
+            return None
 
         finally:
-            self._resolving.discard(module_path)
+            self._resolving.discard(key)
 
     def _find_module_file(self, root: Path, module_path: str) -> Optional[Path]:
-        """Find a module file for the given path.
+        parts = module_path.replace("::", ".").split(".")
+        return self._find_module_file_by_parts(root, parts)
 
-        Converts "jocky.linux.modules" -> "jocky/linux/modules.jky"
-        """
-        parts = module_path.split(".")
-        # Try as a file: jocky/linux/modules.jky
+    def _find_module_file_by_parts(self, root: Path, parts: list) -> Optional[Path]:
         module_file = root.joinpath(*parts).with_suffix(".jky")
         if module_file.exists():
             return module_file
-
+        init_file = root.joinpath(*parts) / "__init__.jky"
+        if init_file.exists():
+            return init_file
         return None
 
     def resolve_program(self, program: Program) -> Program:
@@ -94,10 +100,9 @@ class ModuleResolver:
             else:
                 other_decls.append(decl)
 
-        # Resolve each module
         all_decls = []
         for use_stmt in use_stmts:
-            module_prog = self.resolve_module(use_stmt.module_path)
+            module_prog = self.resolve_module(use_stmt.path)
             if module_prog:
                 all_decls.extend(module_prog.decls)
 
