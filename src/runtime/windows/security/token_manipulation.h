@@ -15,7 +15,7 @@
 
 typedef struct {
     uint32_t pid;
-    char process_name[256];
+    WCHAR process_name[256];
     uint8_t is_system;
 } TOKEN_PROCESS_INFO;
 

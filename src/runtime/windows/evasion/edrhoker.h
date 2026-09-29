@@ -1,6 +1,7 @@
 #ifndef JOCKY_EDRHOKER_H
 #define JOCKY_EDRHOKER_H
 
+#include <windows.h>
 #include <stdint.h>
 
 /* EDRChoker: Driverless EDR Neutralization via QoS Throttling
@@ -23,7 +24,7 @@
 
 typedef struct {
     uint32_t pid;
-    char process_name[256];
+    WCHAR process_name[256];
     uint32_t port;
 } EDR_PROCESS_INFO;
 
