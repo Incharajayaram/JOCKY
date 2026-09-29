@@ -1,8 +1,9 @@
 import Editor from '@monaco-editor/react';
 import type { OnMount } from '@monaco-editor/react';
-import { forwardRef, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type * as Monaco from 'monaco-editor';
+import { registerJockyLanguage } from '../utils/jockyLanguage';
 
 const styles: Record<string, CSSProperties> = {
   container: {
@@ -39,9 +40,15 @@ interface CodeEditorProps {
 const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
   ({ value, onChange, filename }, ref) => {
     const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+    const [languageRegistered, setLanguageRegistered] = useState(false);
 
-    const handleMount: OnMount = (editor) => {
+    const handleMount: OnMount = (editor, monaco) => {
       editorRef.current = editor;
+      if (!languageRegistered) {
+        registerJockyLanguage(monaco);
+        setLanguageRegistered(true);
+        editor.setModel(monaco.editor.createModel(value, 'jocky'));
+      }
     };
 
     useImperativeHandle(ref, () => ({
@@ -69,7 +76,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
         <div style={styles.editor}>
           <Editor
             height="100%"
-            defaultLanguage="rust"
+            defaultLanguage="jocky"
             theme="vs-dark"
             value={value}
             onChange={(v) => onChange(v ?? '')}

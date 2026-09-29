@@ -1,7 +1,8 @@
-import { ChevronDown, ChevronUp, Terminal, Download, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Terminal, Download, X, Copy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { LogEntry } from '../types';
+import LogFilter from './LogFilter';
 
 const styles: Record<string, CSSProperties> = {
   container: {
@@ -91,17 +92,27 @@ interface BuildOutputProps {
 export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOutputProps) {
   const [expanded, setExpanded] = useState(true);
   const [dlHovered, setDlHovered] = useState(false);
+  const [filteredLogs, setFilteredLogs] = useState<LogEntry[]>(logs);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
+  }, [filteredLogs]);
+
+  useEffect(() => {
+    setFilteredLogs(logs);
   }, [logs]);
 
   useEffect(() => {
     if (logs.length > 0) setExpanded(true);
   }, [logs.length]);
+
+  const copyLogs = () => {
+    const text = filteredLogs.map(log => log.text).join('\n');
+    navigator.clipboard.writeText(text);
+  };
 
   const height = expanded ? 200 : 0;
 
@@ -113,7 +124,7 @@ export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOu
           Build Output
           {logs.length > 0 && (
             <span style={{ color: 'var(--accent-blue)', fontWeight: 400 }}>
-              ({logs.length} lines)
+              ({filteredLogs.length}/{logs.length} lines)
             </span>
           )}
         </div>
@@ -144,6 +155,25 @@ export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOu
               }}
               onClick={(e) => {
                 e.stopPropagation();
+                copyLogs();
+              }}
+              title="Copy logs"
+            >
+              <Copy size={14} />
+            </button>
+          )}
+          {logs.length > 0 && (
+            <button
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                padding: 2,
+                display: 'flex',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
                 onClear();
               }}
               title="Clear logs"
@@ -154,6 +184,7 @@ export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOu
           {expanded ? <ChevronDown size={14} color="var(--text-secondary)" /> : <ChevronUp size={14} color="var(--text-secondary)" />}
         </div>
       </div>
+      {expanded && logs.length > 0 && <LogFilter logs={logs} onFilterChange={setFilteredLogs} />}
       <div
         ref={scrollRef}
         style={{ ...styles.logArea, height, transition: 'height 0.2s ease', overflow: expanded ? 'auto' : 'hidden' }}
@@ -162,8 +193,12 @@ export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOu
           <div style={styles.emptyState}>
             No build output yet. Click Compile to start.
           </div>
+        ) : filteredLogs.length === 0 ? (
+          <div style={styles.emptyState}>
+            No logs match the current filter.
+          </div>
         ) : (
-          logs.map((log, i) => (
+          filteredLogs.map((log, i) => (
             <div key={i} style={{ ...styles.logLine, color: logColors[log.level] }}>
               {log.text}
             </div>
