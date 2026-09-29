@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast.h"
+#include "token_diversifier.h"
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
@@ -21,6 +22,8 @@ class CodeGen {
 public:
     CodeGen(bool noRuntime = false);
     std::unique_ptr<llvm::Module> generate(Program& prog, const std::string& moduleName);
+    void setTokenSeed(uint64_t seed) { diversifier.setSeed(seed); }
+    void resetTokens() { diversifier.reset(); }
 
 private:
     llvm::LLVMContext ctx;
@@ -41,6 +44,7 @@ private:
 
     llvm::Function* currentFunc = nullptr;
     bool noRuntime = false;
+    TokenDiversifier diversifier;
 
     void declareFunc(FuncDecl& decl);
     void declareFFI(FFIDecl& decl);

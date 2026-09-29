@@ -379,7 +379,6 @@ def main():
     # 6. Write new candidate driver files (per-driver format)
     # ------------------------------------------------------------------
     new_files_written = 0
-    new_file_paths = []
     if args.commit:  # Only write candidate files when explicitly committing
         for c in new_candidates[:5]:  # Only top 5 to avoid spam
             driver_file = DRIVERS_DIR / f"{c['name']}.json"
@@ -410,7 +409,7 @@ def main():
             }
             driver_file.write_text(json.dumps(driver_data, indent=2), encoding="utf-8")
             new_files_written += 1
-            new_file_paths.append(driver_file)
+
             log(f"[+] Wrote new candidate file: {driver_file}")
     else:
         log("[*] Skipping candidate file write (use --commit to persist)")
@@ -468,19 +467,16 @@ def main():
             log(f"[+] DeepZero report: {deepzero_report}")
 
     # ------------------------------------------------------------------
-    # 9. Commit if requested and there are changes
+# 9. Commit if requested and there are changes
     # ------------------------------------------------------------------
     if args.commit and (blocked_drivers or new_candidates):
         log("[*] Committing changes...")
         # Only add relevant files, not repo_cache or other untracked stuff
-        files_to_add = [
-            "src/runtime/byovd/drivers/",
-            "src/runtime/byovd/driver_manifest.json",
-            "pipeline_scripts/driver_update_report.md",
-        ]
-        if deepzero_report and Path(deepzero_report).exists():
-            files_to_add.append(str(Path(deepzero_report).relative_to(PROJECT_ROOT)))
-        subprocess.run(["git", "add"] + files_to_add, cwd=PROJECT_ROOT)
+        subprocess.run(["git", "add", 
+                        "src/runtime/byovd/drivers/",
+                        "src/runtime/byovd/driver_manifest.json",
+                        "pipeline_scripts/driver_update_report.md"],
+                       cwd=PROJECT_ROOT)
         msg = f"Auto-update BYOVD driver manifest\n\n"
         if blocked_drivers:
             msg += f"BLOCKED: {len(blocked_drivers)} drivers now on Microsoft blocklist:\n"

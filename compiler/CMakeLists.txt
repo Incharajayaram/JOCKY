@@ -57,7 +57,12 @@ set(JOCKYC_SOURCES
     src/ast.cpp
     src/codegen.cpp
     src/pipeline.cpp
-    src/packer.cpp
+    src/token_diversifier.cpp
+    src/forensic/forensic_analyzer.cpp
+    src/forensic/static_analyzer.cpp
+    src/forensic/dynamic_analyzer.cpp
+    src/forensic/memory_analyzer.cpp
+    src/forensic/evasion_scorer.cpp
 )
 
 add_executable(jockyc ${JOCKYC_SOURCES})
