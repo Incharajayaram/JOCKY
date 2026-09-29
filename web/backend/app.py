@@ -227,7 +227,24 @@ async def download_binary(job_id: str):
 
 @app.get("/api/runtime-apis")
 async def get_runtime_apis():
-    return {"categories": RUNTIME_APIS}
+    # Transform backend format to frontend format
+    transformed = []
+    for category in RUNTIME_APIS:
+        # Convert "category" key to "name", "all" to "both"
+        platform = "both" if category.get("platform") == "all" else category.get("platform", "both")
+        apis = []
+        for api in category.get("apis", []):
+            apis.append({
+                "name": api.get("name"),
+                "description": api.get("description"),
+                "snippet": api.get("snippet"),
+            })
+        transformed.append({
+            "name": category.get("category"),
+            "platform": platform,
+            "apis": apis,
+        })
+    return {"categories": transformed}
 
 
 @app.get("/api/obfuscation-passes")
