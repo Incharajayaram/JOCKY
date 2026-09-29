@@ -50,9 +50,11 @@ def log(stage, msg):
     print(f"[{ts}] [{stage}] {msg}", flush=True)
 
 
-def run(cmd, label, cwd=None):
+def run(cmd, label, cwd=None, env=None):
     log("exec", f"{label}: {' '.join(str(c) for c in cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+    if env is None:
+        env = os.environ.copy()
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, env=env)
     if result.stdout.strip():
         for line in result.stdout.strip().split("\n"):
             log("exec", f"  stdout: {line}")
@@ -339,16 +341,43 @@ def stage_compile_runtime(build_dir, platform="windows"):
         "-I", str(RUNTIME_DIR / "windows"),
     ]
 
+    # Set up environment for bundled MinGW
+    compile_env = os.environ.copy()
+    bundled_mingw_bin = TOOLCHAIN / "mingw" / "bin"
+    bundled_mingw_lib = TOOLCHAIN / "mingw" / "lib"
+    extra_flags = []
+    if bundled_mingw_lib.exists():
+        # Prioritize bundled toolchain bin directory in PATH
+        if "PATH" in compile_env:
+            compile_env["PATH"] = str(bundled_mingw_bin) + ":" + compile_env["PATH"]
+        else:
+            compile_env["PATH"] = str(bundled_mingw_bin)
+        # Add bundled MinGW lib to library search paths
+        ld_path = str(bundled_mingw_lib)
+        if "LD_LIBRARY_PATH" in compile_env:
+            compile_env["LD_LIBRARY_PATH"] = ld_path + ":" + compile_env["LD_LIBRARY_PATH"]
+        else:
+            compile_env["LD_LIBRARY_PATH"] = ld_path
+        # Tell gcc where to find cc1 and other internal tools (use 10-win32 version)
+        mingw_include = str(TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "include")
+        mingw_lib = str(TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "lib")
+        extra_flags = [
+            "-B", str(TOOLCHAIN / "mingw" / "lib" / "10-win32") + "/",
+            "-I", mingw_include,
+            "-L", mingw_lib,
+        ]
+
     for src in sources_win:
         if not src.exists():
             log("RUNTIME", f"  skip (not found): {src.name}")
             continue
         obj = build_dir / f"rt_{src.parent.name}_{src.stem}.o"
         try:
-            run([mingw_gcc] + cflags_win + [
+            run([mingw_gcc] + extra_flags + cflags_win + [
                  "-I", str(src.parent),
                  str(src), "-o", str(obj)],
-                f"Compile {src.name}")
+                f"Compile {src.name}",
+                env=compile_env)
             objs.append(obj)
             log("RUNTIME", f"  compiled: {src.name} -> {obj.stat().st_size} bytes")
         except SystemExit:
@@ -390,8 +419,12 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
     log("LINK", "Linking Windows PE executable")
     # Try bundled MinGW first, then system MinGW, fallback to clang
     bundled_mingw = TOOLCHAIN / "mingw" / "bin" / "gcc"
+    link_env = os.environ.copy()
+    use_bundled = False
+
     if bundled_mingw.exists():
         linker = str(bundled_mingw)
+        use_bundled = True
         log("LINK", "Using bundled MinGW")
     else:
         try:
@@ -401,6 +434,33 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
         except (FileNotFoundError, subprocess.CalledProcessError):
             linker = "clang"
             log("LINK", "Using clang for Windows PE target")
+
+    # Set up environment for bundled MinGW
+    linker_flags = []
+    if use_bundled:
+        bundled_mingw_bin = TOOLCHAIN / "mingw" / "bin"
+        bundled_mingw_lib = TOOLCHAIN / "mingw" / "lib"
+        if bundled_mingw_lib.exists():
+            # Prioritize bundled toolchain bin directory in PATH
+            if "PATH" in link_env:
+                link_env["PATH"] = str(bundled_mingw_bin) + ":" + link_env["PATH"]
+            else:
+                link_env["PATH"] = str(bundled_mingw_bin)
+            ld_path = str(bundled_mingw_lib)
+            if "LD_LIBRARY_PATH" in link_env:
+                link_env["LD_LIBRARY_PATH"] = ld_path + ":" + link_env["LD_LIBRARY_PATH"]
+            else:
+                link_env["LD_LIBRARY_PATH"] = ld_path
+            # Explicitly set LD to use bundled linker
+            link_env["LD"] = str(bundled_mingw_bin / "x86_64-w64-mingw32-ld")
+            # Tell gcc where to find cc1 and other internal tools, plus include/lib paths
+            mingw_lib = str(TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "lib")
+            linker_flags = [
+                "-B", str(TOOLCHAIN / "mingw" / "lib" / "10-win32") + "/",
+                "-L", mingw_lib,
+                "-fno-use-linker-plugin",
+                f"-fuse-ld={str(bundled_mingw_bin / 'x86_64-w64-mingw32-ld')}"
+            ]
 
     all_objs = [str(obj_path)] + [str(o) for o in runtime_objs]
     if linker == "clang":
@@ -415,12 +475,13 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
     else:
         cmd = [
             linker,
+            *linker_flags,
             *all_objs,
             "-lntdll", "-lwinhttp", "-ldnsapi", "-lwevtapi",
             "-ladvapi32", "-lkernel32", "-lws2_32",
             "-o", str(exe_path),
         ]
-    run(cmd, "Link PE executable")
+    run(cmd, "Link PE executable", env=link_env)
     log("LINK", f"Output: {exe_path} ({exe_path.stat().st_size} bytes)")
 
     result = subprocess.run(["file", str(exe_path)], capture_output=True, text=True)
