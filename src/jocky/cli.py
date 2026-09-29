@@ -87,7 +87,8 @@ def cli():
 @click.option("--target", "-t", default="native", help="Target platform (linux, windows, or both)")
 @click.option("--keep-intermediates", is_flag=True, help="Keep intermediate build files")
 @click.option("--no-prelude", is_flag=True, help="Skip auto-injection of the standard prelude")
-def build(file: str, profile: Optional[str], output: Optional[str], target: str, keep_intermediates: bool, no_prelude: bool):
+@click.option("--forensic", is_flag=True, help="Embed forensic trace cleanup runtime into the binary")
+def build(file: str, profile: Optional[str], output: Optional[str], target: str, keep_intermediates: bool, no_prelude: bool, forensic: bool):
     """Build a JOCKY source file into a native executable (Linux, Windows, or both)."""
     input_path = Path(file)
     build_dir = input_path.parent / ".jocky-build"
@@ -97,7 +98,7 @@ def build(file: str, profile: Optional[str], output: Optional[str], target: str,
     targets = ["linux", "windows"] if target.lower() == "both" else [target]
 
     for tgt in targets:
-        config = {"target": tgt, "no_prelude": no_prelude}
+        config = {"target": tgt, "no_prelude": no_prelude, "forensic": forensic}
         if output:
             config["output"] = output if len(targets) == 1 else f"{output}_{tgt}"
 
