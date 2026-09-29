@@ -84,6 +84,15 @@ class TypeChecker:
             elif isinstance(decl, UseStmt):
                 self.process_use_stmt(decl)
 
+        # Register imported symbols from modules into self.functions
+        for name, symbol in self.visible_symbols.items():
+            if isinstance(symbol, tuple) and len(symbol) >= 2:
+                # It's a function signature (ptypes, ret_type, variadic)
+                self.functions[name] = symbol
+            elif hasattr(symbol, 'type_info') and isinstance(symbol.type_info, tuple):
+                # It's a Symbol object with type_info
+                self.functions[name] = symbol.type_info
+
         # First pass: collect type aliases, struct/enum and function signatures
         for decl in prog.decls:
             if isinstance(decl, UseStmt):
