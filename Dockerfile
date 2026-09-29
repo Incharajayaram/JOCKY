@@ -33,6 +33,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     mingw-w64-x86-64-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Install Caddy for CDN server
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    caddy \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Setup CDN directories
+RUN mkdir -p /opt/jocky-cdn/data/uploads && chmod 755 /opt/jocky-cdn /opt/jocky-cdn/data /opt/jocky-cdn/data/uploads
+
+# Copy Caddy config
+COPY tools/Caddyfile /opt/jocky-cdn/Caddyfile
+
 # Install Ghidra: use local copy if available, otherwise download
 COPY tools/ghidra_install.sh /tmp/ghidra_install.sh
 COPY tools/ghidra*.zip* /tmp/ghidra_local/

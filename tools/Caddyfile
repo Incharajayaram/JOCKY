@@ -1,0 +1,45 @@
+:8443 {
+    root * /opt/jocky-cdn/data
+
+    # Enable HTTPS with self-signed cert (internal CA)
+    tls internal
+
+    # Serve static files from uploads directory
+    file_server /uploads {
+        root /opt/jocky-cdn/data/uploads
+    }
+
+    # Handle PUT/POST for exfiltration uploads
+    handle /upload {
+        # Accept PUT/POST requests
+        @upload {
+            method PUT POST
+        }
+
+        handle @upload {
+            file_server
+
+            log {
+                output stdout
+                format single_field common_log
+            }
+        }
+
+        respond 405
+    }
+
+    # Health check endpoint
+    handle /health {
+        respond 200 {
+            body "OK"
+        }
+    }
+
+    # List uploaded files
+    handle /list {
+        file_server browse /uploads
+    }
+
+    # Block everything else
+    respond 403
+}
