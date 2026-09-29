@@ -70,36 +70,16 @@ if [ -d "/usr/x86_64-w64-mingw32/include" ]; then
     echo "  ✓ Headers copied"
 fi
 
-# Create wrapper scripts that use the bundled MinGW
-echo -e "${BLUE}Creating wrapper scripts...${NC}"
-
-cat > "$TOOLCHAIN/mingw/bin/mingw-gcc" << 'EOF'
-#!/bin/bash
-MINGW_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export LIBRARY_PATH="$MINGW_ROOT/x86_64-w64-mingw32/lib:$LIBRARY_PATH"
-export CPATH="$MINGW_ROOT/x86_64-w64-mingw32/include:$CPATH"
-exec "$MINGW_ROOT/bin/gcc" "$@"
-EOF
-
-chmod +x "$TOOLCHAIN/mingw/bin/mingw-gcc"
-
-cat > "$TOOLCHAIN/mingw/bin/mingw-g++" << 'EOF'
-#!/bin/bash
-MINGW_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export LIBRARY_PATH="$MINGW_ROOT/x86_64-w64-mingw32/lib:$LIBRARY_PATH"
-export CPATH="$MINGW_ROOT/x86_64-w64-mingw32/include:$CPATH"
-exec "$MINGW_ROOT/bin/g++" "$@"
-EOF
-
-chmod +x "$TOOLCHAIN/mingw/bin/mingw-g++"
-
-echo "  ✓ Wrapper scripts created"
-
-# Create symlink from toolchain/bin for easy access
+# Create symlinks with simple names for easy access
 echo -e "${BLUE}Creating convenience symlinks...${NC}"
-ln -sf "$TOOLCHAIN/mingw/bin/gcc" "$TOOLCHAIN/bin/mingw-gcc" 2>/dev/null || true
-ln -sf "$TOOLCHAIN/mingw/bin/g++" "$TOOLCHAIN/bin/mingw-g++" 2>/dev/null || true
-ln -sf "$TOOLCHAIN/mingw/bin/ar" "$TOOLCHAIN/bin/mingw-ar" 2>/dev/null || true
+ln -sf "$TOOLCHAIN/mingw/bin/x86_64-w64-mingw32-gcc" "$TOOLCHAIN/mingw/bin/gcc" 2>/dev/null || true
+ln -sf "$TOOLCHAIN/mingw/bin/x86_64-w64-mingw32-g++" "$TOOLCHAIN/mingw/bin/g++" 2>/dev/null || true
+ln -sf "$TOOLCHAIN/mingw/bin/x86_64-w64-mingw32-ar" "$TOOLCHAIN/mingw/bin/ar" 2>/dev/null || true
+ln -sf "$TOOLCHAIN/mingw/bin/x86_64-w64-mingw32-ld" "$TOOLCHAIN/mingw/bin/ld" 2>/dev/null || true
+
+# Also link in toolchain/bin for consistency
+ln -sf "$TOOLCHAIN/mingw/bin/x86_64-w64-mingw32-gcc" "$TOOLCHAIN/bin/mingw-gcc" 2>/dev/null || true
+ln -sf "$TOOLCHAIN/mingw/bin/x86_64-w64-mingw32-g++" "$TOOLCHAIN/bin/mingw-g++" 2>/dev/null || true
 echo "  ✓ Symlinks created"
 
 # Verify
