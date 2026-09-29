@@ -346,20 +346,35 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <source.jky> [output_dir]")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="JOCKY Compilation Pipeline")
+    parser.add_argument("source", help="Source file (*.jky)")
+    parser.add_argument("output_dir", nargs="?", default="/workspace/build", help="Output directory (default: /workspace/build)")
+    parser.add_argument("--platform", choices=["windows", "linux"], default="windows", help="Target platform (default: windows)")
+    parser.add_argument("--preset", choices=["none", "light", "standard", "aggressive"], default="standard", help="Obfuscation preset (default: standard)")
+    parser.add_argument("--no-mlir-passes", action="store_true", help="Disable all MLIR obfuscation passes")
+    parser.add_argument("--no-llvm-passes", action="store_true", help="Disable all LLVM obfuscation passes")
 
-    source_file = sys.argv[1]
-    build_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("/workspace/build")
+    args = parser.parse_args()
+
+    source_file = args.source
+    build_dir = Path(args.output_dir)
     build_dir.mkdir(parents=True, exist_ok=True)
+
+    platform = args.platform
+    preset = args.preset if not args.no_mlir_passes and not args.no_llvm_passes else "none"
+
+    selected_mlir_passes = [] if args.no_mlir_passes else PRESETS[preset]["mlir"]
+    selected_llvm_passes = [] if args.no_llvm_passes else PRESETS[preset]["llvm"]
 
     log("PIPELINE", "=" * 60)
     log("PIPELINE", "JOCKY Compilation Pipeline")
     log("PIPELINE", f"Source: {source_file}")
     log("PIPELINE", f"Build dir: {build_dir}")
     log("PIPELINE", f"Toolchain: {TOOLCHAIN}")
-    log("PIPELINE", f"Target: Windows x86_64 (PE/COFF)")
+    log("PIPELINE", f"Target: {platform.title()} x86_64")
+    log("PIPELINE", f"Preset: {preset}")
+    log("PIPELINE", f"MLIR Passes: {len(selected_mlir_passes)} enabled")
+    log("PIPELINE", f"LLVM Passes: {len(selected_llvm_passes)} enabled")
     log("PIPELINE", "=" * 60)
 
     start = time.time()
@@ -371,20 +386,21 @@ def main():
     ir_path = stage_codegen(ast, build_dir)
 
     log("PIPELINE", "Stage 3/6: MLIR Obfuscation")
-    mlir_bc = stage_mlir_obfuscate(ir_path, build_dir)
+    mlir_bc = stage_mlir_obfuscate(ir_path, build_dir, selected_mlir_passes)
 
     log("PIPELINE", "Stage 4/6: LLVM Obfuscation")
-    obf_bc = stage_llvm_obfuscate(mlir_bc, build_dir)
+    obf_bc = stage_llvm_obfuscate(mlir_bc, build_dir, selected_llvm_passes)
 
     log("PIPELINE", "Stage 5/6: Cross-Compile")
-    obj_path = stage_compile(obf_bc, build_dir)
+    obj_path = stage_compile(obf_bc, build_dir, platform)
 
     log("PIPELINE", "Stage 5b/6: Compile Runtime")
-    runtime_objs = stage_compile_runtime(build_dir)
+    runtime_objs = stage_compile_runtime(build_dir, platform)
 
     log("PIPELINE", "Stage 6/6: Link")
     stem = Path(source_file).stem
-    exe_path = stage_link(obj_path, runtime_objs, build_dir, f"{stem}.exe")
+    output_ext = ".exe" if platform == "windows" else ""
+    exe_path = stage_link(obj_path, runtime_objs, build_dir, f"{stem}{output_ext}", platform)
 
     elapsed = time.time() - start
     log("PIPELINE", "=" * 60)
