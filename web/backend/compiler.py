@@ -99,15 +99,19 @@ async def run_compilation(
         if notify_callback:
             await notify_callback(job)
 
-        # Use project-relative build directory (Docker-mountable)
+        # Use project-relative directories (Docker-mountable)
         project_root = Path(__file__).resolve().parent.parent.parent
         build_base = project_root / "build"
         build_base.mkdir(exist_ok=True)
         build_dir = build_base / f"jocky_build_{uuid.uuid4().hex[:8]}"
         build_dir.mkdir(parents=True, exist_ok=True)
 
-        source_dir = tempfile.mkdtemp(prefix="jocky_src_")
-        source_path = Path(source_dir) / "source.jky"
+        # Use project-relative source directory instead of /tmp
+        src_base = project_root / "build" / "sources"
+        src_base.mkdir(exist_ok=True)
+        source_dir = src_base / f"jocky_src_{uuid.uuid4().hex[:8]}"
+        source_dir.mkdir(parents=True, exist_ok=True)
+        source_path = source_dir / "source.jky"
         source_path.write_text(source)
 
         job.progress = 10
@@ -153,9 +157,10 @@ async def run_compilation(
             ]
 
             if obf_cfg.get("mlir_flags"):
-                cmd.extend(["--mlir-passes", ",".join(obf_cfg["mlir_flags"])])
+                # Use = syntax to avoid argparse issues with values starting with --
+                cmd.append(f"--mlir-passes={','.join(obf_cfg['mlir_flags'])}")
             if obf_cfg.get("llvm_passes"):
-                cmd.extend(["--llvm-passes", obf_cfg["llvm_passes"]])
+                cmd.append(f"--llvm-passes={obf_cfg['llvm_passes']}")
         else:
             job.progress = 15
             job.logs.append("[PIPELINE] Using local compile pipeline (Docker not available)")
@@ -166,28 +171,91 @@ async def run_compilation(
                 "python3",
                 str(compile_script),
                 str(source_path),
-                build_dir,
+                str(build_dir),
                 "--platform", job.platform,
                 "--preset", preset,
             ]
 
             if obf_cfg.get("mlir_flags"):
-                cmd.extend(["--mlir-passes", ",".join(obf_cfg["mlir_flags"])])
+                # Use = syntax to avoid argparse issues with values starting with --
+                cmd.append(f"--mlir-passes={','.join(obf_cfg['mlir_flags'])}")
             if obf_cfg.get("llvm_passes"):
-                cmd.extend(["--llvm-passes", obf_cfg["llvm_passes"]])
+                cmd.append(f"--llvm-passes={obf_cfg['llvm_passes']}")
 
         # Set up environment with proper paths
         env = os.environ.copy()
         env["PYTHONPATH"] = str(project_root / "src")
         env["TOOLCHAIN_PATH"] = str(project_root / "toolchain")
 
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            cwd=str(project_root) if not use_docker else None,
-            env=env,
-        )
+        # Try Docker with automatic local fallback on mount failures
+        docker_failed_mount = False
+        if use_docker:
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                    cwd=str(project_root) if not use_docker else None,
+                    env=env,
+                )
+
+                docker_output = []
+                while True:
+                    line = await process.stdout.readline()
+                    if not line:
+                        break
+                    decoded = line.decode("utf-8", errors="replace").rstrip()
+                    docker_output.append(decoded)
+                    job.logs.append(decoded)
+
+                await process.wait()
+
+                # Check if Docker failed due to mount issues
+                docker_stderr = "\n".join(docker_output)
+                if process.returncode != 0 and ("not shared from the host" in docker_stderr or "mounts denied" in docker_stderr):
+                    docker_failed_mount = True
+                    job.logs.append("[PIPELINE] Docker mount failed, falling back to local compilation")
+                    job.progress = 15  # Reset to retry with local
+                elif process.returncode != 0:
+                    # Docker failed for other reasons, don't retry with local
+                    use_docker = False  # Prevent status check
+                else:
+                    # Docker succeeded
+                    use_docker = False  # Mark completion
+            except Exception as e:
+                job.logs.append(f"[PIPELINE] Docker execution failed: {str(e)}")
+                docker_failed_mount = True
+                job.progress = 15
+
+        # If Docker mount failed or wasn't available, use local compilation
+        if not use_docker or docker_failed_mount:
+            if docker_failed_mount:
+                # Rebuild command for local compilation
+                cmd = [
+                    "python3",
+                    str(compile_script),
+                    str(source_path),
+                    str(build_dir),
+                    "--platform", job.platform,
+                    "--preset", preset,
+                ]
+
+                if obf_cfg.get("mlir_flags"):
+                    cmd.extend(["--mlir-passes", ",".join(obf_cfg["mlir_flags"])])
+                if obf_cfg.get("llvm_passes"):
+                    cmd.extend(["--llvm-passes", obf_cfg["llvm_passes"]])
+
+                job.logs.append("[PIPELINE] Starting local compilation")
+                if notify_callback:
+                    await notify_callback(job)
+
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                cwd=str(project_root),
+                env=env,
+            )
 
         stage_progress = {
             "PARSE": 30,

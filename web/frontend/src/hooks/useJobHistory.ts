@@ -9,8 +9,6 @@ export interface JobHistoryItem {
   output_size?: number;
 }
 
-const API_BASE = 'http://localhost:8000';
-
 export function useJobHistory() {
   const [history, setHistory] = useState<JobHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -20,7 +18,7 @@ export function useJobHistory() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/jobs/history?limit=${limit}&offset=${offset}`);
+      const res = await fetch(`/api/jobs/history?limit=${limit}&offset=${offset}`);
       if (!res.ok) throw new Error('Failed to load history');
       const data = await res.json();
       setHistory(data);

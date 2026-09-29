@@ -31,6 +31,7 @@ export interface CompileRequest {
     mlir: Record<string, boolean>;
     llvm: Record<string, boolean>;
   };
+  preset?: string;
 }
 
 export interface CompileResponse {
