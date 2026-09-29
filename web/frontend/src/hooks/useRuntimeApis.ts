@@ -16,8 +16,12 @@ export function useRuntimeApis() {
         const res = await fetch(`${API_BASE}/api/runtime-apis`);
         if (!res.ok) throw new Error('API unavailable');
         const data = await res.json();
-        if (!cancelled && data.categories) {
-          setCategories(data.categories);
+        if (!cancelled) {
+          // Handle both array and {categories: array} formats
+          const cats = Array.isArray(data) ? data : data.categories;
+          if (cats && Array.isArray(cats)) {
+            setCategories(cats);
+          }
         }
       } catch {
         // Backend down -- use bundled fallback data

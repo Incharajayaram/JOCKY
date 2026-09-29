@@ -227,7 +227,7 @@ async def download_binary(job_id: str):
 
 @app.get("/api/runtime-apis")
 async def get_runtime_apis():
-    return RUNTIME_APIS
+    return {"categories": RUNTIME_APIS}
 
 
 @app.get("/api/obfuscation-passes")
