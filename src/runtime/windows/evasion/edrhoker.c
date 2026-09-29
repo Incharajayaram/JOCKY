@@ -12,7 +12,7 @@
 #pragma comment(lib, "ws2_32.lib")
 
 /* Traffic Control (TC) API bindings */
-typedef HANDLE (WINAPI *TcOpenInterfaceProc)(
+typedef ULONG (WINAPI *TcOpenInterfaceProc)(
     LPCWSTR InterfaceName,
     HANDLE *pIfcHandle
 );
