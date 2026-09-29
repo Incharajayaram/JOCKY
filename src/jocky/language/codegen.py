@@ -593,7 +593,7 @@ class CodeGen:
                 self.emit_stmt(stmt)
 
     def emit_stmt(self, stmt: Any):
-        if isinstance(stmt, LetStmt):
+        if isinstance(stmt, (LetStmt, VarDecl)):
             t = stmt.type if stmt.type else self.infer_type(stmt.init)
             # Resolve type aliases
             t = self.resolve_type_alias(t)
