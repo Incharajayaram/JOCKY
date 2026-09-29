@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # C2 Command & Control Server
+  c2-server:
+    image: python:3.11-slim
+    container_name: jocky-c2
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./scripts/c2_server.py:/app/c2_server.py
+    working_dir: /app
+    command: sh -c "pip install -q flask && python c2_server.py"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_APP=c2_server.py
+    networks:
+      - jocky-local
+
+  # Model Repository Server
+  model-repo:
+    image: caddy:2.7-alpine
+    container_name: jocky-models
+    ports:
+      - "5001:80"
+    volumes:
+      - ./models:/usr/share/caddy/models:ro
+      - ./scripts/Caddyfile.models:/etc/caddy/Caddyfile
+    networks:
+      - jocky-local
+    depends_on:
+      - c2-server
+
+  # CDN Exfiltration Endpoint
+  cdn-endpoint:
+    image: caddy:2.7-alpine
+    container_name: jocky-cdn
+    ports:
+      - "5002:443"
+      - "5080:80"
+    volumes:
+      - ./build/uploads:/usr/share/caddy/uploads
+      - ./scripts/Caddyfile.cdn:/etc/caddy/Caddyfile
+    environment:
+      - CDN_TOKEN=Bearer local_development_token_xyz_123
+    networks:
+      - jocky-local
+    depends_on:
+      - c2-server
+
+networks:
+  jocky-local:
+    driver: bridge
