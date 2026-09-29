@@ -7,6 +7,11 @@
 *.a
 *.ll
 
+# Driver binaries (LOLDrivers) - never commit
+pipeline_scripts/drivers_out/
+*.sys
+*.dll
+
 # Python
 __pycache__/
 *.egg-info/
@@ -34,6 +39,17 @@ toolchain/
 
 # C++ compiler build directory
 compiler/build/
-tools/ghidra_*_PUBLIC/
-tools/ghidra*.zip
-node_modules/
+ghidra_11.1.2_PUBLIC/
+
+# DeepZero toolchain (auto-generated)
+static_analysis_of_drivers/deepzero_toolchain/
+static_analysis_of_drivers/deepzero_toolchain/DeepZero/
+static_analysis_of_drivers/deepzero_toolchain/venv/
+static_analysis_of_drivers/deepzero_toolchain/tools/
+static_analysis_of_drivers/deepzero_toolchain/.env
+test_forensics/evidence/
+test_forensics/output/
+test_forensics/index.json
+test_forensics/audit/audit.jsonl
+build_forensics/
+test_forensics/

