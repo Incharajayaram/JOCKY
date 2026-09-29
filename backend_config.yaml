@@ -1,0 +1,49 @@
+# JOCKY Backend Configuration
+# Customize which Runtime APIs and Obfuscation Passes to include
+
+# Runtime APIs to include
+apis:
+  audit:
+    enabled: true
+  byovd:
+    enabled: true  # Required - always enabled
+  evasion:
+    enabled: true
+  exploitation:
+    enabled: true
+  registry:
+    enabled: true
+  forensics:
+    enabled: true
+  exfil:
+    enabled: true
+  plugin:
+    enabled: true
+  sandbox:
+    enabled: true
+  ai_ml:
+    enabled: false  # Disable if not needed to reduce binary size
+
+# Obfuscation Passes
+obfuscation:
+  # MLIR Passes (applied during MLIR translation)
+  string_encrypt:
+    enabled: true
+  constant_obfuscate:
+    enabled: true
+  symbol_obfuscate:
+    enabled: true
+
+  # LLVM Passes (applied to LLVM IR)
+  boguscf:
+    enabled: true
+  flattening:
+    enabled: true
+  substitution:
+    enabled: true
+  split:
+    enabled: true
+  indirect_call:
+    enabled: true
+  strip_signature:
+    enabled: true
