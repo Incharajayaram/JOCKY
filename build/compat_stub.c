@@ -86,3 +86,18 @@ int btr_mask_module(const char* n) { (void)n; return 0; }
 int jocky_exploit_disable_callbacks(void) { return 0; }
 int jocky_exploit_token_replacement(int a1, int a2) { (void)a1;(void)a2; return 0; }
 int edrhoker_detect(void) { return 0; }
+#include <stdlib.h>
+#include <string.h>
+const char* jocky_getenv(const char* var_name) { 
+  if (!var_name) return ""; 
+  const char* val = getenv(var_name); 
+  return val ? val : ""; 
+}
+int jocky_setenv(const char* var_name, const char* value) { 
+  if (!var_name || !value) return -1; 
+#ifdef _WIN32
+  return _putenv_s(var_name, value); 
+#else
+  return setenv(var_name, value, 1); 
+#endif
+}
