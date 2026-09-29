@@ -417,17 +417,24 @@ if syslog_result == 0 {
 
 export const defaultObfuscation: ObfuscationState = {
   mlir: [
-    { id: 'string_encrypt', name: 'String Encrypt', description: 'Encrypts string constants in MLIR', enabled: false },
-    { id: 'constant_obfuscate', name: 'Constant Obfuscate', description: 'Obfuscates numeric constants', enabled: false },
-    { id: 'symbol_obfuscate', name: 'Symbol Obfuscate', description: 'Renames symbols to random identifiers', enabled: false },
+    { id: 'string_encrypt', name: 'String Encryption', description: 'Encrypts all string literals with XOR/RC4', enabled: true },
+    { id: 'constant_obfuscate', name: 'Constant Obfuscation', description: 'Replaces numeric constants with opaque expressions', enabled: true },
+    { id: 'symbol_obfuscate', name: 'Symbol Obfuscation', description: 'Renames internal symbols to randomized identifiers', enabled: true },
+    { id: 'crypto_hash', name: 'Cryptographic Hashing', description: 'Uses crypto hashing for symbol obfuscation verification', enabled: true },
+    { id: 'scf_obfuscate', name: 'SCF Region Obfuscation', description: 'Applies opaque predicates to structured control flow', enabled: true },
+    { id: 'import_obfuscate', name: 'Import Obfuscation', description: 'Hides imports behind wrapper functions', enabled: true },
   ],
   llvm: [
-    { id: 'bogus_cf', name: 'Bogus Control Flow', description: 'Inserts fake control flow paths', enabled: false },
-    { id: 'cf_flatten', name: 'Control Flow Flattening', description: 'Flattens function control flow into switch-based dispatch', enabled: false },
-    { id: 'insn_sub', name: 'Instruction Substitution', description: 'Replaces instructions with equivalent complex sequences', enabled: false },
-    { id: 'bb_split', name: 'Basic Block Splitting', description: 'Splits basic blocks into smaller fragments', enabled: false },
-    { id: 'indirect_calls', name: 'Indirect Calls', description: 'Replaces direct calls with indirect function pointers', enabled: false },
-    { id: 'strip_sigs', name: 'Strip Signatures', description: 'Removes function signature metadata', enabled: false },
+    { id: 'strip_signature', name: 'Strip Signatures', description: 'Removes debug metadata and function signature info', enabled: true },
+    { id: 'pdata_strip', name: 'PDATA Strip', description: 'Removes exception handling and unwinding metadata', enabled: true },
+    { id: 'virtualize', name: 'Function Virtualization', description: 'Converts functions to virtualized bytecode dispatchers', enabled: true },
+    { id: 'opaque_pred', name: 'Opaque Predicates', description: 'Injects opaque predicates to obfuscate control flow', enabled: true },
+    { id: 'substitution', name: 'Instruction Substitution', description: 'Replaces standard instructions with complex sequences', enabled: true },
+    { id: 'boguscf', name: 'Bogus Control Flow', description: 'Inserts opaque predicates and dead code branches', enabled: true },
+    { id: 'flattening', name: 'Control Flow Flattening', description: 'Converts structured control flow to switch dispatcher', enabled: true },
+    { id: 'linear_mba', name: 'Linear MBA', description: 'Converts arithmetic operations to mixed-boolean arithmetic', enabled: true },
+    { id: 'anti_debug', name: 'Anti-Debug Protection', description: 'Injects debugger detection and anti-debugging techniques', enabled: true },
+    { id: 'indirect_call', name: 'Indirect Calls', description: 'Converts direct calls to indirect via function pointers', enabled: true },
   ],
 };
 
