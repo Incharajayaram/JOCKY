@@ -33,10 +33,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     mingw-w64-x86-64-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Caddy for CDN server
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    caddy \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install Caddy from GitHub releases
+RUN wget -q https://github.com/caddyserver/caddy/releases/download/v2.7.6/caddy_2.7.6_linux_amd64.tar.gz -O /tmp/caddy.tar.gz && \
+    tar -xzf /tmp/caddy.tar.gz -C /usr/local/bin caddy && \
+    chmod +x /usr/local/bin/caddy && \
+    rm /tmp/caddy.tar.gz
 
 # Setup CDN directories
 RUN mkdir -p /opt/jocky-cdn/data/uploads && chmod 755 /opt/jocky-cdn /opt/jocky-cdn/data /opt/jocky-cdn/data/uploads
