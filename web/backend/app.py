@@ -1,5 +1,6 @@
 import asyncio
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -176,6 +177,13 @@ async def compile_source(request: CompileRequest):
         "llvm": request.obfuscation.llvm.model_dump(),
     }
 
+    # Extract enabled passes for metrics
+    mlir_passes = [p["flag"].lstrip("-") for p in MLIR_PASSES if request.obfuscation.mlir.model_dump().get(p["id"], p["default"])]
+    llvm_passes = [p["flag"].lstrip("-") for p in LLVM_PASSES if request.obfuscation.llvm.model_dump().get(p["id"], p["default"])]
+
+    # Create metrics record
+    metric = create_metric(job.job_id, request.platform, request.preset, len(request.source), mlir_passes, llvm_passes)
+
     async def notify(j):
         conns = ws_connections.get(j.job_id, [])
         dead = []
@@ -184,14 +192,14 @@ async def compile_source(request: CompileRequest):
                 await ws.send_json({
                     "status": j.status.value,
                     "progress": j.progress,
-                    "logs": j.logs[-10:],
+                    "logs": j.logs,
                 })
             except Exception:
                 dead.append(ws)
         for ws in dead:
             conns.remove(ws)
 
-    asyncio.create_task(run_compilation(job, request.source, obf_dict, notify, request.preset))
+    asyncio.create_task(run_compilation(job, request.source, obf_dict, notify, request.preset, job.job_id))
     return CompileResponse(job_id=job.job_id)
 
 
@@ -325,7 +333,7 @@ async def get_job_history(limit: int = 50, offset: int = 0):
                 platform=r.platform,
                 created_at=r.created_at.isoformat() if r.created_at else "",
                 compilation_time=r.compilation_time,
-                output_size=r.output_path and Path(r.output_path).stat().st_size if Path(r.output_path).exists() else None if r.output_path else None,
+                output_size=(Path(r.output_path).stat().st_size if r.output_path and Path(r.output_path).exists() else None),
             )
             for r in records
         ]
