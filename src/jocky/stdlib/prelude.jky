@@ -5,6 +5,9 @@
 // ---- libc / system ----
 ffi puts(s: string) -> i32;
 ffi printf(fmt: string, ...) -> i32;
+ffi println(s: string) -> void;
+ffi string(val: i64) -> string;
+ffi jocky_str_concat(a: string, b: string) -> string;
 ffi malloc(size: i64) -> i8*;
 ffi free(ptr: i8*) -> void;
 ffi memset(ptr: i8*, val: i32, n: i64) -> i8*;

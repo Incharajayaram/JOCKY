@@ -1,9 +1,9 @@
+#include <winsock2.h>
 #include "btr_abuse.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <setupapi.h>
-#include <winsock2.h>
 
 #pragma comment(lib, "setupapi.lib")
 

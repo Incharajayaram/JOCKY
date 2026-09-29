@@ -182,7 +182,7 @@ int jocky_kernel_find_function(
     }
 
     while (fgets(line, sizeof(line), kallsyms)) {
-        if (sscanf(line, "%lx %c %s", &addr, &type, name) == 3) {
+        if (sscanf(line, "%lx %c %63s", &addr, &type, name) == 3) {
             if (strcmp(name, symbol_name) == 0) {
                 *out_addr = addr;
                 fclose(kallsyms);
@@ -234,8 +234,10 @@ int jocky_kernel_enumerate_memory(
 
             regions[count].addr = start;
             regions[count].size = end - start;
-            strcpy(regions[count].perms, perms);
-            strcpy(regions[count].path, path);
+            strncpy(regions[count].perms, perms, sizeof(regions[count].perms) - 1);
+            regions[count].perms[sizeof(regions[count].perms) - 1] = '\0';
+            strncpy(regions[count].path, path, sizeof(regions[count].path) - 1);
+            regions[count].path[sizeof(regions[count].path) - 1] = '\0';
 
             fprintf(stdout, "    0x%lx-0x%lx %s %s\n", start, end, perms, path);
             count++;

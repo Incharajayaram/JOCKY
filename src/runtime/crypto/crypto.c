@@ -44,7 +44,12 @@ int jocky_aes_encrypt(jocky_aes_ctx_t ctx_handle, const uint8_t* plaintext,
     aes_context_t* ctx = (aes_context_t*)ctx_handle;
     int len = 0, ciphertext_len = 0;
 
-    if (!EVP_EncryptFinal_ex(ctx->ctx, ciphertext + len, &len)) {
+    if (!EVP_EncryptUpdate(ctx->ctx, ciphertext, &len, plaintext, plaintext_size)) {
+        return -1;
+    }
+    ciphertext_len += len;
+
+    if (!EVP_EncryptFinal_ex(ctx->ctx, ciphertext + ciphertext_len, &len)) {
         return -1;
     }
     ciphertext_len += len;
@@ -63,7 +68,12 @@ int jocky_aes_decrypt(jocky_aes_ctx_t ctx_handle, const uint8_t* ciphertext,
     aes_context_t* ctx = (aes_context_t*)ctx_handle;
     int len = 0, plaintext_len = 0;
 
-    if (!EVP_DecryptFinal_ex(ctx->ctx, plaintext + len, &len)) {
+    if (!EVP_DecryptUpdate(ctx->ctx, plaintext, &len, ciphertext, ciphertext_size)) {
+        return -1;
+    }
+    plaintext_len += len;
+
+    if (!EVP_DecryptFinal_ex(ctx->ctx, plaintext + plaintext_len, &len)) {
         return -1;
     }
     plaintext_len += len;

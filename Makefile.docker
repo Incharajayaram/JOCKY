@@ -1,0 +1,121 @@
+.PHONY: docker-build docker-run docker-shell docker-test docker-clean help
+
+# Docker configuration
+DOCKER_IMAGE ?= jocky:latest
+DOCKER_CONTAINER ?= jocky-compiler
+SOURCE ?= examples/research_chain_with_drivers.jky
+OUTPUT ?= ./dist
+PROFILE ?= standard
+TARGETS ?= linux,windows
+
+help:
+	@echo "JOCKY Docker Build System"
+	@echo "════════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "Usage: make -f Makefile.docker <target>"
+	@echo ""
+	@echo "Targets:"
+	@echo "  docker-build          Build Docker image with LLVM toolchain"
+	@echo "  docker-run            Run JOCKY compilation in Docker"
+	@echo "  docker-shell          Open interactive shell in container"
+	@echo "  docker-compile-jky    Compile JOCKY script to EXE (SOURCE=path)"
+	@echo "  docker-test-linux     Test Linux binary in container"
+	@echo "  docker-test-windows   Test Windows binary with Wine"
+	@echo "  docker-clean          Remove Docker image and containers"
+	@echo "  docker-logs           View container logs"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make -f Makefile.docker docker-build"
+	@echo "  make -f Makefile.docker docker-compile-jky SOURCE=examples/test.jky OUTPUT=./dist PROFILE=aggressive"
+	@echo "  make -f Makefile.docker docker-test-linux"
+	@echo ""
+
+# Build Docker image with full LLVM/MLIR toolchain
+docker-build:
+	@echo "Building JOCKY Docker image..."
+	docker compose build --no-cache jocky-compiler
+	@echo "Docker image built successfully!"
+
+# Run JOCKY compilation pipeline
+docker-run:
+	@echo "Running JOCKY compilation pipeline..."
+	docker compose run --rm \
+		-e JOCKY_PROFILE=$(PROFILE) \
+		-e JOCKY_TARGETS=$(TARGETS) \
+		jocky-compiler \
+		bash -c "python3 -m jocky build $(SOURCE) --target linux --profile $(PROFILE) -o $(OUTPUT)"
+
+# Compile a JOCKY script to both Windows and Linux
+docker-compile-jky:
+	@echo "Compiling JOCKY source to both Windows and Linux..."
+	docker compose run --rm \
+		-v $(PWD)/$(SOURCE):/tmp/build_source:ro \
+		-e JOCKY_PROFILE=$(PROFILE) \
+		jocky-compiler \
+		bash -c "cd /workspace/jocky && python3 -m jocky build /tmp/build_source --target both --profile $(PROFILE)"
+
+# Interactive shell in Docker container
+docker-shell:
+	@echo "Launching interactive shell in Docker container..."
+	docker compose run --rm \
+		-e PYTHONPATH=/workspace/jocky/src:$$PYTHONPATH \
+		jocky-compiler \
+		/bin/bash
+
+# Test compiled Linux binary
+docker-test-linux:
+	@echo "Testing Linux binary..."
+	@if [ -f "$(OUTPUT)/research_chain_with_drivers" ]; then \
+		docker compose run --rm \
+			-v $(PWD)/$(OUTPUT):/workspace/output:ro \
+			jocky-compiler \
+			/workspace/output/research_chain_with_drivers; \
+	else \
+		echo "Error: Linux binary not found at $(OUTPUT)/research_chain_with_drivers"; \
+		exit 1; \
+	fi
+
+# Test compiled Windows binary with Wine
+docker-test-windows:
+	@echo "Testing Windows binary with Wine..."
+	docker compose run --rm \
+		--profile test-windows \
+		-v $(PWD)/$(OUTPUT):/workspace/output:ro \
+		jocky-wine \
+		bash -c "cd /workspace/output && wine research_chain_with_drivers.exe"
+
+# Run full pipeline: build image, compile, test
+docker-pipeline: docker-build docker-compile-jky docker-test-linux
+	@echo "Full pipeline completed!"
+
+# View container logs
+docker-logs:
+	docker compose logs -f jocky-compiler
+
+# Clean up Docker containers and images
+docker-clean:
+	@echo "Cleaning up Docker containers and images..."
+	docker compose down -v
+	docker rmi $(DOCKER_IMAGE) 2>/dev/null || true
+	rm -rf build dist .jocky-build
+	@echo "Cleanup complete!"
+
+# One-liner: full automated compilation
+compile: docker-build docker-compile-jky
+	@echo "✓ Compilation complete!"
+	@echo "Outputs:"
+	@ls -lh $(OUTPUT)/* 2>/dev/null || echo "No outputs found"
+
+# Advanced: paranoid obfuscation compilation
+paranoid: PROFILE=paranoid
+paranoid: compile
+
+# Advanced: aggressive obfuscation compilation
+aggressive: PROFILE=aggressive
+aggressive: compile
+
+# Advanced: light obfuscation compilation
+light: PROFILE=light
+light: compile
+
+.DEFAULT_GOAL := help

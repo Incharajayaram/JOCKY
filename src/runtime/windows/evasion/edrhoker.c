@@ -1,6 +1,6 @@
 #include "edrhoker.h"
-#include <windows.h>
 #include <winsock2.h>
+#include <windows.h>
 #include <iphlpapi.h>
 #include <tlhelp32.h>
 #include <string.h>

@@ -28,12 +28,17 @@ class TokenType(Enum):
     TYPE = auto()
     MATCH = auto()
     MOD = auto()
+    CONST = auto()
+    VAR = auto()
+    IN = auto()
     ARROW_FAT = auto()  # =>
 
     # Types
     I8 = auto()
     I32 = auto()
     I64 = auto()
+    F32 = auto()
+    F64 = auto()
     BOOL = auto()
     VOID = auto()
     STRING_KW = auto()
@@ -101,13 +106,18 @@ KEYWORDS = {
     "type": TokenType.TYPE,
     "match": TokenType.MATCH,
     "mod": TokenType.MOD,
-    "use": TokenType.USE,
+    "const": TokenType.CONST,
+    "var": TokenType.VAR,
+    "in": TokenType.IN,
     "i8": TokenType.I8,
     "i32": TokenType.I32,
     "i64": TokenType.I64,
+    "f32": TokenType.F32,
+    "f64": TokenType.F64,
     "bool": TokenType.BOOL,
     "void": TokenType.VOID,
     "string": TokenType.STRING_KW,
+    "str": TokenType.STRING_KW,
 }
 
 @dataclass
@@ -183,9 +193,8 @@ class Lexer:
         self.advance()  # consume closing "
         return value
 
-    def read_number(self) -> int:
+    def read_number(self):
         value = ""
-        # Support hex
         if self.peek() == "0" and self.peek(1) in "xX":
             value += self.advance()
             value += self.advance()
@@ -194,6 +203,11 @@ class Lexer:
             return int(value, 16)
         while self.peek() in "0123456789":
             value += self.advance()
+        if self.peek() == "." and self.peek(1) in "0123456789":
+            value += self.advance()
+            while self.peek() in "0123456789":
+                value += self.advance()
+            return float(value)
         return int(value, 10)
 
     def read_ident(self) -> str:
