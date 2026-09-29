@@ -6,17 +6,25 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        - VITE_API_BASE=${VITE_API_BASE:-http://localhost:8000}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
       - VITE_API_BASE=${VITE_API_BASE:-http://localhost:8000}
+      - NODE_ENV=${NODE_ENV:-development}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - jocky-network
-    volumes:
-      - ./web/frontend:/app
-      - /app/node_modules
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
 
   # Backend service (FastAPI)
   backend:
@@ -28,28 +36,44 @@ services:
     environment:
       - BACKEND_HOST=0.0.0.0
       - BACKEND_PORT=8000
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://frontend:3000}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./jocky_jobs.db}
+      - MAX_COMPILATION_TIME=${MAX_COMPILATION_TIME:-600}
     depends_on:
-      - compiler
+      compiler:
+        condition: service_started
     networks:
       - jocky-network
     volumes:
-      - ./web/backend:/app
       - ./build:/tmp/jocky_build
+      - backend_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/config"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
 
   # Compiler service (JOCKY toolchain)
   compiler:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - BUILD_TYPE=${BUILD_TYPE:-Release}
     networks:
       - jocky-network
     volumes:
       - ./src:/workspace/jocky/src
       - ./scripts:/workspace/jocky/scripts
       - ./build:/workspace/jocky/build
-    # Keep container running for use as a service
+      - ./compiler:/workspace/jocky/compiler
+    environment:
+      - BUILD_TYPE=${BUILD_TYPE:-Release}
     command: tail -f /dev/null
+    restart: unless-stopped
 
   # Reverse proxy (Caddy) - optional, for production
   caddy:
@@ -67,15 +91,19 @@ services:
     networks:
       - jocky-network
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     profiles:
       - production
+    restart: unless-stopped
 
 networks:
   jocky-network:
     driver: bridge
 
 volumes:
+  backend_data:
   caddy_data:
   caddy_config:

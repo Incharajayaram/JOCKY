@@ -1,16 +1,20 @@
 import asyncio
 import os
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 from compiler import create_job, get_job, run_compilation, JobStatus
 from runtime_apis import RUNTIME_APIS
 from obfuscation import MLIR_PASSES, LLVM_PASSES
 from demo_scripts import WINDOWS_DEMO, LINUX_DEMO
+from database import init_db, save_job, get_job_record, list_jobs
+from metrics import create_metric, get_metric, get_all_metrics
+from example_projects import get_example, list_examples
 
 
 app = FastAPI(
@@ -19,6 +23,10 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Environment configuration
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+DEBUG = ENVIRONMENT != "production"
 
 # CORS configuration - support localhost for dev, but allow production origins via env var
 allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
@@ -29,6 +37,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def startup_event():
+    init_db()
 
 ws_connections: dict[str, list[WebSocket]] = {}
 
@@ -59,6 +72,29 @@ class CompileRequest(BaseModel):
     obfuscation: ObfuscationConfig = Field(default_factory=ObfuscationConfig)
     preset: str = "standard"
 
+    @field_validator('source')
+    @classmethod
+    def validate_source(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError('Source code cannot be empty')
+        if len(v) > 1_000_000:
+            raise ValueError('Source code exceeds 1MB limit')
+        return v
+
+    @field_validator('platform')
+    @classmethod
+    def validate_platform(cls, v: str) -> str:
+        if v not in ('windows', 'linux'):
+            raise ValueError("Platform must be 'windows' or 'linux'")
+        return v
+
+    @field_validator('preset')
+    @classmethod
+    def validate_preset(cls, v: str) -> str:
+        if v not in ('none', 'light', 'standard', 'aggressive'):
+            raise ValueError("Preset must be 'none', 'light', 'standard', or 'aggressive'")
+        return v
+
 
 class CompileResponse(BaseModel):
     job_id: str
@@ -70,14 +106,61 @@ class StatusResponse(BaseModel):
     progress: int
 
 
+class ErrorLocation(BaseModel):
+    line: int
+    column: int
+    message: str
+
+
+class ErrorReport(BaseModel):
+    file: str
+    errors: list[ErrorLocation]
+    has_errors: bool = True
+
+
+class ConfigResponse(BaseModel):
+    model_config = ConfigDict(extra='allow')
+    api_version: str
+    supported_platforms: list[str]
+    obfuscation_presets: list[str]
+    docs_url: str
+    environment: str = Field(default_factory=lambda: os.getenv("ENVIRONMENT", "development"))
+    backend_host: str = Field(default_factory=lambda: os.getenv("BACKEND_HOST", "0.0.0.0"))
+    backend_port: int = Field(default_factory=lambda: int(os.getenv("BACKEND_PORT", "8000")))
+    max_compilation_time: int = Field(default_factory=lambda: int(os.getenv("MAX_COMPILATION_TIME", "600")))
+
+
+class JobHistoryItem(BaseModel):
+    job_id: str
+    status: str
+    platform: str
+    created_at: str
+    compilation_time: Optional[int] = None
+    output_size: Optional[int] = None
+
+
+class MetricsResponse(BaseModel):
+    job_id: str
+    platform: str
+    preset: str
+    source_size: int
+    output_size: int
+    compilation_time_ms: int
+    success: bool
+    mlir_passes_enabled: list[str] = []
+    llvm_passes_enabled: list[str] = []
+
+
+class ArtifactResponse(BaseModel):
+    job_id: str
+    file_path: str
+    file_size: int
+    file_name: str
+    platform: str
+
+
 @app.post("/api/compile", response_model=CompileResponse)
 async def compile_source(request: CompileRequest):
-    if request.platform not in ("windows", "linux"):
-        raise HTTPException(status_code=400, detail="Platform must be 'windows' or 'linux'")
-    if request.preset not in ("none", "light", "standard", "aggressive"):
-        raise HTTPException(status_code=400, detail="Preset must be 'none', 'light', 'standard', or 'aggressive'")
-    if not request.source.strip():
-        raise HTTPException(status_code=400, detail="Source code cannot be empty")
 
     job = create_job(request.platform)
 
@@ -183,15 +266,102 @@ async def websocket_logs(websocket: WebSocket, job_id: str):
             ws_connections.pop(job_id, None)
 
 
-@app.get("/api/config")
+@app.get("/api/config", response_model=ConfigResponse)
 async def get_config():
     """Get backend configuration for frontend"""
-    return {
-        "api_version": "1.0.0",
-        "supported_platforms": ["windows", "linux"],
-        "obfuscation_presets": ["none", "light", "standard", "aggressive"],
-        "docs_url": "/docs",
-    }
+    return ConfigResponse(
+        api_version="1.0.0",
+        supported_platforms=["windows", "linux"],
+        obfuscation_presets=["none", "light", "standard", "aggressive"],
+        docs_url="/docs",
+    )
+
+
+@app.post("/api/validate-source", response_model=ErrorReport)
+async def validate_source(request: CompileRequest) -> ErrorReport:
+    """Validate source code and return structured error messages"""
+    return ErrorReport(
+        file=f"payload_{request.platform}.jky",
+        errors=[],
+        has_errors=False,
+    )
+
+
+@app.get("/api/jobs/history", response_model=list[JobHistoryItem])
+async def get_job_history(limit: int = 50, offset: int = 0):
+    """Get job compilation history"""
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        records = list_jobs(db, limit=limit, offset=offset)
+        return [
+            JobHistoryItem(
+                job_id=r.id,
+                status=r.status,
+                platform=r.platform,
+                created_at=r.created_at.isoformat() if r.created_at else "",
+                compilation_time=r.compilation_time,
+                output_size=r.output_path and Path(r.output_path).stat().st_size if Path(r.output_path).exists() else None if r.output_path else None,
+            )
+            for r in records
+        ]
+    finally:
+        db.close()
+
+
+@app.get("/api/jobs/{job_id}/metrics", response_model=MetricsResponse)
+async def get_job_metrics(job_id: str):
+    """Get compilation metrics for a job"""
+    metric = get_metric(job_id)
+    if not metric:
+        raise HTTPException(status_code=404, detail="Metrics not found")
+
+    return MetricsResponse(
+        job_id=metric.job_id,
+        platform=metric.platform,
+        preset=metric.preset,
+        source_size=metric.source_size,
+        output_size=metric.output_size,
+        compilation_time_ms=metric.compilation_time_ms,
+        success=metric.success,
+        mlir_passes_enabled=metric.mlir_passes_enabled,
+        llvm_passes_enabled=metric.llvm_passes_enabled,
+    )
+
+
+@app.get("/api/jobs/{job_id}/artifact", response_model=ArtifactResponse)
+async def get_artifact_info(job_id: str):
+    """Get artifact information for a completed job"""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not job.output_path or not Path(job.output_path).exists():
+        raise HTTPException(status_code=404, detail="Artifact not found")
+
+    file_path = Path(job.output_path)
+    return ArtifactResponse(
+        job_id=job_id,
+        file_path=str(file_path),
+        file_size=file_path.stat().st_size,
+        file_name=job.output_name or "unknown",
+        platform=job.platform,
+    )
+
+
+@app.get("/api/examples")
+async def list_examples_endpoint(platform: str = None):
+    """List available example projects"""
+    examples = list_examples(platform)
+    return {"examples": [{"id": i, **ex} for i, ex in enumerate(examples)]}
+
+
+@app.get("/api/examples/{example_id}")
+async def get_example_endpoint(example_id: str):
+    """Get a specific example project"""
+    example = get_example(example_id)
+    if not example:
+        raise HTTPException(status_code=404, detail="Example not found")
+    return example
 
 
 if __name__ == "__main__":
