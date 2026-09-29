@@ -200,6 +200,8 @@ class Lexer:
             value += self.advance()
             while self.peek() in "0123456789abcdefABCDEF":
                 value += self.advance()
+            if len(value) <= 2:  # Only "0x" or "0X" with no hex digits
+                raise ValueError(f"Invalid hex literal: {value}")
             return int(value, 16)
         while self.peek() in "0123456789":
             value += self.advance()
