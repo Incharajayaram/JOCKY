@@ -92,9 +92,9 @@ ffi fs_read_file(path: string) -> i8*;
 ffi fs_write_file(path: string, data: i8*, size: i64) -> bool;
 
 // ---- Crypto ----
-ffi crypto_generate_key(size: i32) -> [u8];
-ffi crypto_aes256_encrypt(data: i8*, size: i32, key: [u8]) -> [u8];
-ffi crypto_aes256_decrypt(data: i8*, size: i32, key: [u8]) -> [u8];
+ffi crypto_generate_key(size: i32) -> [i8];
+ffi crypto_aes256_encrypt(data: i8*, size: i32, key: [i8]) -> [i8];
+ffi crypto_aes256_decrypt(data: i8*, size: i32, key: [i8]) -> [i8];
 
 // ---- Sandbox ----
 ffi sandbox_spawn(exe: string, args: string) -> i32;
@@ -119,7 +119,7 @@ ffi provenance_record(path: string, operation: string, detail: string) -> void;
 
 // ---- AI/ML ----
 ffi ai_init() -> i32;
-ffi ai_collect_telemetry() -> [u8];
+ffi ai_collect_telemetry() -> [i8];
 ffi ai_score_threat() -> f64;
 
 // ---- BYOVD helpers ----
