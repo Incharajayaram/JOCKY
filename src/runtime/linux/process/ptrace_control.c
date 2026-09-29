@@ -37,16 +37,8 @@ int jocky_process_get_maps(int pid) {
     return -1;
 }
 
-int jocky_thread_hijack(int pid, void* func) {
-    /* Would use ptrace to inject code into thread */
-    return -1;
-}
-
-int jocky_spoof_syscall(int syscall, void* args) {
-    /* Would use ptrace to modify syscall arguments */
-    return -1;
-}
-
-int jocky_spoof_call(void) {
-    return 0;
-}
+/* Advanced ptrace operations implemented in thread_hijack.c:
+ * - jocky_thread_hijack
+ * - jocky_spoof_syscall
+ * - jocky_spoof_call
+ */
