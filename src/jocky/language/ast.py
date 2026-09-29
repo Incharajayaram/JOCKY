@@ -181,9 +181,12 @@ class StructField:
 class StructDef:
     name: str
     fields: List[StructField]
+    generic_params: List[str] = None  # Type parameter names: [T, U, V]
     attributes: List[Attribute] = None  # #[packed], #[repr], etc.
 
     def __post_init__(self):
+        if self.generic_params is None:
+            self.generic_params = []
         if self.attributes is None:
             self.attributes = []
 
@@ -202,9 +205,12 @@ class EnumVariant:
 class EnumDef:
     name: str
     variants: List[EnumVariant]
+    generic_params: List[str] = None  # Type parameter names: [T, U, V]
     attributes: List[Attribute] = None  # #[repr], etc.
 
     def __post_init__(self):
+        if self.generic_params is None:
+            self.generic_params = []
         if self.attributes is None:
             self.attributes = []
 
