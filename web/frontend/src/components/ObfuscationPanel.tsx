@@ -81,11 +81,34 @@ function switchKnobStyle(enabled: boolean): CSSProperties {
   };
 }
 
+const passImpact: Record<string, { level: 'Light' | 'Medium' | 'High'; cost: string; color: string }> = {
+  // MLIR passes
+  'string-encrypt': { level: 'Light', cost: '+10-15%', color: '#10b981' },
+  'constant-obfuscate': { level: 'Medium', cost: '+20-30%', color: '#f59e0b' },
+  'symbol-obfuscate': { level: 'Light', cost: '+5-10%', color: '#10b981' },
+  'crypto-hash': { level: 'High', cost: '+40-50%', color: '#ef4444' },
+  'scf-obfuscate': { level: 'Medium', cost: '+25-35%', color: '#f59e0b' },
+  'import-obfuscate': { level: 'Light', cost: '+8-12%', color: '#10b981' },
+  // LLVM passes
+  'strip-signature': { level: 'Light', cost: '+2-5%', color: '#10b981' },
+  'pdata-strip': { level: 'Light', cost: '+1-3%', color: '#10b981' },
+  'virtualize': { level: 'High', cost: '+80-120%', color: '#ef4444' },
+  'opaque-pred': { level: 'Medium', cost: '+30-40%', color: '#f59e0b' },
+  'substitution': { level: 'Medium', cost: '+35-50%', color: '#f59e0b' },
+  'boguscf': { level: 'High', cost: '+50-70%', color: '#ef4444' },
+  'flattening': { level: 'High', cost: '+60-80%', color: '#ef4444' },
+  'linear-mba': { level: 'High', cost: '+70-100%', color: '#ef4444' },
+  'anti-debug': { level: 'Medium', cost: '+15-25%', color: '#f59e0b' },
+  'indirect-call': { level: 'Medium', cost: '+20-30%', color: '#f59e0b' },
+};
+
 function Toggle({ pass, onToggle }: {
   pass: ObfuscationPass;
   onToggle: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
+  const impact = passImpact[pass.id] || { level: 'Medium', cost: '+25%', color: '#f59e0b' };
+
   return (
     <div
       style={{
@@ -95,8 +118,32 @@ function Toggle({ pass, onToggle }: {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div>
-        <div style={styles.label}>{pass.name}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={styles.label}>{pass.name}</div>
+          <div
+            style={{
+              fontSize: 9,
+              fontWeight: 600,
+              padding: '2px 6px',
+              borderRadius: 3,
+              background: `${impact.color}20`,
+              color: impact.color,
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            {impact.level}
+          </div>
+          <div
+            style={{
+              fontSize: 9,
+              color: 'var(--text-secondary)',
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            {impact.cost}
+          </div>
+        </div>
         <div style={styles.description}>{pass.description}</div>
       </div>
       <div style={switchTrackStyle(pass.enabled)} onClick={onToggle}>

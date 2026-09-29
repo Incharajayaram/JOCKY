@@ -1,5 +1,5 @@
-import { ChevronDown, ChevronUp, Terminal, Download, X, Copy } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp, Terminal, Download, X, Copy, CheckCircle, Circle } from 'lucide-react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import type { LogEntry } from '../types';
 import LogFilter from './LogFilter';
@@ -89,11 +89,28 @@ interface BuildOutputProps {
   onClear: () => void;
 }
 
+const PIPELINE_STAGES = ['Parse', 'CodeGen', 'MLIR Obf', 'LLVM Obf', 'Compile', 'Link'];
+
+function detectCurrentStage(logs: LogEntry[]): { current: number; stages: { name: string; completed: boolean }[] } {
+  const stages = PIPELINE_STAGES.map((name) => ({
+    name,
+    completed: logs.some((log) => log.text.includes(`Stage ${PIPELINE_STAGES.indexOf(name) + 1}/6`)),
+  }));
+
+  let current = 0;
+  for (let i = 0; i < stages.length; i++) {
+    if (stages[i].completed) current = i + 1;
+  }
+
+  return { current: Math.min(current, PIPELINE_STAGES.length - 1), stages };
+}
+
 export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOutputProps) {
   const [expanded, setExpanded] = useState(true);
   const [dlHovered, setDlHovered] = useState(false);
   const [filteredLogs, setFilteredLogs] = useState<LogEntry[]>(logs);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const pipeline = useMemo(() => detectCurrentStage(logs), [logs]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -184,7 +201,44 @@ export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOu
           {expanded ? <ChevronDown size={14} color="var(--text-secondary)" /> : <ChevronUp size={14} color="var(--text-secondary)" />}
         </div>
       </div>
-      {expanded && logs.length > 0 && <LogFilter logs={logs} onFilterChange={setFilteredLogs} />}
+      {expanded && logs.length > 0 && (
+        <>
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              padding: '8px 16px',
+              borderBottom: '1px solid var(--border)',
+              background: 'rgba(0,0,0,0.2)',
+              alignItems: 'center',
+              fontSize: 11,
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            {pipeline.stages.map((stage, i) => (
+              <div key={stage.name} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {stage.completed ? (
+                  <CheckCircle size={12} color="var(--accent-green)" />
+                ) : (
+                  <Circle size={12} color="var(--text-secondary)" />
+                )}
+                <span
+                  style={{
+                    color: stage.completed ? 'var(--accent-green)' : 'var(--text-secondary)',
+                    fontWeight: stage.completed ? 600 : 400,
+                  }}
+                >
+                  {stage.name}
+                </span>
+                {i < pipeline.stages.length - 1 && (
+                  <div style={{ color: 'var(--text-secondary)', marginLeft: 4 }}>→</div>
+                )}
+              </div>
+            ))}
+          </div>
+          <LogFilter logs={logs} onFilterChange={setFilteredLogs} />
+        </>
+      )}
       <div
         ref={scrollRef}
         style={{ ...styles.logArea, height, transition: 'height 0.2s ease', overflow: expanded ? 'auto' : 'hidden' }}

