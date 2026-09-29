@@ -11,7 +11,6 @@
  */
 
 #include "jocky_rt.h"
-#include "jocky_error.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -21,30 +20,12 @@
 void* jocky_alloc(int64_t size)
 {
     if (size <= 0) return NULL;
-
-    void *ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)size);
-    if (!ptr && size > 0) {
-        JOCKY_ERROR_LOG(JOCKY_ERR_ALLOCATION_FAILED, "HeapAlloc returned NULL");
-    }
-    return ptr;
-}
-
-int32_t jocky_alloc_safe(int64_t size, void **out) {
-    if (!out) return JOCKY_ERR_NULL_PTR;
-    if (size <= 0) return JOCKY_ERR_INVALID_SIZE;
-
-    *out = jocky_alloc(size);
-    return (*out) ? JOCKY_SUCCESS : JOCKY_ERR_ALLOCATION_FAILED;
+    return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)size);
 }
 
 void jocky_free(void* ptr)
 {
-    if (ptr) {
-        BOOL result = HeapFree(GetProcessHeap(), 0, ptr);
-        if (!result) {
-            JOCKY_ERROR_LOG(JOCKY_ERR_OPERATION_FAILED, "HeapFree returned FALSE");
-        }
-    }
+    if (ptr) HeapFree(GetProcessHeap(), 0, ptr);
 }
 
 void* jocky_byovd_new(void)
@@ -66,23 +47,9 @@ void jocky_byovd_destroy(void* ctx)
 void* jocky_alloc(int64_t size)
 {
     if (size <= 0) return NULL;
-
     void* p = malloc((size_t)size);
-    if (!p && size > 0) {
-        JOCKY_ERROR_LOG(JOCKY_ERR_ALLOCATION_FAILED, "malloc returned NULL");
-        return NULL;
-    }
-
     if (p) memset(p, 0, (size_t)size);
     return p;
-}
-
-int32_t jocky_alloc_safe(int64_t size, void **out) {
-    if (!out) return JOCKY_ERR_NULL_PTR;
-    if (size <= 0) return JOCKY_ERR_INVALID_SIZE;
-
-    *out = jocky_alloc(size);
-    return (*out) ? JOCKY_SUCCESS : JOCKY_ERR_ALLOCATION_FAILED;
 }
 
 void jocky_free(void* ptr)
