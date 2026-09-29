@@ -128,15 +128,15 @@ def stage_mlir_obfuscate(ir_path, build_dir):
     log("MLIR", f"MLIR: {mlir_path.stat().st_size} bytes, {len(mlir_path.read_text().splitlines())} lines")
 
     plugin = TOOLCHAIN / "lib" / "MLIRObfuscationPlugin.so"
-    # MLIR obfuscation passes (using safe subset - 2/6 available)
+    # MLIR obfuscation passes (3/6 available - symbol-obfuscate fixed!)
     passes = [
         "--string-encrypt",           # Encrypt string literals
         "--constant-obfuscate",       # Obfuscate numeric constants
-        # Note: symbol-obfuscate, crypto-hash, scf-obfuscate, import-obfuscate cause reference issues
-        # Full symbol/crypto obfuscation applied at LLVM level instead
+        "--symbol-obfuscate",         # Mangle function/variable names (FIXED!)
+        # Note: crypto-hash, scf-obfuscate, import-obfuscate need further work
     ]
     log("MLIR", f"Running MLIR obfuscation passes: {', '.join(p.lstrip('-') for p in passes)}")
-    log("MLIR", "  Full obfuscation suite (anti-debug, virtualize, opaque-predicates, mba, etc.) applied at LLVM stage")
+    log("MLIR", "  Symbol reference issue fixed! Full LLVM suite (anti-debug, virtualize, mba, etc.) applied at LLVM stage")
 
     mlir_opt = TOOLCHAIN / "bin" / "run-mlir-opt.sh"
     if not mlir_opt.exists():
