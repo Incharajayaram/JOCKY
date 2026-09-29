@@ -2,14 +2,13 @@ from .ast import *
 from .errors import CodeGenError as BaseCodeGenError, SourceRange
 from .bytecode import BytecodeCompiler
 from typing import Dict, List, Tuple, Any, Optional
-from .optimizations import IREmissionBuffer, FunctionDeduplicator, LLVMTypeCache
+from .optimizations import FunctionDeduplicator, LLVMTypeCache
 
 class CodeGenError(BaseCodeGenError):
     pass
 
 class CodeGen:
     def __init__(self):
-        self.emission_buffer = IREmissionBuffer()
         self.output_lines: List[str] = []
         self.string_constants: Dict[str, str] = {}
         self.string_counter = 0
@@ -47,7 +46,7 @@ class CodeGen:
         return l
 
     def emit(self, line: str):
-        self.emission_buffer.emit(line)
+        self.output_lines.append(line)
 
     def emit_label(self, label: str):
         self.output_lines.append(f"{label}:")
@@ -63,7 +62,11 @@ class CodeGen:
         length = len(s.encode("utf-8")) + 1
         return name, length
 
-    def gen(self, prog: Program) -> str:
+    def gen(self, prog: Program, monomorphizations: set = None) -> str:
+        # Store monomorphizations from type checker
+        if monomorphizations:
+            self.monomorphizations = monomorphizations
+
         # Emit DWARF compilation unit metadata
         if self.debug_enabled:
             self.cu_id, self.file_id = self.emit_dwarf_compile_unit(self.source_file)
@@ -79,12 +82,12 @@ class CodeGen:
             elif isinstance(decl, EnumDef):
                 self.enums[decl.name] = decl
             elif isinstance(decl, FuncDecl):
-                # Skip generic functions - they don't generate code directly
+                self._all_funcs.append(decl)  # Store for generic resolution
+                # Skip registering generic functions - they are instantiated on demand
                 if decl.is_generic:
                     continue
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, False)
-                self._all_funcs.append(decl)  # Store for generic resolution
             elif isinstance(decl, FFIDecl):
                 ptypes = [p.type for p in decl.params]
                 self.functions[decl.name] = (ptypes, decl.ret_type, decl.variadic)
@@ -118,6 +121,32 @@ class CodeGen:
         for instance_name, instance_decl in self.monomorphic_instances.items():
             self.emit_func(instance_decl)
 
+        # Emit monomorphized functions recorded by the type checker's set
+        if self.monomorphizations:
+            from jocky.language.checker import GenericContext
+            for mono in self.monomorphizations:
+                if mono.mangled_name in self.functions:
+                    continue
+                for func_decl in self._all_funcs:
+                    if func_decl.name != mono.base_name:
+                        continue
+                    ctx = GenericContext()
+                    for var_name, concrete in mono.type_bindings.items():
+                        ctx.bind(var_name, concrete)
+                    instance = FuncDecl(
+                        name=mono.mangled_name,
+                        params=[Param(p.name, self.substitute_type(p.type, ctx))
+                                for p in func_decl.params],
+                        ret_type=self.substitute_type(func_decl.ret_type, ctx),
+                        body=func_decl.body,
+                        attributes=func_decl.attributes,
+                        is_generic=False,
+                        location=func_decl.location,
+                    )
+                    self.functions[mono.mangled_name] = (
+                        [p.type for p in instance.params], instance.ret_type, False)
+                    self.emit_func(instance)
+
         # Emit non-generic function definitions
         for decl in prog.decls:
             if isinstance(decl, FuncDecl):
@@ -140,8 +169,7 @@ class CodeGen:
             escaped = "".join(parts)
             prelude.append(f'{name} = private constant [{length} x i8] c"{escaped}\\00"')
 
-        self.emission_buffer.flush()
-        return "\n".join(prelude + [""] + self.emission_buffer.get_all())
+        return "\n".join(prelude + [""] + self.output_lines)
 
     def emit_struct_def(self, struct_def: StructDef):
         """Emit LLVM struct type definition."""
@@ -227,6 +255,21 @@ class CodeGen:
         result = resolved.llvm_type()
         self.type_cache.cache_type(cache_key, result)
         return result
+
+    def substitute_type(self, jtype: JType, context=None) -> JType:
+        """Substitute type variables with concrete types using generic context."""
+        if context is None:
+            return jtype
+        concrete = context.lookup(jtype.name)
+        if concrete:
+            # Preserve pointer and array flags
+            return JType(
+                concrete.name,
+                is_pointer=jtype.is_pointer or concrete.is_pointer,
+                is_array=jtype.is_array or concrete.is_array,
+                array_size=jtype.array_size or concrete.array_size,
+            )
+        return jtype
 
     def resolve_type_alias(self, t: JType) -> JType:
         """Resolve type alias recursively."""
@@ -909,8 +952,18 @@ class CodeGen:
                 return JType("bool")
             return self.infer_type(expr.operand)
         elif isinstance(expr, CallExpr):
-            if expr.name in self.functions:
-                sig = self.functions[expr.name]
+            # Resolve the callee name (may be mangled for generics)
+            name = expr.name
+            if expr.generic_args:
+                type_names = [t.name for t in expr.generic_args]
+                name = f"{expr.name}_{'_'.join(type_names)}"
+            elif name not in self.functions:
+                arg_types = self.infer_arg_types_simple(expr.args)
+                instance_name = self.find_monomorphic_instance(name, arg_types)
+                if instance_name:
+                    name = instance_name
+            if name in self.functions:
+                sig = self.functions[name]
                 return sig[1]
             # Check if calling a local variable holding a function pointer
             if expr.name in self.locals:
@@ -1473,9 +1526,13 @@ class CodeGen:
                 # Indirect call through function pointer
                 return self.emit_indirect_call(expr, alloca, var_type)
 
-        # Check if this is a generic function call that has been instantiated
+        # Determine the actual function name (may be mangled for generics)
         actual_func_name = expr.name
-        if expr.name not in self.functions:
+        if expr.generic_args:
+            # Turbofish call: func::<T1, T2>(args) -> func_T1_T2
+            type_names = [t.name for t in expr.generic_args]
+            actual_func_name = f"{expr.name}_{'_'.join(type_names)}"
+        elif expr.name not in self.functions:
             # Try to find a monomorphic instance by inferring argument types
             arg_types = self.infer_arg_types_simple(expr.args)
             instance_name = self.find_monomorphic_instance(expr.name, arg_types)
