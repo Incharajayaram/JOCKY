@@ -143,11 +143,28 @@ class CodeGen:
             if decl.init:
                 self.global_inits[decl.name] = decl.init
         elif t.is_array or isinstance(decl.init, ArrayLiteralExpr):
-            self.emit(f"@{decl.name} = global i8* null")
-            stored_type = JType("i8", is_pointer=True)
-            self.globals[decl.name] = (f"@{decl.name}", stored_type)
+            elem_type = JType(t.name) if t.is_array else self.infer_type(decl.init.elements[0]) if isinstance(decl.init, ArrayLiteralExpr) and decl.init.elements else JType("i32")
+            array_size = t.array_size if t.is_array else (len(decl.init.elements) if isinstance(decl.init, ArrayLiteralExpr) else 0)
+            array_llvm_t = f"[{array_size} x {self.llvm_type(elem_type)}]"
+
             if decl.init and isinstance(decl.init, ArrayLiteralExpr) and len(decl.init.elements) > 0:
-                self.global_inits[decl.name] = decl.init
+                values = []
+                for elem in decl.init.elements:
+                    if isinstance(elem, IntLiteral):
+                        values.append(f"{self.llvm_type(elem_type)} {elem.value}")
+                    elif isinstance(elem, FloatLiteral):
+                        values.append(f"{self.llvm_type(elem_type)} {elem.value:#.17g}")
+                    elif isinstance(elem, BoolLiteral):
+                        values.append(f"i1 {1 if elem.value else 0}")
+                    else:
+                        values.append(f"{self.llvm_type(elem_type)} 0")
+                init_val = "[" + ", ".join(values) + "]"
+                self.emit(f"@{decl.name} = global {array_llvm_t} {init_val}")
+            else:
+                self.emit(f"@{decl.name} = global {array_llvm_t} zeroinitializer")
+
+            stored_type = JType(elem_type.name, is_pointer=False, is_array=True, array_size=array_size)
+            self.globals[decl.name] = (f"@{decl.name}", stored_type)
             return
         elif t.name in ("f32", "f64"):
             init_val = "0.0"
@@ -352,9 +369,20 @@ class CodeGen:
             if decl.ret_type.name == "void":
                 self.emit("  ret void")
             else:
-                self.emit(f"  ret {self.llvm_type(decl.ret_type)} 0")
+                default_val = self.get_default_value(decl.ret_type)
+                self.emit(f"  ret {self.llvm_type(decl.ret_type)} {default_val}")
 
         self.emit("}")
+
+    def get_default_value(self, jtype: JType) -> str:
+        if jtype.is_pointer:
+            return "null"
+        elif jtype.name in ("f32", "f64"):
+            return "0.0"
+        elif jtype.name == "bool":
+            return "0"
+        else:
+            return "0"
 
     def last_line_is_terminator(self) -> bool:
         if not self.output_lines:
