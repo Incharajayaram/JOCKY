@@ -240,6 +240,10 @@ git push -f origin feature/pattern-matching
   - **Rule:** Test Docker images, build scripts, and CI/CD changes before committing
   - **Why:** Broken infrastructure affects all developers and wastes time on rebuilds
   - **How:** Build Docker image locally, test compilation pipeline, verify outputs work
+- ❌ Add stub implementations without checking for real implementations first
+  - **Rule:** Search runtime C files for real function implementations before adding stubs
+  - **Why:** Duplicates waste code, wrong signatures cause linker errors, stubs hide real bugs
+  - **How:** `grep -r "function_name" src/runtime --include="*.c" --include="*.h"` to verify if real impl exists
 
 ---
 
