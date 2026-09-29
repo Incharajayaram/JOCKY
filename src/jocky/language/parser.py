@@ -259,7 +259,7 @@ class Parser:
                 self.advance()
         self.expect(TokenType.RBRACE)
         self.expect(TokenType.SEMICOLON)
-        return StructDef(name, fields, attributes)
+        return StructDef(name, fields, generic_params=generic_params, attributes=attributes)
 
     def parse_struct_decl(self) -> StructDef:
         return self.parse_struct_decl_with_attributes([])
@@ -298,7 +298,7 @@ class Parser:
                 self.advance()
         self.expect(TokenType.RBRACE)
         self.expect(TokenType.SEMICOLON)
-        return EnumDef(name, variants, attributes)
+        return EnumDef(name, variants, generic_params=generic_params, attributes=attributes)
 
     def parse_enum_decl(self) -> EnumDef:
         return self.parse_enum_decl_with_attributes([])
@@ -496,6 +496,11 @@ class Parser:
         else:
             # Single expression body
             body = self.parse_expr()
+
+        # Infer captures from free variables in body
+        param_names = {p.name for p in params}
+        free_vars = self.collect_free_variables(body, param_names)
+        captures = sorted(set(captures) | free_vars)
 
         return ClosureExpr(params, ret_type, captures, body)
 
@@ -1102,6 +1107,24 @@ class Parser:
         elif tok.type == TokenType.PIPE:
             # Closure expression: |params| body
             return self.parse_closure_expr()
+        elif tok.type == TokenType.OROR:
+            # Handle || as closure with no parameters
+            # Need to manually parse since tokenizer gives us OROR not two PIPEs
+            self.advance()  # consume ||
+
+            # Parse return type annotation if present: | -> Type
+            ret_type = None
+            if self.match(TokenType.ARROW):
+                self.advance()
+                ret_type = self.parse_type()
+
+            # Parse body (block or expression)
+            if self.match(TokenType.LBRACE):
+                body = self.parse_block()
+            else:
+                body = self.parse_expr()
+
+            return ClosureExpr([], ret_type, [], body)
         elif tok.type == TokenType.LAMBDA:
             # Lambda expression: lambda(params) -> type { body }
             return self.parse_lambda_expr()

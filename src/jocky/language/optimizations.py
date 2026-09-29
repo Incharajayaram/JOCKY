@@ -24,7 +24,7 @@ class CharacterClassLookup:
         for i in range(256):
             ch = chr(i)
             self.whitespace[i] = 1 if ch in ' \t\r\n' else 0
-            self.digit[i] = 1 if ch.isdigit() else 0
+            self.digit[i] = 1 if ch in "0123456789" else 0
             self.hex_digit[i] = 1 if ch in '0123456789abcdefABCDEF' else 0
             self.alpha[i] = 1 if ch.isalpha() else 0
             self.alnum[i] = 1 if ch.isalnum() else 0
@@ -32,25 +32,32 @@ class CharacterClassLookup:
             self.identifier_cont[i] = 1 if ch.isalnum() or ch == '_' else 0
 
     def is_whitespace(self, ch: str) -> bool:
-        return self.whitespace[ord(ch[0])] if ch else False
+        o = ord(ch[0]) if ch else -1
+        return 0 <= o < 256 and bool(self.whitespace[o])
 
     def is_digit(self, ch: str) -> bool:
-        return self.digit[ord(ch[0])] if ch else False
+        o = ord(ch[0]) if ch else -1
+        return 0 <= o < 256 and bool(self.digit[o])
 
     def is_hex_digit(self, ch: str) -> bool:
-        return self.hex_digit[ord(ch[0])] if ch else False
+        o = ord(ch[0]) if ch else -1
+        return 0 <= o < 256 and bool(self.hex_digit[o])
 
     def is_alpha(self, ch: str) -> bool:
-        return self.alpha[ord(ch[0])] if ch else False
+        o = ord(ch[0]) if ch else -1
+        return 0 <= o < 256 and bool(self.alpha[o])
 
     def is_alnum(self, ch: str) -> bool:
-        return self.alnum[ord(ch[0])] if ch else False
+        o = ord(ch[0]) if ch else -1
+        return 0 <= o < 256 and bool(self.alnum[o])
 
     def is_identifier_start(self, ch: str) -> bool:
-        return self.identifier_start[ord(ch[0])] if ch else False
+        o = ord(ch[0]) if ch else -1
+        return 0 <= o < 256 and bool(self.identifier_start[o])
 
     def is_identifier_cont(self, ch: str) -> bool:
-        return self.identifier_cont[ord(ch[0])] if ch else False
+        o = ord(ch[0]) if ch else -1
+        return 0 <= o < 256 and bool(self.identifier_cont[o])
 
 
 class TokenPositionCache:
