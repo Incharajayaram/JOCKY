@@ -8,8 +8,6 @@ export interface Example {
   source: string;
 }
 
-const API_BASE = 'http://localhost:8000';
-
 export function useExamples() {
   const [examples, setExamples] = useState<Example[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,7 +16,7 @@ export function useExamples() {
   useEffect(() => {
     const loadExamples = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/examples`);
+        const res = await fetch('/api/examples');
         if (!res.ok) throw new Error('Failed to load examples');
         const data = await res.json();
         setExamples(data.examples || []);

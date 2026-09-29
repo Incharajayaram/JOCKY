@@ -20,6 +20,7 @@ export const categoryColors: Record<string, string> = {
   'Crypto': '#8b5cf6',
   'Exfiltration': '#f59e0b',
   'AI/ML': '#06b6d4',
+  'AI/ML Runtime': '#06b6d4',
   'Sandbox': '#22c55e',
   'Plugin': '#14b8a6',
   'Audit': '#6366f1',
