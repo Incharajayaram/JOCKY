@@ -78,7 +78,8 @@ int32_t jocky_win_get_system_info(char* out_buffer, int32_t max_len) {
 int64_t jocky_win_get_tick_count(void) { return 50000; }
 int32_t jocky_win_get_computer_name(char* out_buffer, int32_t max_len) {
     if (!out_buffer || max_len <= 0) return -1;
-    strncpy(out_buffer, "CROSS-COMPILER", max_len);
+    strncpy(out_buffer, "CROSS-COMPILER", max_len - 1);
+    out_buffer[max_len - 1] = '\0';
     return (int32_t)strlen(out_buffer);
 }
 int32_t jocky_win_get_memory_status(char* out_buffer, int32_t max_len) {
@@ -87,7 +88,8 @@ int32_t jocky_win_get_memory_status(char* out_buffer, int32_t max_len) {
 }
 int32_t jocky_win_get_temp_path(char* out_buffer, int32_t max_len) {
     if (!out_buffer || max_len <= 0) return -1;
-    strncpy(out_buffer, "C:\\Users\\Temp\\", max_len);
+    strncpy(out_buffer, "C:\\Users\\Temp\\", max_len - 1);
+    out_buffer[max_len - 1] = '\0';
     return (int32_t)strlen(out_buffer);
 }
 bool jocky_win_file_exists(const char* file_path) { (void)file_path; return false; }

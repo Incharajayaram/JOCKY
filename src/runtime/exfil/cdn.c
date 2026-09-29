@@ -224,7 +224,7 @@ int jocky_exfil_verify_cdn_hash(
     SHA256_Final(hash, &sha256);
 
     for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-        sprintf(computed_hash + (i * 2), "%02x", hash[i]);
+        snprintf(computed_hash + (i * 2), sizeof(computed_hash) - (i * 2), "%02x", hash[i]);
     }
     computed_hash[64] = 0;
 

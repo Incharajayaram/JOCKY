@@ -89,7 +89,7 @@ int jocky_setenv(const char* name, const char* value, int overwrite) {
         }
 
         env_vars[env_count] = entry;
-        sprintf(env_vars[env_count], "%s=%s", name, value);
+        snprintf(env_vars[env_count], (env_buffer + sizeof(env_buffer)) - entry, "%s=%s", name, value);
         env_count++;
 
         return 0;

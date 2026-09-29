@@ -1,5 +1,7 @@
 #include "../include/jocky_syscall.h"
 
+#if defined(__x86_64__)
+
 /* x86_64 Linux syscall calling convention:
  * rax = syscall number
  * rdi, rsi, rdx, r10, r8, r9 = arguments 1-6
@@ -89,3 +91,5 @@ long jocky_syscall6(long number, long arg1, long arg2, long arg3, long arg4, lon
     );
     return result;
 }
+
+#endif
