@@ -1,0 +1,23 @@
+:80 {
+	root * /usr/share/caddy/uploads
+	
+	@upload {
+		method POST
+		path /upload*
+	}
+	
+	handle @upload {
+		file_server {
+			hide .gitkeep
+		}
+	}
+	
+	handle {
+		file_server
+	}
+	
+	log {
+		output stdout
+		format console
+	}
+}
