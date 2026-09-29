@@ -408,6 +408,8 @@ class Parser:
         while not self.match(TokenType.RBRACE):
             if self.match(TokenType.LET):
                 stmts.append(self.parse_let_stmt())
+            elif self.match(TokenType.VAR):
+                stmts.append(self.parse_var_stmt())
             elif self.match(TokenType.IF):
                 stmts.append(self.parse_if_stmt())
             elif self.match(TokenType.WHILE):
@@ -425,9 +427,18 @@ class Parser:
                 self.expect(TokenType.SEMICOLON)
                 stmts.append(ContinueStmt())
             else:
-                # Expression statement - might be implicit return if last
+                # Expression, assignment, or implicit return of last expr
                 expr = self.parse_expr()
-                if self.match(TokenType.SEMICOLON):
+                if self.match(TokenType.EQ):
+                    self.advance()
+                    rhs = self.parse_expr()
+                    self.consume_semicolon()
+                    stmts.append(AssignStmt(expr, rhs))
+                elif isinstance(expr, MatchExpr):
+                    if self.match(TokenType.SEMICOLON):
+                        self.advance()
+                    stmts.append(ExprStmt(expr))
+                elif self.match(TokenType.SEMICOLON):
                     # Explicit semicolon - this is a statement
                     self.advance()
                     stmts.append(ExprStmt(expr))
@@ -436,8 +447,8 @@ class Parser:
                     stmts.append(expr)
                     break
                 else:
-                    # No semicolon and not at closing brace - error
-                    self.expect(TokenType.SEMICOLON)
+                    self.consume_semicolon()
+                    stmts.append(ExprStmt(expr))
         self.expect(TokenType.RBRACE)
         return Block(stmts)
 
@@ -647,6 +658,8 @@ class Parser:
         while not self.match(TokenType.RBRACE):
             if self.match(TokenType.LET):
                 stmts.append(self.parse_let_stmt())
+            elif self.match(TokenType.VAR):
+                stmts.append(self.parse_var_stmt())
             elif self.match(TokenType.IF):
                 stmts.append(self.parse_if_stmt())
             elif self.match(TokenType.WHILE):
@@ -664,9 +677,18 @@ class Parser:
                 self.expect(TokenType.SEMICOLON)
                 stmts.append(ContinueStmt())
             else:
-                # Expression statement - might be implicit return if last
+                # Expression, assignment, or implicit return of last expr
                 expr = self.parse_expr()
-                if self.match(TokenType.SEMICOLON):
+                if self.match(TokenType.EQ):
+                    self.advance()
+                    rhs = self.parse_expr()
+                    self.consume_semicolon()
+                    stmts.append(AssignStmt(expr, rhs))
+                elif isinstance(expr, MatchExpr):
+                    if self.match(TokenType.SEMICOLON):
+                        self.advance()
+                    stmts.append(ExprStmt(expr))
+                elif self.match(TokenType.SEMICOLON):
                     # Explicit semicolon - this is a statement
                     self.advance()
                     stmts.append(ExprStmt(expr))
@@ -675,8 +697,8 @@ class Parser:
                     stmts.append(expr)
                     break
                 else:
-                    # No semicolon and not at closing brace - error
-                    self.expect(TokenType.SEMICOLON)
+                    self.consume_semicolon()
+                    stmts.append(ExprStmt(expr))
         self.expect(TokenType.RBRACE)
         return Block(stmts)
 
