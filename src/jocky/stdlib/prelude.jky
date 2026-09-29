@@ -35,6 +35,10 @@ ffi jocky_sleep_and_recheck() -> void;
 ffi jocky_decrypt_xor(buf: i8*, size: i32, key: i8, keylen: i32) -> void;
 ffi jocky_decrypt_rc4(buf: i8*, size: i32, key: i8*, keylen: i32) -> void;
 
+// ---- Environment ----
+ffi jocky_getenv(var_name: string) -> string;
+ffi jocky_setenv(var_name: string, value: string) -> i32;
+
 // ---- Evasion ----
 ffi jocky_unhook_ntdll() -> bool;
 ffi jocky_get_syscall_number(name: string) -> i32;

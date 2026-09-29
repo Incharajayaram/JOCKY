@@ -336,6 +336,17 @@ def stage_compile_runtime(build_dir):
         'int jocky_exploit_disable_callbacks(void) { return 0; }\n'
         'int jocky_exploit_token_replacement(int a1, int a2) { (void)a1;(void)a2; return 0; }\n'
         'int edrhoker_detect(void) { return 0; }\n'
+        '#include <stdlib.h>\n'
+        '#include <string.h>\n'
+        'const char* jocky_getenv(const char* var_name) { \n'
+        '  if (!var_name) return ""; \n'
+        '  const char* val = getenv(var_name); \n'
+        '  return val ? val : ""; \n'
+        '}\n'
+        'int jocky_setenv(const char* var_name, const char* value) { \n'
+        '  if (!var_name || !value) return -1; \n'
+        '  return setenv(var_name, value, 1); \n'
+        '}\n'
     )
     stub.write_text(stub_src)
     run([mingw_gcc, "-c", str(stub), "-o", str(stub_o)], "Compile compat stub")
