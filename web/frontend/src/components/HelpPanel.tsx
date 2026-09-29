@@ -1,5 +1,4 @@
-import { HelpCircle, X } from 'lucide-react';
-import { useState } from 'react';
+import { X } from 'lucide-react';
 import type { CSSProperties } from 'react';
 
 const styles: Record<string, CSSProperties> = {

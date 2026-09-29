@@ -21,6 +21,6 @@ export const API_BASE = getApiBase();
 
 export const ENV = {
   API_BASE,
-  DEBUG: process.env.NODE_ENV === 'development',
+  DEBUG: import.meta.env.MODE === 'development',
   VERSION: '1.0.0',
 };

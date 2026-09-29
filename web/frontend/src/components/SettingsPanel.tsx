@@ -1,5 +1,4 @@
 import { Settings, X } from 'lucide-react';
-import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useConfig } from '../hooks/useConfig';
 
