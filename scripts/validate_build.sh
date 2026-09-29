@@ -49,7 +49,7 @@ print('✓ All modules load')
 
 # Step 2: Verify prelude.jky
 log "Step 2: Verifying prelude.jky..."
-python3 << 'EOF'
+if python3 << EOF
 import sys
 sys.path.insert(0, '$PROJECT_ROOT/src')
 from jocky.language.lexer import Lexer
@@ -70,7 +70,11 @@ checker = TypeChecker()
 checker.check(ast)
 print('✓ prelude.jky parses and type-checks correctly')
 EOF
-|| error "prelude.jky validation failed"
+then
+    log "✓ Prelude validation passed"
+else
+    error "prelude.jky validation failed"
+fi
 
 # Step 3: Check Docker image exists
 log "Step 3: Checking Docker image..."
