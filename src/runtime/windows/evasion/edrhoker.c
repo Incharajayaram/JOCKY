@@ -1,6 +1,6 @@
-#include "edrhoker.h"
 #include <winsock2.h>
 #include <windows.h>
+#include "edrhoker.h"
 #include <iphlpapi.h>
 #include <tlhelp32.h>
 #include <string.h>
@@ -216,7 +216,7 @@ int jocky_edrhoker_apply_profile(const EDR_PROFILE* profile)
     int throttled = 0;
     for (int i = 0; i < found; i++) {
         for (int j = 0; j < profile->count; j++) {
-            if (strcmp(processes[i].process_name, profile->names[j]) == 0) {
+            if (wcscmp(processes[i].process_name, profile->names[j]) == 0) {
                 if (jocky_edrhoker_throttle_process(processes[i].pid,
                                                    profile->throttle_kbps) == 0) {
                     throttled++;
