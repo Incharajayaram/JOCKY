@@ -233,7 +233,7 @@ class TypeChecker:
             lt = self.typeof(stmt.target)
             rt = self.typeof(stmt.value)
             if not self.types_equal(lt, rt):
-                pass
+                raise TypeError(f"Type mismatch in assignment: expected {lt}, got {rt}")
         elif isinstance(stmt, IfStmt):
             self.typeof(stmt.cond)
             self.check_block(stmt.then_block)

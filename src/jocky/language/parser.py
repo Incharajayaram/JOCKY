@@ -318,7 +318,7 @@ class Parser:
                 components.append(self.expect(TokenType.IDENT).value)
 
         if not all_flag:
-            all_flag = True
+            all_flag = False
 
         if self.match(TokenType.SEMICOLON):
             self.advance()
@@ -499,7 +499,7 @@ class Parser:
         else:
             return self.parse_expr_or_assign_stmt()
 
-    def parse_var_stmt(self) -> LetStmt:
+    def parse_var_stmt(self) -> VarDecl:
         self.expect(TokenType.VAR)
         name = self.expect(TokenType.IDENT).value
         typ: Optional[JType] = None
@@ -509,7 +509,7 @@ class Parser:
         self.expect(TokenType.EQ)
         init = self.parse_expr()
         self.consume_semicolon()
-        return LetStmt(name, typ, init)
+        return VarDecl(name, typ, init)
 
     def parse_let_stmt(self) -> LetStmt:
         self.expect(TokenType.LET)

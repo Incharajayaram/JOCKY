@@ -261,16 +261,10 @@ class CodeGen:
 
         self.emit("}")
 
-        # Restore state
         self.locals = saved_locals
         self.current_func = saved_func
         self.current_block = saved_block
         self.type_context = saved_type_context
-
-        # Restore state
-        self.locals = saved_locals
-        self.current_func = saved_func
-        self.current_block = saved_block
 
     def collect_lets(self, stmts: List[Any]) -> List[Tuple[str, JType]]:
         """Walk statement list recursively and collect (name, type) for every LetStmt."""

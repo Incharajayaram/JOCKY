@@ -106,7 +106,6 @@ KEYWORDS = {
     "type": TokenType.TYPE,
     "match": TokenType.MATCH,
     "mod": TokenType.MOD,
-    "use": TokenType.USE,
     "const": TokenType.CONST,
     "var": TokenType.VAR,
     "in": TokenType.IN,
