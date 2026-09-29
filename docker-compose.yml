@@ -1,91 +1,81 @@
+version: '3.8'
+
 services:
-  # JOCKY Compiler Service - Full LLVM/MLIR Toolchain
-  jocky-compiler:
+  # Frontend service (Node.js + React)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - VITE_API_BASE=${VITE_API_BASE:-http://localhost:8000}
+    depends_on:
+      - backend
+    networks:
+      - jocky-network
+    volumes:
+      - ./web/frontend:/app
+      - /app/node_modules
+
+  # Backend service (FastAPI)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - BACKEND_HOST=0.0.0.0
+      - BACKEND_PORT=8000
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    depends_on:
+      - compiler
+    networks:
+      - jocky-network
+    volumes:
+      - ./web/backend:/app
+      - ./build:/tmp/jocky_build
+
+  # Compiler service (JOCKY toolchain)
+  compiler:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: jocky-compiler
-    image: jocky:latest
-
-    # Volume mounts for source, output, and cache
-    volumes:
-      # Source code
-      - .:/workspace/jocky
-      # Build output
-      - ./build:/workspace/build
-      # Compiled executables
-      - ./dist:/workspace/output
-      # Cache for faster rebuilds
-      - jocky-cache:/root/.cache
-      # ML models
-      - ~/.jocky/models:/root/.jocky/models:ro
-
-    environment:
-      - TOOLCHAIN_PATH=/workspace/jocky/toolchain
-      - JOCKY_OPT_LEVEL=2
-      - JOCKY_LTO=thin
-      - JOCKY_PROFILE=standard
-      - JOCKY_TARGETS=linux,windows
-      - JOCKY_KEEP_INTERMEDIATES=false
-      - JOCKY_ENABLE_OBFUSCATION=true
-      - JOCKY_ENABLE_PACKING=true
-      - PYTHONPATH=/workspace/jocky/src
-
-    # Network configuration
     networks:
       - jocky-network
+    volumes:
+      - ./src:/workspace/jocky/src
+      - ./scripts:/workspace/jocky/scripts
+      - ./build:/workspace/jocky/build
+    # Keep container running for use as a service
+    command: tail -f /dev/null
 
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: '4'
-          memory: 8G
-        reservations:
-          cpus: '2'
-          memory: 4G
-
-    # Keep container running
-    stdin_open: true
-    tty: true
-
-    # Health check
-    healthcheck:
-      test: ["CMD", "python3", "-m", "jocky", "--version"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
-
-  # Optional: Wine container for testing Windows binaries on Linux
-  jocky-wine:
-    image: jocky:latest
-    container_name: jocky-wine
+  # Reverse proxy (Caddy) - optional, for production
+  caddy:
+    image: caddy:2.7.6-alpine
+    ports:
+      - "${CADDY_PORT:-443}:443"
+      - "80:80"
+    environment:
+      - FRONTEND_HOST=${FRONTEND_HOST:-frontend:3000}
+      - BACKEND_HOST=${BACKEND_HOST:-backend:8000}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - jocky-network
     depends_on:
-      - jocky-compiler
-
-    volumes:
-      - ./dist:/workspace/output:ro
-      - wine-prefix:/root/.wine
-
-    environment:
-      - WINEPREFIX=/root/.wine
-      - WINEARCH=win64
-      - DISPLAY=${DISPLAY:-:0}
-
-    networks:
-      - jocky-network
-
-    # Only start if explicitly requested
+      - frontend
+      - backend
     profiles:
-      - test-windows
+      - production
 
 networks:
   jocky-network:
     driver: bridge
 
 volumes:
-  jocky-cache:
-    driver: local
-  wine-prefix:
-    driver: local
+  caddy_data:
+  caddy_config:
