@@ -9,6 +9,11 @@
 #ifdef _WIN32
 #include <windows.h>
 
+/* Declare RegDeleteTreeW if not available in headers */
+#ifndef RegDeleteTreeW
+LONG WINAPI RegDeleteTreeW(HKEY hKey, LPCWSTR lpSubKey);
+#endif
+
 static HKEY jocky_to_win_key(jocky_reg_handle_t key) {
     return (HKEY)key;
 }

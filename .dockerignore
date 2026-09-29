@@ -1,10 +1,16 @@
+# Exclude from Docker build
 .git
-__pycache__
-*.pyc
-.claude
+.gitignore
+node_modules
 build/
 dist/
-*.egg-info
-.env
-tools/ghidra_*_PUBLIC/
-tools/__pycache__/
+.venv
+__pycache__
+*.pyc
+.DS_Store
+*.log
+
+# DO NOT IGNORE - needed for Docker build
+!toolchain/
+!toolchain/bin/
+!toolchain/lib/

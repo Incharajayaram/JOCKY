@@ -34,6 +34,17 @@ const styles: Record<string, CSSProperties> = {
     flexDirection: 'column',
     background: 'var(--bg-primary)',
     overflow: 'hidden',
+    minHeight: 0,
+  },
+  runtimePanelWrapper: {
+    flex: 1,
+    minHeight: 0,
+    overflow: 'auto',
+  },
+  obfuscationPanelWrapper: {
+    flex: 0,
+    minHeight: 200,
+    borderTop: '1px solid var(--border)',
   },
 };
 
@@ -85,16 +96,20 @@ export default function App() {
           filename={platform === 'windows' ? 'payload_win.jky' : 'payload_linux.jky'}
         />
         <div style={styles.rightPanel}>
-          <RuntimePanel
-            categories={categories}
-            platform={platform}
-            onInsert={handleInsertSnippet}
-          />
-          <ObfuscationPanel
-            mlir={obfuscation.mlir}
-            llvm={obfuscation.llvm}
-            onToggle={handleTogglePass}
-          />
+          <div style={styles.runtimePanelWrapper}>
+            <RuntimePanel
+              categories={categories}
+              platform={platform}
+              onInsert={handleInsertSnippet}
+            />
+          </div>
+          <div style={styles.obfuscationPanelWrapper}>
+            <ObfuscationPanel
+              mlir={obfuscation.mlir}
+              llvm={obfuscation.llvm}
+              onToggle={handleTogglePass}
+            />
+          </div>
         </div>
       </div>
       <BuildOutput

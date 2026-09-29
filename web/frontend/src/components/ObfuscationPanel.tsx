@@ -5,9 +5,11 @@ import type { ObfuscationPass } from '../types';
 
 const styles: Record<string, CSSProperties> = {
   container: {
-    borderTop: '1px solid var(--border)',
     padding: '12px 16px',
     overflow: 'auto',
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
   },
   sectionTitle: {
     fontSize: 11,
