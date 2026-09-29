@@ -207,6 +207,8 @@ class Lexer:
             value += self.advance()
             while self.peek() and self._char_lookup.is_hex_digit(self.peek()):
                 value += self.advance()
+            if len(value) == 2:
+                self.error("Hexadecimal literal requires at least one digit")
             return int(value, 16)
         while self.peek() and self._char_lookup.is_digit(self.peek()):
             value += self.advance()
