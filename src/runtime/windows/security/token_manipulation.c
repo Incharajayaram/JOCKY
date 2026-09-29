@@ -16,13 +16,13 @@ int jocky_find_system_process(
     }
 
     /* Common SYSTEM processes in priority order */
-    const char* system_processes[] = {
-        preferred_process ? preferred_process : "winlogon.exe",
-        "services.exe",
-        "lsass.exe",
-        "svchost.exe",
-        "wininit.exe",
-        "csrss.exe"
+    const WCHAR* system_processes[] = {
+        L"winlogon.exe",
+        L"services.exe",
+        L"lsass.exe",
+        L"svchost.exe",
+        L"wininit.exe",
+        L"csrss.exe"
     };
 
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -43,7 +43,7 @@ int jocky_find_system_process(
         for (int i = 0; i < sizeof(system_processes)/sizeof(system_processes[0]); i++) {
             if (system_processes[i] == NULL) continue;
 
-            if (strcmp(pe32.szExeFile, system_processes[i]) == 0) {
+            if (wcscmp(pe32.szExeFile, system_processes[i]) == 0) {
                 /* Try to open and check if it's SYSTEM */
                 HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pe32.th32ProcessID);
                 if (hProcess) {
@@ -63,7 +63,7 @@ int jocky_find_system_process(
                                 if (EqualSid(token_user.User.Sid, system_sid)) {
                                     /* Found SYSTEM process */
                                     out_info->pid = pe32.th32ProcessID;
-                                    strncpy(out_info->process_name, pe32.szExeFile, 255);
+                                    wcsncpy(out_info->process_name, pe32.szExeFile, 255);
                                     out_info->is_system = 1;
 
                                     CloseHandle(hToken);
@@ -131,7 +131,7 @@ int jocky_enum_system_processes(
 
                         if (EqualSid(token_user.User.Sid, system_sid)) {
                             processes[*out_count].pid = pe32.th32ProcessID;
-                            strncpy(processes[*out_count].process_name, pe32.szExeFile, 255);
+                            wcsncpy(processes[*out_count].process_name, pe32.szExeFile, 255);
                             processes[*out_count].is_system = 1;
                             (*out_count)++;
                         }
@@ -219,12 +219,12 @@ int jocky_spawn_as_system(
     }
 
     /* Create process with SYSTEM token */
-    STARTUPINFO si = {0};
-    si.cb = sizeof(STARTUPINFO);
+    STARTUPINFOW si = {0};
+    si.cb = sizeof(STARTUPINFOW);
     PROCESS_INFORMATION pi = {0};
 
-    if (!CreateProcessAsUser(hSystemToken, NULL, (LPSTR)command_line, NULL, NULL,
-                             FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi)) {
+    if (!CreateProcessAsUserW(hSystemToken, NULL, (LPWSTR)command_line, NULL, NULL,
+                              FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi)) {
         CloseHandle(hSystemToken);
         return -1;
     }
