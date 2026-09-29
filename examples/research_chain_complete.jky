@@ -23,9 +23,9 @@ const DRIVER_CHAIN = [
 ]
 
 // Configuration
-const CDN_ENDPOINT = "https://research.internal:8443/upload"
+const CDN_ENDPOINT = "https://10.0.2.2:8443/upload"
 const CDN_AUTH_TOKEN = "Bearer research_caddy_auth_token_v2_2024"
-const CDN_CA_CERT = "/opt/jocky-cdn/certs/research.internal.crt"
+const CDN_CA_CERT = ""
 
 const ML_MODEL_PATH = "/opt/models/phi3_evasion.gguf"
 const MAX_INFERENCE_TIME_MS = 100
