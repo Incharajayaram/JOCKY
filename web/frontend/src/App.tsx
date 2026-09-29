@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
+import ErrorBoundary from './components/ErrorBoundary';
 import TopBar from './components/TopBar';
 import PlatformTabs from './components/PlatformTabs';
 import CodeEditor from './components/CodeEditor';
@@ -85,39 +86,41 @@ export default function App() {
   }, [compile, editorState, platform, obfuscation]);
 
   return (
-    <div style={styles.app}>
-      <TopBar onCompile={handleCompile} compiling={compiling} />
-      <PlatformTabs active={platform} onChange={handlePlatformChange} />
-      <div style={styles.main}>
-        <CodeEditor
-          ref={editorRef}
-          value={editorState[platform]}
-          onChange={handleEditorChange}
-          filename={platform === 'windows' ? 'payload_win.jky' : 'payload_linux.jky'}
-        />
-        <div style={styles.rightPanel}>
-          <div style={styles.runtimePanelWrapper}>
-            <RuntimePanel
-              categories={categories}
-              platform={platform}
-              onInsert={handleInsertSnippet}
-            />
-          </div>
-          <div style={styles.obfuscationPanelWrapper}>
-            <ObfuscationPanel
-              mlir={obfuscation.mlir}
-              llvm={obfuscation.llvm}
-              onToggle={handleTogglePass}
-            />
+    <ErrorBoundary>
+      <div style={styles.app}>
+        <TopBar onCompile={handleCompile} compiling={compiling} />
+        <PlatformTabs active={platform} onChange={handlePlatformChange} />
+        <div style={styles.main}>
+          <CodeEditor
+            ref={editorRef}
+            value={editorState[platform]}
+            onChange={handleEditorChange}
+            filename={platform === 'windows' ? 'payload_win.jky' : 'payload_linux.jky'}
+          />
+          <div style={styles.rightPanel}>
+            <div style={styles.runtimePanelWrapper}>
+              <RuntimePanel
+                categories={categories}
+                platform={platform}
+                onInsert={handleInsertSnippet}
+              />
+            </div>
+            <div style={styles.obfuscationPanelWrapper}>
+              <ObfuscationPanel
+                mlir={obfuscation.mlir}
+                llvm={obfuscation.llvm}
+                onToggle={handleTogglePass}
+              />
+            </div>
           </div>
         </div>
+        <BuildOutput
+          logs={logs}
+          jobId={jobId}
+          buildDone={buildDone}
+          onClear={clearLogs}
+        />
       </div>
-      <BuildOutput
-        logs={logs}
-        jobId={jobId}
-        buildDone={buildDone}
-        onClear={clearLogs}
-      />
-    </div>
+    </ErrorBoundary>
   );
 }

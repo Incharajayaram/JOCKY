@@ -1,5 +1,5 @@
-import { ChevronDown, ChevronRight, Zap } from 'lucide-react';
-import { useState } from 'react';
+import { ChevronDown, ChevronRight, Zap, Search, X } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import type { ApiCategory, Platform, RuntimeApi } from '../types';
 import { categoryColors } from '../theme';
@@ -9,8 +9,30 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    overflow: 'auto',
     padding: '12px 16px',
+  },
+  searchBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '6px 10px',
+    borderRadius: 4,
+    border: '1px solid var(--border)',
+    background: 'var(--bg-secondary)',
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    background: 'transparent',
+    border: 'none',
+    color: 'var(--text-primary)',
+    fontSize: 12,
+    fontFamily: "'JetBrains Mono', monospace",
+    outline: 'none',
+  },
+  listContainer: {
+    flex: 1,
+    overflow: 'auto',
   },
   sectionTitle: {
     fontSize: 11,
@@ -133,9 +155,31 @@ interface RuntimePanelProps {
 }
 
 export default function RuntimePanel({ categories, platform, onInsert }: RuntimePanelProps) {
-  const filtered = categories.filter(
-    (c) => c.platform === 'both' || c.platform === platform,
-  );
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    let result = categories.filter(
+      (c) => c.platform === 'both' || c.platform === platform,
+    );
+
+    if (search.trim()) {
+      const query = search.toLowerCase();
+      result = result
+        .map((cat) => ({
+          ...cat,
+          apis: cat.apis.filter(
+            (api) =>
+              api.name.toLowerCase().includes(query) ||
+              api.description.toLowerCase().includes(query),
+          ),
+        }))
+        .filter((cat) => cat.apis.length > 0);
+    }
+
+    return result;
+  }, [categories, platform, search]);
+
+  const totalApis = filtered.reduce((sum, cat) => sum + cat.apis.length, 0);
 
   return (
     <div style={styles.container}>
@@ -143,9 +187,60 @@ export default function RuntimePanel({ categories, platform, onInsert }: Runtime
         <Zap size={12} />
         Runtime APIs
       </div>
-      {filtered.map((category) => (
-        <Category key={category.name} category={category} onInsert={onInsert} />
-      ))}
+      <div style={styles.searchBox}>
+        <Search size={12} color="var(--text-secondary)" />
+        <input
+          style={styles.searchInput}
+          type="text"
+          placeholder="Search APIs..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            <X size={12} />
+          </button>
+        )}
+      </div>
+      {search && (
+        <div
+          style={{
+            fontSize: 10,
+            color: 'var(--text-secondary)',
+            marginBottom: 8,
+            textAlign: 'center' as const,
+          }}
+        >
+          {totalApis} API{totalApis !== 1 ? 's' : ''} found
+        </div>
+      )}
+      <div style={styles.listContainer}>
+        {filtered.length === 0 ? (
+          <div
+            style={{
+              textAlign: 'center' as const,
+              color: 'var(--text-secondary)',
+              fontSize: 11,
+              padding: '20px 0',
+            }}
+          >
+            {search ? 'No APIs found' : 'No APIs for this platform'}
+          </div>
+        ) : (
+          filtered.map((category) => (
+            <Category key={category.name} category={category} onInsert={onInsert} />
+          ))
+        )}
+      </div>
     </div>
   );
 }
