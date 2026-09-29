@@ -145,7 +145,8 @@ def stage_mlir_obfuscate(ir_path, build_dir, custom_passes=None):
         mlir_opt = TOOLCHAIN / "bin" / "run-mlir-opt.sh"
         if not mlir_opt.exists():
             mlir_opt = TOOLCHAIN / "bin" / "mlir-opt"
-        run([str(mlir_opt), f"--load-pass-plugin={plugin}"] + passes + [str(mlir_path), "-o", str(mlir_obf_path)],
+        pass_args = [f"-{p.lstrip('-')}" for p in passes]
+        run([str(mlir_opt), f"--load-pass-plugin={plugin}", str(mlir_path), "-o", str(mlir_obf_path)] + pass_args,
             "MLIR obfuscation")
     else:
         log("MLIR", "No MLIR obfuscation passes enabled (skipping MLIR obfuscation, copying input to output)")
