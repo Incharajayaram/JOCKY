@@ -93,17 +93,4 @@ int jocky_rdll_inject(const char* dll, const char* func) { return -1; }
 /* See: thread_hijack.c for jocky_thread_hijack, jocky_spoof_syscall */
 /* See: process_hollow.c for jocky_process_hollow, jocky_process_hollow_linux */
 
-/* Helper function stubs */
-void jocky_sleep_and_recheck(void) { sleep(1); }
-
-int jocky_runtime_init(void) { return 0; }  /* Implemented in runtime_init.c */
-
-/* String utilities stubs */
-void println(const char* s) { }  /* Implemented in io_core.c */
-const char* string(int64_t val) { return ""; }  /* Implemented in io_core.c */
-int64_t array_len(void* arr) { return 0; }
-void* array_append(void* arr, void* elem) { return arr; }
-
-/* Deprecated/stub functions */
-void provenance_record(const char* path, const char* owner, const char* data) { }
-int audit_verify(void) { return 0; }
+/* All major implementations now in dedicated files - no duplicates needed */
