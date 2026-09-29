@@ -148,6 +148,7 @@ start_backend() {
 cd '$JOCKY_ROOT/web/backend'
 source venv/bin/activate
 export PYTHONPATH='$JOCKY_ROOT/src'
+export TOOLCHAIN_PATH='$JOCKY_ROOT/toolchain'
 echo ''
 echo '=========================================='
 echo 'JOCKY Backend API'

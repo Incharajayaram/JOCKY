@@ -10,6 +10,7 @@ set -e
 
 JOCKY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PYTHONPATH="$JOCKY_ROOT/src"
+export TOOLCHAIN_PATH="$JOCKY_ROOT/toolchain"
 export PATH="$JOCKY_ROOT/toolchain/bin:$PATH"
 export LD_LIBRARY_PATH="$JOCKY_ROOT/toolchain/lib:$LD_LIBRARY_PATH"
 
