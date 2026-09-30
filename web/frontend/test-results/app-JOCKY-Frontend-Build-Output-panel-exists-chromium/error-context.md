@@ -35,149 +35,237 @@ Call log:
       - generic [ref=e5]:
         - generic [ref=e8]: JOCKY
         - generic [ref=e9]: v1.0
-      - button "Compile" [ref=e10] [cursor=pointer]
-    - generic [ref=e13]:
-      - button "Windows" [ref=e14] [cursor=pointer]
-      - button "Linux" [ref=e17] [cursor=pointer]
-    - generic [ref=e20]:
-      - generic [ref=e21]:
-        - generic [ref=e22]: payload_win.jky
-        - code [ref=e26]:
-          - generic [ref=e27]:
-            - textbox "Editor content" [ref=e28]
-            - textbox [aria-hidden] [ref=e29]
-            - generic [aria-hidden] [ref=e31]:
-              - generic [ref=e32]: "1"
-              - generic [ref=e35]: "2"
-              - generic [ref=e37]: "3"
-              - generic [ref=e39]: "4"
-              - generic [ref=e41]: "5"
-              - generic [ref=e43]: "6"
-              - generic [ref=e45]: "7"
-              - generic [ref=e47]: "8"
-              - generic [ref=e49]: "9"
-              - generic [ref=e51]: "10"
-              - generic [ref=e53]:
-                - generic [ref=e54] [cursor=pointer]: 
-                - generic [ref=e55]: "11"
-              - generic [ref=e56]: "12"
-              - generic [ref=e58]: "13"
-              - generic [ref=e60]: "14"
-              - generic [ref=e62]: "15"
-              - generic [ref=e64]: "16"
-              - generic [ref=e66]: "17"
-              - generic [ref=e68]: "18"
-              - generic [ref=e70]: "19"
-            - generic [aria-hidden] [ref=e101]:
-              - generic [ref=e102]: // JOCKY Windows Research Chain - Full Capability Demo
-              - generic [ref=e104]: // BYOVD + Exploitation + Persistence + Multi-Channel Exfiltration
-              - generic [ref=e106]: "// Authorized: Red Hat + IIT Bombay Cyber Security Team"
-              - generic [ref=e108]: "// Purpose: Defense research, detection validation, authorized testing"
-              - generic [ref=e111]: use jocky.runtime
-              - generic [ref=e113]: use jocky.fs
-              - generic [ref=e115]: use jocky.crypto
-              - generic [ref=e117]: use jocky.net
-              - generic [ref=e120]: const DRIVER_CHAIN = [
-              - generic [ref=e122]: ("rtkiow10x64.sys", "\\\\.\\RTCore64", 0x82000000),
-              - generic [ref=e124]: ("rtkiow8x64.sys", "\\\\.\\RTCore64", 0x82000000),
-              - generic [ref=e126]: ("AMDRyzenMasterDriver.sys", "\\\\.\\AMDRyzenMasterDriver", 0x81000000),
-              - generic [ref=e128]: ("nvflsh64.sys", "\\\\.\\nvflsh64", 0x80002000),
-              - generic [ref=e130]: ("speedfan.sys", "\\\\.\\speedfan", 0x80002000),
-              - generic [ref=e132]: ("ene.sys", "\\\\.\\EneIo", 0x85000000),
-              - generic [ref=e134]: ("iQVW64.SYS", "\\\\.\\Nal", 0x80802000),
-              - generic [ref=e136]: ("UCOREW64.SYS", "\\\\.\\Global\\", 0x88000000),
-      - generic [ref=e139]:
-        - generic [ref=e140]:
-          - generic [ref=e141]: Runtime APIs
-          - button "Anti-Analysis 5" [ref=e145] [cursor=pointer]:
-            - text: Anti-Analysis
-            - generic [ref=e148]: "5"
-          - button "Crypto 2" [ref=e150] [cursor=pointer]:
-            - text: Crypto
-            - generic [ref=e153]: "2"
-          - button "Exfiltration 3" [ref=e155] [cursor=pointer]:
-            - text: Exfiltration
-            - generic [ref=e158]: "3"
-          - button "AI/ML 3" [ref=e160] [cursor=pointer]:
-            - text: AI/ML
-            - generic [ref=e163]: "3"
-          - button "Sandbox 5" [ref=e165] [cursor=pointer]:
-            - text: Sandbox
-            - generic [ref=e168]: "5"
-          - button "Plugin 2" [ref=e170] [cursor=pointer]:
-            - text: Plugin
-            - generic [ref=e173]: "2"
-          - button "Audit 4" [ref=e175] [cursor=pointer]:
-            - text: Audit
-            - generic [ref=e178]: "4"
-          - button "BYOVD 4" [ref=e180] [cursor=pointer]:
-            - text: BYOVD
-            - generic [ref=e183]: "4"
-          - button "Evasion 2" [ref=e185] [cursor=pointer]:
-            - text: Evasion
-            - generic [ref=e188]: "2"
-          - button "Registry 3" [ref=e190] [cursor=pointer]:
-            - text: Registry
-            - generic [ref=e193]: "3"
-          - button "Forensics (Win) 7" [ref=e195] [cursor=pointer]:
-            - text: Forensics (Win)
-            - generic [ref=e198]: "7"
-          - button "Exploitation 2" [ref=e200] [cursor=pointer]:
-            - text: Exploitation
-            - generic [ref=e203]: "2"
-        - generic [ref=e204]:
-          - generic [ref=e205]: Obfuscation Passes
-          - generic [ref=e208]: MLIR PASSES
-          - generic [ref=e209]:
-            - generic [ref=e210]:
-              - generic [ref=e211]: String Encrypt
-              - generic [ref=e212]: Encrypts string constants in MLIR
-            - generic [ref=e213] [cursor=pointer]
-          - generic [ref=e215]:
-            - generic [ref=e216]:
-              - generic [ref=e217]: Constant Obfuscate
-              - generic [ref=e218]: Obfuscates numeric constants
-            - generic [ref=e219] [cursor=pointer]
-          - generic [ref=e221]:
-            - generic [ref=e222]:
-              - generic [ref=e223]: Symbol Obfuscate
-              - generic [ref=e224]: Renames symbols to random identifiers
-            - generic [ref=e225] [cursor=pointer]
-          - generic [ref=e227]: LLVM PASSES
-          - generic [ref=e228]:
-            - generic [ref=e229]:
-              - generic [ref=e230]: Bogus Control Flow
-              - generic [ref=e231]: Inserts fake control flow paths
-            - generic [ref=e232] [cursor=pointer]
-          - generic [ref=e234]:
-            - generic [ref=e235]:
-              - generic [ref=e236]: Control Flow Flattening
-              - generic [ref=e237]: Flattens function control flow into switch-based dispatch
-            - generic [ref=e238] [cursor=pointer]
-          - generic [ref=e240]:
-            - generic [ref=e241]:
-              - generic [ref=e242]: Instruction Substitution
-              - generic [ref=e243]: Replaces instructions with equivalent complex sequences
-            - generic [ref=e244] [cursor=pointer]
-          - generic [ref=e246]:
-            - generic [ref=e247]:
-              - generic [ref=e248]: Basic Block Splitting
-              - generic [ref=e249]: Splits basic blocks into smaller fragments
-            - generic [ref=e250] [cursor=pointer]
-          - generic [ref=e252]:
-            - generic [ref=e253]:
-              - generic [ref=e254]: Indirect Calls
-              - generic [ref=e255]: Replaces direct calls with indirect function pointers
-            - generic [ref=e256] [cursor=pointer]
-          - generic [ref=e258]:
-            - generic [ref=e259]:
-              - generic [ref=e260]: Strip Signatures
-              - generic [ref=e261]: Removes function signature metadata
-            - generic [ref=e262] [cursor=pointer]
-    - generic [ref=e264]:
-      - generic [ref=e265] [cursor=pointer]: Build Output
-      - generic [ref=e272]: No build output yet. Click Compile to start.
-  - generic [ref=e274]:
+      - generic [ref=e10]:
+        - button "Help (?)" [ref=e11] [cursor=pointer]
+        - button "Settings" [ref=e15] [cursor=pointer]
+        - button "Compile" [ref=e19] [cursor=pointer]
+    - generic [ref=e22]:
+      - button "Windows" [ref=e23] [cursor=pointer]
+      - button "Linux" [ref=e26] [cursor=pointer]
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - generic [ref=e31]: payload_win.jky
+        - code [ref=e35]:
+          - generic [ref=e36]:
+            - textbox "Editor content" [ref=e37]
+            - textbox [aria-hidden] [ref=e38]
+            - generic [aria-hidden] [ref=e40]:
+              - generic [ref=e41]: "1"
+              - generic [ref=e44]: "2"
+              - generic [ref=e46]: "3"
+              - generic [ref=e48]: "4"
+              - generic [ref=e50]: "5"
+              - generic [ref=e52]: "6"
+              - generic [ref=e54]: "7"
+              - generic [ref=e56]: "8"
+              - generic [ref=e58]: "9"
+              - generic [ref=e60]: "10"
+              - generic [ref=e62]:
+                - generic [ref=e63] [cursor=pointer]: 
+                - generic [ref=e64]: "11"
+              - generic [ref=e65]: "12"
+              - generic [ref=e67]: "13"
+              - generic [ref=e69]: "14"
+              - generic [ref=e71]: "15"
+              - generic [ref=e73]: "16"
+              - generic [ref=e75]: "17"
+              - generic [ref=e77]: "18"
+              - generic [ref=e79]: "19"
+            - generic [aria-hidden] [ref=e110]:
+              - generic [ref=e111]: // JOCKY Windows Research Chain - Full Capability Demo
+              - generic [ref=e113]: // BYOVD + Exploitation + Persistence + Multi-Channel Exfiltration
+              - generic [ref=e115]: "// Authorized: Red Hat + IIT Bombay Cyber Security Team"
+              - generic [ref=e117]: "// Purpose: Defense research, detection validation, authorized testing"
+              - generic [ref=e120]: use jocky.runtime
+              - generic [ref=e122]: use jocky.fs
+              - generic [ref=e124]: use jocky.crypto
+              - generic [ref=e126]: use jocky.net
+              - generic [ref=e129]: const DRIVER_CHAIN = [
+              - generic [ref=e131]: ("rtkiow10x64.sys", "\\\\.\\RTCore64", 0x82000000),
+              - generic [ref=e133]: ("rtkiow8x64.sys", "\\\\.\\RTCore64", 0x82000000),
+              - generic [ref=e135]: ("AMDRyzenMasterDriver.sys", "\\\\.\\AMDRyzenMasterDriver", 0x81000000),
+              - generic [ref=e137]: ("nvflsh64.sys", "\\\\.\\nvflsh64", 0x80002000),
+              - generic [ref=e139]: ("speedfan.sys", "\\\\.\\speedfan", 0x80002000),
+              - generic [ref=e141]: ("ene.sys", "\\\\.\\EneIo", 0x85000000),
+              - generic [ref=e143]: ("iQVW64.SYS", "\\\\.\\Nal", 0x80802000),
+              - generic [ref=e145]: ("UCOREW64.SYS", "\\\\.\\Global\\", 0x88000000),
+      - generic [ref=e148]:
+        - generic [ref=e150]:
+          - generic [ref=e151]: Runtime APIs
+          - textbox "Search APIs..." [ref=e158]
+          - generic [ref=e159]:
+            - button "Anti-Analysis 5" [ref=e161] [cursor=pointer]:
+              - text: Anti-Analysis
+              - generic [ref=e164]: "5"
+            - button "BYOVD 4" [ref=e166] [cursor=pointer]:
+              - text: BYOVD
+              - generic [ref=e169]: "4"
+            - button "Evasion 2" [ref=e171] [cursor=pointer]:
+              - text: Evasion
+              - generic [ref=e174]: "2"
+            - button "Crypto 2" [ref=e176] [cursor=pointer]:
+              - text: Crypto
+              - generic [ref=e179]: "2"
+            - button "Exfiltration 3" [ref=e181] [cursor=pointer]:
+              - text: Exfiltration
+              - generic [ref=e184]: "3"
+            - button "Forensics 7" [ref=e186] [cursor=pointer]:
+              - text: Forensics
+              - generic [ref=e189]: "7"
+            - button "AI/ML Runtime 3" [ref=e191] [cursor=pointer]:
+              - text: AI/ML Runtime
+              - generic [ref=e194]: "3"
+            - button "Sandbox 5" [ref=e196] [cursor=pointer]:
+              - text: Sandbox
+              - generic [ref=e199]: "5"
+            - button "Plugin 2" [ref=e201] [cursor=pointer]:
+              - text: Plugin
+              - generic [ref=e204]: "2"
+            - button "Audit 4" [ref=e206] [cursor=pointer]:
+              - text: Audit
+              - generic [ref=e209]: "4"
+            - button "Registry 3" [ref=e211] [cursor=pointer]:
+              - text: Registry
+              - generic [ref=e214]: "3"
+            - button "Exploitation 2" [ref=e216] [cursor=pointer]:
+              - text: Exploitation
+              - generic [ref=e219]: "2"
+        - generic [ref=e221]:
+          - generic [ref=e222]: Obfuscation Passes
+          - generic [ref=e225]: MLIR PASSES
+          - generic [ref=e226]:
+            - generic [ref=e227]:
+              - generic [ref=e228]:
+                - generic [ref=e229]: String Encryption
+                - generic [ref=e230]: Medium
+                - generic [ref=e231]: +25%
+              - generic [ref=e232]: Encrypts all string literals with XOR/RC4
+            - generic [ref=e233] [cursor=pointer]
+          - generic [ref=e235]:
+            - generic [ref=e236]:
+              - generic [ref=e237]:
+                - generic [ref=e238]: Constant Obfuscation
+                - generic [ref=e239]: Medium
+                - generic [ref=e240]: +25%
+              - generic [ref=e241]: Replaces numeric constants with opaque expressions
+            - generic [ref=e242] [cursor=pointer]
+          - generic [ref=e244]:
+            - generic [ref=e245]:
+              - generic [ref=e246]:
+                - generic [ref=e247]: Symbol Obfuscation
+                - generic [ref=e248]: Medium
+                - generic [ref=e249]: +25%
+              - generic [ref=e250]: Renames internal symbols to randomized identifiers
+            - generic [ref=e251] [cursor=pointer]
+          - generic [ref=e253]:
+            - generic [ref=e254]:
+              - generic [ref=e255]:
+                - generic [ref=e256]: Cryptographic Hashing
+                - generic [ref=e257]: Medium
+                - generic [ref=e258]: +25%
+              - generic [ref=e259]: Uses crypto hashing for symbol obfuscation verification
+            - generic [ref=e260] [cursor=pointer]
+          - generic [ref=e262]:
+            - generic [ref=e263]:
+              - generic [ref=e264]:
+                - generic [ref=e265]: SCF Region Obfuscation
+                - generic [ref=e266]: Medium
+                - generic [ref=e267]: +25%
+              - generic [ref=e268]: Applies opaque predicates to structured control flow
+            - generic [ref=e269] [cursor=pointer]
+          - generic [ref=e271]:
+            - generic [ref=e272]:
+              - generic [ref=e273]:
+                - generic [ref=e274]: Import Obfuscation
+                - generic [ref=e275]: Medium
+                - generic [ref=e276]: +25%
+              - generic [ref=e277]: Hides imports behind wrapper functions
+            - generic [ref=e278] [cursor=pointer]
+          - generic [ref=e280]: LLVM PASSES
+          - generic [ref=e281]:
+            - generic [ref=e282]:
+              - generic [ref=e283]:
+                - generic [ref=e284]: Strip Signatures
+                - generic [ref=e285]: Medium
+                - generic [ref=e286]: +25%
+              - generic [ref=e287]: Removes debug metadata and function signature info
+            - generic [ref=e288] [cursor=pointer]
+          - generic [ref=e290]:
+            - generic [ref=e291]:
+              - generic [ref=e292]:
+                - generic [ref=e293]: PDATA Strip
+                - generic [ref=e294]: Medium
+                - generic [ref=e295]: +25%
+              - generic [ref=e296]: Removes exception handling and unwinding metadata
+            - generic [ref=e297] [cursor=pointer]
+          - generic [ref=e299]:
+            - generic [ref=e300]:
+              - generic [ref=e301]:
+                - generic [ref=e302]: Function Virtualization
+                - generic [ref=e303]: High
+                - generic [ref=e304]: +80-120%
+              - generic [ref=e305]: Converts functions to virtualized bytecode dispatchers
+            - generic [ref=e306] [cursor=pointer]
+          - generic [ref=e308]:
+            - generic [ref=e309]:
+              - generic [ref=e310]:
+                - generic [ref=e311]: Opaque Predicates
+                - generic [ref=e312]: Medium
+                - generic [ref=e313]: +25%
+              - generic [ref=e314]: Injects opaque predicates to obfuscate control flow
+            - generic [ref=e315] [cursor=pointer]
+          - generic [ref=e317]:
+            - generic [ref=e318]:
+              - generic [ref=e319]:
+                - generic [ref=e320]: Instruction Substitution
+                - generic [ref=e321]: Medium
+                - generic [ref=e322]: +35-50%
+              - generic [ref=e323]: Replaces standard instructions with complex sequences
+            - generic [ref=e324] [cursor=pointer]
+          - generic [ref=e326]:
+            - generic [ref=e327]:
+              - generic [ref=e328]:
+                - generic [ref=e329]: Bogus Control Flow
+                - generic [ref=e330]: High
+                - generic [ref=e331]: +50-70%
+              - generic [ref=e332]: Inserts opaque predicates and dead code branches
+            - generic [ref=e333] [cursor=pointer]
+          - generic [ref=e335]:
+            - generic [ref=e336]:
+              - generic [ref=e337]:
+                - generic [ref=e338]: Control Flow Flattening
+                - generic [ref=e339]: High
+                - generic [ref=e340]: +60-80%
+              - generic [ref=e341]: Converts structured control flow to switch dispatcher
+            - generic [ref=e342] [cursor=pointer]
+          - generic [ref=e344]:
+            - generic [ref=e345]:
+              - generic [ref=e346]:
+                - generic [ref=e347]: Linear MBA
+                - generic [ref=e348]: Medium
+                - generic [ref=e349]: +25%
+              - generic [ref=e350]: Converts arithmetic operations to mixed-boolean arithmetic
+            - generic [ref=e351] [cursor=pointer]
+          - generic [ref=e353]:
+            - generic [ref=e354]:
+              - generic [ref=e355]:
+                - generic [ref=e356]: Anti-Debug Protection
+                - generic [ref=e357]: Medium
+                - generic [ref=e358]: +25%
+              - generic [ref=e359]: Injects debugger detection and anti-debugging techniques
+            - generic [ref=e360] [cursor=pointer]
+          - generic [ref=e362]:
+            - generic [ref=e363]:
+              - generic [ref=e364]:
+                - generic [ref=e365]: Indirect Calls
+                - generic [ref=e366]: Medium
+                - generic [ref=e367]: +25%
+              - generic [ref=e368]: Converts direct calls to indirect via function pointers
+            - generic [ref=e369] [cursor=pointer]
+    - generic [ref=e371]:
+      - generic [ref=e372] [cursor=pointer]: Build Output
+      - generic [ref=e379]: No build output yet. Click Compile to start.
+  - generic [ref=e381]:
     - alert
     - alert
 ```

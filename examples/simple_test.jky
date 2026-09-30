@@ -1,10 +1,4 @@
-// Simple JOCKY test - Windows PE compilation
 fn main() -> i32 {
-    println("JOCKY Test Starting")
-
-    let x = 42
-    let y = x + 8
-    println("Result: " + string(y))
-
-    return 0
+    var x: i32 = 42;
+    return x;
 }
