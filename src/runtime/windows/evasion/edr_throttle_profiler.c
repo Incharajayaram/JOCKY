@@ -59,7 +59,7 @@ HANDLE edr_profiler_init()
     ctx->magic = EDR_PROFILE_MAGIC;
     ctx->version = EDR_PROFILE_VERSION;
     ctx->initialized = 1;
-    ctx->state = EDR_PROFILE_INITIALIZING;
+    ctx->state = EDR_PROFILE_NOT_DETECTED;
 
     GetSystemTimeAsFileTime(&ctx->start_time);
 
