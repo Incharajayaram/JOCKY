@@ -8,6 +8,7 @@
 
 #pragma comment(lib, "wininet.lib")
 #pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "winhttp.lib")
 
 uint64_t jocky_http_get(const char* url, char* out_buf, uint64_t max_size) {
     HINTERNET hInternetSession = InternetOpen("JOCKY", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);

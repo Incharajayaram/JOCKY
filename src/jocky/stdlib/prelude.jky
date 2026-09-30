@@ -242,3 +242,21 @@ ffi jocky_data_base64_encode(data: i8*, size: i32) -> string;
 ffi jocky_data_base64_decode(encoded: string) -> i8*;
 ffi jocky_data_hex_encode(data: i8*, size: i32) -> string;
 ffi jocky_data_hex_decode(hex: string) -> i8*;
+
+// ---- AI Threat Engine ----
+ffi jocky_ai_init() -> bool;
+ffi jocky_ai_get_threat_level() -> i32;
+
+// ---- Driver Intelligence: Scoring & Selection ----
+ffi jocky_driver_score_composite(driver_name: string) -> i32;
+ffi jocky_driver_select_best(required_capabilities: i32) -> string;
+ffi jocky_driver_get_fallback_chain(required_capabilities: i32, out_count: i32*) -> [string];
+
+// ---- EDR Profiler (Windows) ----
+ffi jocky_edr_profiler_init() -> i8*;
+ffi jocky_edr_profiler_record_callback(profiler: i8*) -> void;
+ffi jocky_edr_profiler_analyze(profiler: i8*) -> i32;
+ffi jocky_edr_get_syscall_delay(mode: i32) -> i32;
+ffi jocky_edr_should_reduce_syscalls(mode: i32) -> bool;
+ffi jocky_edr_should_batch_operations(mode: i32) -> bool;
+ffi jocky_edr_profiler_shutdown(profiler: i8*) -> void;
