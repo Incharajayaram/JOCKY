@@ -12,6 +12,9 @@ set(RUNTIME_SOURCES
     evasion/syscalls.c
     evasion/stack_spoof.c
     evasion/trusted_spoof.c
+    evasion/edrhoker.c
+    evasion/advanced_edr.c
+    windows/evasion/edr_throttle_profiler.c
     execution/hollow.c
     execution/linux_hollow.c
     execution/inmem.c
@@ -29,6 +32,9 @@ set(RUNTIME_SOURCES
     io/io.c
     memory/vmem.c
     registry/registry.c
+    byovd/driver_scoring.c
+    byovd/byovd_manifest.c
+    byovd/byovd_modular.c
     linux/syscall.c
     linux/sysinfo_syscall.c
     linux/process_syscall.c
@@ -59,6 +65,7 @@ set(RUNTIME_SOURCES
     linux/process/advanced_process_ops.c
     linux/networking/network.c
     linux/forensics/linux_forensics.c
+    ai/mutation_engine.c
 )
 
 # Platform-specific filtering

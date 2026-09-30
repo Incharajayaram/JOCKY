@@ -5,6 +5,12 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+/* Model configuration and paths */
+#define JOCKY_AI_MODEL_PATH "/opt/models/jocky_ai_model.bin"
+#define JOCKY_AI_MODEL_MAGIC 0x4A4F434B  /* "JOCK" */
+#define JOCKY_AI_MAX_INFERENCE_MS 50     /* Max inference latency */
+#define JOCKY_AI_MODEL_VERSION 1
+
 /* Adaptive AI-Driven Evasion Engine
  *
  * Pairs executable payload with a lightweight ML reasoning component that:
@@ -59,7 +65,7 @@ typedef struct {
 
 /* ML model definition (quantized, embedded) */
 typedef struct {
-    uint32_t magic;              /* Model magic signature */
+    uint32_t magic;              /* Model magic signature (0x4A4F434B = JOCK) */
     uint32_t version;            /* Model version */
     uint32_t input_size;         /* Input feature vector size */
     uint32_t output_size;        /* Output class count */
@@ -67,7 +73,18 @@ typedef struct {
     uint32_t weights_size;
     uint8_t* bias;               /* Quantized biases */
     uint32_t bias_size;
+    uint8_t model_type;          /* 0=decision_tree, 1=neural_net, 2=ensemble */
+    uint8_t quantization_bits;   /* 4, 8, 16 bits */
+    uint16_t reserved;
 } JOCKY_AI_MODEL;
+
+/* Model inference result with confidence */
+typedef struct {
+    float threat_score;          /* 0.0-1.0 */
+    uint32_t threat_level;       /* JOCKY_AI_RISK_* */
+    float confidence;            /* 0.0-1.0 */
+    uint64_t inference_time_us;  /* Microseconds */
+} JOCKY_AI_INFERENCE_RESULT;
 
 /* Mutation strategy payload */
 typedef struct {
@@ -145,5 +162,22 @@ bool jocky_ai_get_statistics(JOCKY_AI_STATS* out_stats);
 
 /* Reset statistics */
 void jocky_ai_reset_statistics(void);
+
+/* Load model from file (optional - model can be embedded) */
+bool jocky_ai_load_model_file(const char* model_path);
+
+/* Load model from memory buffer (embedded model data) */
+bool jocky_ai_load_model_buffer(const uint8_t* buffer, size_t buffer_size);
+
+/* Run full inference on telemetry with timing */
+bool jocky_ai_run_inference(
+    const JOCKY_AI_TELEMETRY* telemetry,
+    JOCKY_AI_INFERENCE_RESULT* out_result);
+
+/* Check if model is loaded and ready */
+bool jocky_ai_is_model_ready(void);
+
+/* Get model information */
+bool jocky_ai_get_model_info(JOCKY_AI_MODEL* out_info);
 
 #endif /* JOCKY_AI_H */
