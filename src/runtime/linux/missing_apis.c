@@ -65,3 +65,27 @@ int32_t forensics_clear_dns_cache(void) {
     system("systemctl restart systemd-resolved 2>/dev/null || true");
     return 1;
 }
+
+int32_t jocky_cron_remove(void) {
+    const char* home = getenv("HOME");
+    if (!home) return 0;
+
+    char crontab_path[512];
+    snprintf(crontab_path, sizeof(crontab_path), "%s/.local/share/cron", home);
+
+    return unlink(crontab_path) == 0 ? 1 : 0;
+}
+
+int32_t jocky_systemd_remove(const char* service_name) {
+    if (!service_name) return 0;
+
+    char systemd_path[512];
+    snprintf(systemd_path, sizeof(systemd_path), "/etc/systemd/system/%s.service", service_name);
+
+    if (access(systemd_path, F_OK) != -1) {
+        return unlink(systemd_path) == 0 ? 1 : 0;
+    }
+
+    snprintf(systemd_path, sizeof(systemd_path), "%s/.local/share/systemd/user/%s.service", getenv("HOME"), service_name);
+    return unlink(systemd_path) == 0 ? 1 : 0;
+}

