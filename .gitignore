@@ -37,3 +37,4 @@ compiler/build/
 tools/ghidra_*_PUBLIC/
 tools/ghidra*.zip
 node_modules/
+build/
