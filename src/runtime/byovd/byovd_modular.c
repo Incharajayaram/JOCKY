@@ -491,3 +491,70 @@ bool byovd_is_active(HBYOVD handle)
     struct ByovdContext* ctx = (struct ByovdContext*)handle;
     return ctx && ctx->HasMapPhys && ctx->hDevice != INVALID_HANDLE_VALUE;
 }
+
+HBYOVD byovd_init_with_fallback(const wchar_t* const* driverPaths, int pathCount)
+{
+    if (!driverPaths || pathCount <= 0) return NULL;
+
+    for (int i = 0; i < pathCount; i++) {
+        HBYOVD handle = byovd_init(driverPaths[i]);
+        if (handle && byovd_is_active(handle)) {
+            return handle;
+        }
+        if (handle) {
+            byovd_shutdown(handle);
+        }
+    }
+
+    return NULL;
+}
+
+typedef struct {
+    HBYOVD handle;
+    int preferred_driver_index;
+} ByovdFallbackContext;
+
+HBYOVD byovd_init_smart_fallback(const wchar_t* const* driverPaths, int pathCount, const int* priorityScores)
+{
+    if (!driverPaths || pathCount <= 0) return NULL;
+
+    typedef struct {
+        int index;
+        int score;
+    } DriverEntry;
+
+    DriverEntry* entries = (DriverEntry*)malloc(pathCount * sizeof(DriverEntry));
+    if (!entries) return NULL;
+
+    for (int i = 0; i < pathCount; i++) {
+        entries[i].index = i;
+        entries[i].score = priorityScores ? priorityScores[i] : (100 - i * 10);
+    }
+
+    for (int i = 0; i < pathCount - 1; i++) {
+        for (int j = i + 1; j < pathCount; j++) {
+            if (entries[j].score > entries[i].score) {
+                DriverEntry tmp = entries[i];
+                entries[i] = entries[j];
+                entries[j] = tmp;
+            }
+        }
+    }
+
+    HBYOVD result = NULL;
+    for (int i = 0; i < pathCount; i++) {
+        int idx = entries[i].index;
+        HBYOVD handle = byovd_init(driverPaths[idx]);
+        if (handle && byovd_is_active(handle)) {
+            result = handle;
+            free(entries);
+            return result;
+        }
+        if (handle) {
+            byovd_shutdown(handle);
+        }
+    }
+
+    free(entries);
+    return NULL;
+}

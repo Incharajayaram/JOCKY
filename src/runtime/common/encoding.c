@@ -1,10 +1,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <stdint.h>
+#include <stdio.h>
 
 static const char base64_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-string jocky_data_base64_encode(i8* data, i32 size) {
+char* jocky_data_base64_encode(unsigned char* data, int32_t size) {
     if (!data || size <= 0) return "";
 
     int encoded_size = ((size + 2) / 3) * 4 + 1;
@@ -40,15 +42,15 @@ string jocky_data_base64_encode(i8* data, i32 size) {
     }
 
     encoded[pos] = '\0';
-    return (string)encoded;
+    return encoded;
 }
 
-i8* jocky_data_base64_decode(string encoded) {
+unsigned char* jocky_data_base64_decode(const char* encoded) {
     if (!encoded || strlen(encoded) == 0) return NULL;
 
-    int encoded_len = strlen(encoded);
+    int encoded_len = (int)strlen(encoded);
     int decoded_size = (encoded_len * 3) / 4;
-    i8* decoded = (i8*)malloc(decoded_size + 1);
+    unsigned char* decoded = (unsigned char*)malloc(decoded_size + 1);
 
     if (!decoded) return NULL;
 
@@ -82,7 +84,7 @@ i8* jocky_data_base64_decode(string encoded) {
     return decoded;
 }
 
-string jocky_data_hex_encode(i8* data, i32 size) {
+char* jocky_data_hex_encode(unsigned char* data, int32_t size) {
     if (!data || size <= 0) return "";
 
     char* hex = (char*)malloc(size * 2 + 1);
@@ -93,16 +95,16 @@ string jocky_data_hex_encode(i8* data, i32 size) {
     }
     hex[size * 2] = '\0';
 
-    return (string)hex;
+    return hex;
 }
 
-i8* jocky_data_hex_decode(string hex) {
+unsigned char* jocky_data_hex_decode(const char* hex) {
     if (!hex || strlen(hex) == 0) return NULL;
 
-    int hex_len = strlen(hex);
+    int hex_len = (int)strlen(hex);
     if (hex_len % 2 != 0) return NULL;
 
-    i8* decoded = (i8*)malloc(hex_len / 2);
+    unsigned char* decoded = (unsigned char*)malloc(hex_len / 2);
     if (!decoded) return NULL;
 
     for (int i = 0; i < hex_len; i += 2) {
@@ -111,7 +113,7 @@ i8* jocky_data_hex_decode(string hex) {
         byte[1] = hex[i+1];
         byte[2] = '\0';
 
-        decoded[i/2] = (char)strtol(byte, NULL, 16);
+        decoded[i/2] = (unsigned char)strtol(byte, NULL, 16);
     }
 
     return decoded;

