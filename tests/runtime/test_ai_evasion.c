@@ -242,6 +242,82 @@ void test_low_risk_scenario(void)
     }
 }
 
+/* Test 16: Model inference with timing */
+void test_model_inference(void)
+{
+    TEST("AI Evasion: Model inference with timing");
+
+    JOCKY_AI_TELEMETRY telemetry = {0};
+    telemetry.syscall_frequency = 500.0f;
+    telemetry.network_entropy = 5.2f;
+    telemetry.memory_pattern_score = 0.55f;
+    telemetry.file_io_score = 0.45f;
+    telemetry.blocked_operations = 5;
+    telemetry.alert_count = 2;
+    telemetry.crash_likelihood = 0.25f;
+
+    JOCKY_AI_INFERENCE_RESULT result;
+    bool inference_ok = jocky_ai_run_inference(&telemetry, &result);
+
+    if (inference_ok &&
+        result.threat_score >= 0.0f && result.threat_score <= 1.0f &&
+        result.confidence >= 0.0f && result.confidence <= 1.0f &&
+        result.inference_time_us >= 0) {
+        PASS();
+    } else {
+        FAIL("Inference should produce valid result with timing");
+    }
+}
+
+/* Test 17: Critical risk scenario */
+void test_critical_risk_scenario(void)
+{
+    TEST("AI Evasion: Critical risk scenario");
+
+    JOCKY_AI_TELEMETRY telemetry = {0};
+    telemetry.syscall_frequency = 2500.0f;
+    telemetry.network_entropy = 7.8f;
+    telemetry.memory_pattern_score = 0.92f;
+    telemetry.file_io_score = 0.78f;
+    telemetry.blocked_operations = 15;
+    telemetry.alert_count = 8;
+    telemetry.crash_likelihood = 0.85f;
+
+    JOCKY_AI_RISK_LEVEL risk = jocky_ai_classify_threat(&telemetry);
+    JOCKY_STRATEGY strategy = jocky_ai_recommend_strategy(&telemetry);
+
+    if (risk == JOCKY_AI_RISK_CRITICAL &&
+        strategy == JOCKY_STRAT_AI_ADAPTIVE) {
+        PASS();
+    } else {
+        FAIL("Should classify as critical and recommend AI_ADAPTIVE");
+    }
+}
+
+/* Test 18: Mutation application */
+void test_mutation_application(void)
+{
+    TEST("AI Evasion: Mutation application");
+
+    JOCKY_AI_TELEMETRY telemetry = {0};
+    telemetry.syscall_frequency = 100.0f;
+    telemetry.alert_count = 1;
+
+    JOCKY_AI_MUTATION_STRATEGY strategy;
+    if (!jocky_ai_generate_mutation(&telemetry, &strategy)) {
+        FAIL("Generate mutation failed");
+        return;
+    }
+
+    bool apply_ok = jocky_ai_apply_mutation(&strategy);
+
+    if (apply_ok && strategy.technique_mask > 0) {
+        PASS();
+    } else {
+        FAIL("Should apply mutation with techniques");
+    }
+}
+
 /* Run all tests */
 int main(void)
 {
@@ -262,6 +338,9 @@ int main(void)
     test_risk_level_query();
     test_statistics();
     test_low_risk_scenario();
+    test_model_inference();
+    test_critical_risk_scenario();
+    test_mutation_application();
 
     jocky_ai_shutdown();
 
