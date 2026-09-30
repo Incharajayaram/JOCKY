@@ -99,11 +99,11 @@ def stage_parse(source_file, build_dir):
     return ast
 
 
-def stage_codegen(ast, build_dir):
-    log("CODEGEN", "Generating LLVM IR")
+def stage_codegen(ast, build_dir, platform="windows"):
+    log("CODEGEN", f"Generating LLVM IR (target: {platform})")
     from jocky.language.codegen import CodeGen
 
-    cg = CodeGen()
+    cg = CodeGen(target_platform=platform)
     ir = cg.gen(ast)
     ir_path = build_dir / "output.ll"
     ir_path.write_text(ir)
@@ -190,8 +190,8 @@ def stage_llvm_obfuscate(bc_path, build_dir, custom_passes=None):
             shutil.copy2(bc_path, obf_bc)
     else:
         function_passes = ["opaque-pred", "substitution", "boguscf", "flattening", "linear-mba"]
-        passes = f"strip-signature,pdata-strip,virtualize,function({','.join(function_passes)}),anti-debug,indirect-call"
-        log("LLVM-OBF", f"Passes ({len(function_passes) + 5} total - FULL OLLVM SUITE): {passes}")
+        passes = f"strip-signature,virtualize,function({','.join(function_passes)}),anti-debug,indirect-call"
+        log("LLVM-OBF", f"Passes ({len(function_passes) + 4} total - CORE OLLVM SUITE): {passes}")
         log("LLVM-OBF", f"  Recommended order: strip metadata, virtualize, function rewrites, anti-debug, indirect-call last")
         run([str(opt), f"-load-pass-plugin={plugin}", f"-passes={passes}", str(bc_path), "-o", str(obf_bc)],
             "LLVM obfuscation")
@@ -348,7 +348,7 @@ def stage_compile_runtime(build_dir, platform="windows"):
     ]
 
     cflags_win = [
-        "-O2", "-c", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE",
+        "-O2", "-c", "-D_WIN32", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE",
         "-I", str(include_dir),
         "-I", str(RUNTIME_DIR),
         "-I", str(RUNTIME_DIR / "windows"),
@@ -535,7 +535,7 @@ def main():
     ast = stage_parse(source_file, build_dir)
 
     log("PIPELINE", "Stage 2/6: CodeGen")
-    ir_path = stage_codegen(ast, build_dir)
+    ir_path = stage_codegen(ast, build_dir, args.platform)
 
     log("PIPELINE", "Stage 3/6: MLIR Obfuscation")
     # Use custom MLIR passes if provided, otherwise use preset
