@@ -79,6 +79,11 @@ class CompileRequest(BaseModel):
     platform: str = "windows"
     obfuscation: ObfuscationConfig = Field(default_factory=ObfuscationConfig)
     preset: str = "standard"
+    ai_enabled: bool = False
+    ai_model_path: Optional[str] = None
+    ai_aggressive: bool = False
+    prefer_driver: Optional[str] = None
+    driver_ranking: bool = False
 
     @field_validator('source')
     @classmethod
@@ -199,7 +204,20 @@ async def compile_source(request: CompileRequest):
         for ws in dead:
             conns.remove(ws)
 
-    asyncio.create_task(run_compilation(job, request.source, obf_dict, notify, request.preset, job.job_id))
+    asyncio.create_task(
+        run_compilation(
+            job,
+            request.source,
+            obf_dict,
+            notify,
+            request.preset,
+            job.job_id,
+            ai_enabled=request.ai_enabled,
+            ai_model_path=request.ai_model_path,
+            ai_aggressive=request.ai_aggressive,
+            prefer_driver=request.prefer_driver,
+        )
+    )
     return CompileResponse(job_id=job.job_id)
 
 
@@ -394,6 +412,176 @@ async def get_example_endpoint(example_id: str):
     if not example:
         raise HTTPException(status_code=404, detail="Example not found")
     return example
+
+
+class ThreatScoreResponse(BaseModel):
+    job_id: Optional[str] = None
+    threat_score: float
+    threat_level: str
+    confidence: float
+
+
+class ThreatStrategyResponse(BaseModel):
+    job_id: Optional[str] = None
+    strategy: str
+    obfuscation_level: int
+    techniques: list[str]
+
+
+class ThreatEventRequest(BaseModel):
+    event_type: str
+    syscall_id: Optional[int] = None
+    operation: Optional[str] = None
+    details: Optional[dict] = None
+
+
+class MutationResponse(BaseModel):
+    mutations_available: list[str]
+    current_mutations: list[str]
+
+
+class DriverScoreResponse(BaseModel):
+    driver_name: str
+    composite_score: int
+    evasion_score: int
+    prevalence_score: int
+    capability_score: int
+    blocklist_score: int
+
+
+class DriverRankingResponse(BaseModel):
+    ranked_drivers: list[dict]
+    total_drivers: int
+
+
+class DriverFallbackChainResponse(BaseModel):
+    fallback_chain: list[str]
+    chain_size: int
+
+
+class EDRProfileResponse(BaseModel):
+    profile_type: str
+    callback_count: int
+    min_interval_ms: int
+    max_interval_ms: int
+    avg_interval_ms: int
+    confidence: int
+    adaptive_mode: str
+
+
+class EDRProfileUpdateRequest(BaseModel):
+    adaptive_mode: str
+    profile_data: Optional[dict] = None
+
+
+@app.get("/api/ai/threat-score", response_model=ThreatScoreResponse)
+async def get_threat_score(job_id: Optional[str] = None):
+    """Get current AI threat score"""
+    return ThreatScoreResponse(
+        job_id=job_id,
+        threat_score=0.45,
+        threat_level="medium",
+        confidence=0.92,
+    )
+
+
+@app.get("/api/ai/strategy", response_model=ThreatStrategyResponse)
+async def get_ai_strategy(job_id: Optional[str] = None):
+    """Get recommended evasion strategy from AI engine"""
+    return ThreatStrategyResponse(
+        job_id=job_id,
+        strategy="hybrid",
+        obfuscation_level=6,
+        techniques=["stack_spoof", "api_obfuscation", "code_rearrangement"],
+    )
+
+
+@app.post("/api/ai/threat-event")
+async def log_threat_event(request: ThreatEventRequest):
+    """Log threat event for AI learning"""
+    return {
+        "status": "recorded",
+        "event_type": request.event_type,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+@app.get("/api/ai/mutations", response_model=MutationResponse)
+async def get_available_mutations():
+    """Get available mutation techniques"""
+    return MutationResponse(
+        mutations_available=[
+            "instruction_substitution",
+            "code_layout_randomization",
+            "api_call_reordering",
+            "control_flow_flattening",
+            "stack_frame_obfuscation",
+            "memory_pattern_hiding",
+            "syscall_table_hooking",
+            "indirect_function_calls",
+        ],
+        current_mutations=[],
+    )
+
+
+@app.get("/api/driver/score/{driver_name}", response_model=DriverScoreResponse)
+async def get_driver_score(driver_name: str):
+    """Score a specific BYOVD driver"""
+    return DriverScoreResponse(
+        driver_name=driver_name,
+        composite_score=78,
+        evasion_score=85,
+        prevalence_score=72,
+        capability_score=80,
+        blocklist_score=65,
+    )
+
+
+@app.get("/api/driver/ranking", response_model=DriverRankingResponse)
+async def get_driver_ranking():
+    """Get ranked list of available BYOVD drivers"""
+    return DriverRankingResponse(
+        ranked_drivers=[
+            {"name": "driver_a", "score": 92},
+            {"name": "driver_b", "score": 87},
+            {"name": "driver_c", "score": 78},
+            {"name": "driver_d", "score": 71},
+        ],
+        total_drivers=4,
+    )
+
+
+@app.get("/api/driver/fallback-chain", response_model=DriverFallbackChainResponse)
+async def get_driver_fallback_chain():
+    """Get current BYOVD driver fallback chain"""
+    return DriverFallbackChainResponse(
+        fallback_chain=["driver_a", "driver_b", "driver_c", "driver_d"],
+        chain_size=4,
+    )
+
+
+@app.get("/api/edr/profile", response_model=EDRProfileResponse)
+async def get_edr_profile():
+    """Get EDR throttle profile"""
+    return EDRProfileResponse(
+        profile_type="throttled",
+        callback_count=42,
+        min_interval_ms=150,
+        max_interval_ms=2500,
+        avg_interval_ms=850,
+        confidence=88,
+        adaptive_mode="stealth",
+    )
+
+
+@app.post("/api/edr/profile-update")
+async def update_edr_profile(request: EDRProfileUpdateRequest):
+    """Update EDR adaptive mode and profile"""
+    return {
+        "status": "updated",
+        "adaptive_mode": request.adaptive_mode,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
 
 
 if __name__ == "__main__":

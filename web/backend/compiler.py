@@ -31,6 +31,8 @@ class CompileJob:
     platform: str = "windows"
     output_path: Optional[str] = None
     output_name: Optional[str] = None
+    ai_enabled: bool = False
+    driver_ranking: Optional[list] = None
 
 
 jobs: dict[str, CompileJob] = {}
@@ -107,6 +109,10 @@ async def run_compilation(
     notify_callback=None,
     preset: str = "standard",
     job_id: str = None,
+    ai_enabled: bool = False,
+    ai_model_path: Optional[str] = None,
+    ai_aggressive: bool = False,
+    prefer_driver: Optional[str] = None,
 ):
     build_dir = None
     source_dir = None
@@ -139,6 +145,16 @@ async def run_compilation(
         job.progress = 10
         job.logs.append(f"[PIPELINE] Platform: {job.platform}")
         job.logs.append(f"[PIPELINE] Obfuscation preset: {preset}")
+
+        if ai_enabled:
+            job.logs.append("[PIPELINE] AI Threat Engine: enabled")
+            job.ai_enabled = True
+            if ai_aggressive:
+                job.logs.append("[PIPELINE] AI Mode: aggressive")
+
+        if prefer_driver:
+            job.logs.append(f"[PIPELINE] Preferred driver: {prefer_driver}")
+
         if notify_callback:
             await notify_callback(job)
 
@@ -173,6 +189,16 @@ async def run_compilation(
                 cmd.append(f"--mlir-passes={','.join(obf_cfg['mlir_flags'])}")
             if obf_cfg.get("llvm_passes"):
                 cmd.append(f"--llvm-passes={obf_cfg['llvm_passes']}")
+
+            if ai_enabled:
+                cmd.append("--ai-enabled")
+                if ai_model_path:
+                    cmd.append(f"--ai-model-path={ai_model_path}")
+                if ai_aggressive:
+                    cmd.append("--ai-aggressive")
+
+            if prefer_driver:
+                cmd.append(f"--prefer-driver={prefer_driver}")
         else:
             job.progress = 15
             job.logs.append("[PIPELINE] Using local compile pipeline (Docker not available)")
@@ -193,6 +219,16 @@ async def run_compilation(
                 cmd.append(f"--mlir-passes={','.join(obf_cfg['mlir_flags'])}")
             if obf_cfg.get("llvm_passes"):
                 cmd.append(f"--llvm-passes={obf_cfg['llvm_passes']}")
+
+            if ai_enabled:
+                cmd.append("--ai-enabled")
+                if ai_model_path:
+                    cmd.append(f"--ai-model-path={ai_model_path}")
+                if ai_aggressive:
+                    cmd.append("--ai-aggressive")
+
+            if prefer_driver:
+                cmd.append(f"--prefer-driver={prefer_driver}")
 
         # Set up environment with proper paths
         env = os.environ.copy()

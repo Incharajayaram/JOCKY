@@ -55,6 +55,18 @@ bool byovd_dump_phys(HBYOVD ctx, ULONG_PTR start, ULONG_PTR end, const char* out
 /* Check if BYOVD is active and functional */
 bool byovd_is_active(HBYOVD ctx);
 
+/* Initialize BYOVD with fallback chain support.
+ * Tries each driver in sequence until one loads successfully.
+ * Returns context handle or NULL if all drivers fail.
+ */
+HBYOVD byovd_init_with_fallback(const wchar_t* const* driverPaths, int pathCount);
+
+/* Initialize BYOVD with smart fallback using priority scores.
+ * Attempts drivers in order of descending priority scores.
+ * If priorityScores is NULL, uses default descending priority (first driver highest).
+ */
+HBYOVD byovd_init_smart_fallback(const wchar_t* const* driverPaths, int pathCount, const int* priorityScores);
+
 #ifdef __cplusplus
 }
 #endif

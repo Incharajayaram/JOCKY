@@ -301,7 +301,7 @@ fn phase_kernel_exploit() -> bool {
                 kernel_access = true
 
                 let sym = jocky_lkm_get_symbol("exploit_module", "exploit_handler")
-                if sym != 0 {
+                if sym != null {
                     println("    [+] Found exploit handler symbol")
                 }
 
@@ -353,7 +353,7 @@ fn phase_process_hijacking() -> bool {
 
         // Get thread info
         let thread_info = jocky_thread_get_info(target_pid)
-        if thread_info != 0 {
+        if thread_info != null {
             println("    [+] Retrieved thread information")
         }
 
@@ -374,7 +374,7 @@ fn phase_module_operations() -> bool {
     println("[*] Phase 9: Dynamic Module Operations")
 
     let module = jocky_module_load("/lib64/libc.so.6")
-    if module != 0 {
+    if module != null {
         println("    [+] libc module loaded successfully")
 
         if jocky_module_has_symbol(module, "malloc") {
@@ -385,12 +385,12 @@ fn phase_module_operations() -> bool {
         println("    [+] Module base retrieved")
 
         let sym = jocky_module_resolve_symbol(module, "malloc")
-        if sym != 0 {
+        if sym != null {
             println("    [+] Resolved symbol address: malloc")
         }
 
         let info = jocky_module_info(module)
-        if info != 0 {
+        if info != null {
             println("    [+] Retrieved module information")
         }
 

@@ -15,6 +15,15 @@
       "signed": true,
       "company": "Realtek",
       "evasion_score": 9.5,
+      "scoring": {
+        "evasion_score": 92,
+        "prevalence_score": 88,
+        "capability_score": 95,
+        "blocklist_score": 95,
+        "composite_score": 92,
+        "release_year": 2019,
+        "deployment_count": 5000000
+      },
       "device_path": "\\\\.\\RTCore64",
       "device_aliases": ["\\\\.\\RTCore64", "\\\\.\\rtkiow10x64"],
       "service_name": "rtkiow10x64",
@@ -41,6 +50,15 @@
       "signed": true,
       "company": "Advanced Micro Devices",
       "evasion_score": 8.5,
+      "scoring": {
+        "evasion_score": 88,
+        "prevalence_score": 75,
+        "capability_score": 92,
+        "blocklist_score": 92,
+        "composite_score": 84,
+        "release_year": 2020,
+        "deployment_count": 2000000
+      },
       "device_path": "\\\\.\\AMDRyzenMasterDriver",
       "device_aliases": ["\\\\.\\AMDRyzenMasterDriver", "\\\\.\\AMDRyzenMaster"],
       "service_name": "AMDRyzenMasterDriver",

