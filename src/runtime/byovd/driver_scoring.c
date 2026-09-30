@@ -55,6 +55,9 @@ int byovd_score_driver_evasion(const char* driver_name, const BYOVD_DRIVER_METAD
             if (metadata->compilation_date > 2020) score = (score * 95) / 100;
             if (metadata->compilation_date < 2015) score += 10;
 
+            if (metadata->is_microsoft_blocked) score = (score * 40) / 100;
+            if (metadata->is_on_edr_list) score = (score * 50) / 100;
+
             return (score > 100) ? 100 : score;
         }
     }
@@ -152,7 +155,7 @@ int byovd_score_driver_composite(const char* driver_name, const BYOVD_DRIVER_MET
     int capability = byovd_score_driver_capability(driver_name, required_capabilities);
     int blocklist = byovd_score_driver_blocklist(driver_name, metadata);
 
-    int score = ((evasion + capability - blocklist) * prevalence) / 100;
+    int score = ((evasion + capability) * prevalence * blocklist) / 10000;
 
     return (score > 100) ? 100 : (score < 0 ? 0 : score);
 }

@@ -1,0 +1,68 @@
+{
+  "timestamp": "2026-09-30T17:04:00.817192",
+  "backend_url": "http://127.0.0.1:8000",
+  "test_suites": {
+    "api_tests": {
+      "suite": "API Endpoint Tests",
+      "tests": {
+        "GET /api/ai/threat-score": {
+          "status": "PASS",
+          "status_code": 200
+        },
+        "GET /api/ai/strategy": {
+          "status": "PASS",
+          "status_code": 200
+        },
+        "GET /api/ai/mutations": {
+          "status": "PASS",
+          "status_code": 200
+        },
+        "POST /api/ai/threat-event": {
+          "status": "PASS",
+          "status_code": 200
+        },
+        "GET /api/driver/score/{driver}": {
+          "status": "PASS",
+          "status_code": 200
+        },
+        "GET /api/driver/ranking": {
+          "status": "PASS",
+          "status_code": 200
+        },
+        "GET /api/driver/fallback-chain": {
+          "status": "PASS",
+          "status_code": 200
+        },
+        "GET /api/edr/profile": {
+          "status": "PASS",
+          "status_code": 200
+        },
+        "POST /api/edr/profile-update": {
+          "status": "PASS",
+          "status_code": 200
+        }
+      },
+      "passed": 9,
+      "failed": 0
+    },
+    "performance_tests": {
+      "suite": "Performance Tests",
+      "metrics": {
+        "threat_score_avg_ms": 4.515882999112364,
+        "threat_score_max_ms": 9.674687011283822,
+        "driver_ranking_avg_ms": 3.059188596671447,
+        "driver_ranking_max_ms": 3.7870359956286848,
+        "edr_profile_avg_ms": 2.945048901892733,
+        "edr_profile_max_ms": 3.9453060016967356
+      },
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "summary": {
+    "total_tests": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  }
+}
