@@ -190,8 +190,9 @@ def stage_llvm_obfuscate(bc_path, build_dir, custom_passes=None):
             shutil.copy2(bc_path, obf_bc)
     else:
         function_passes = ["opaque-pred", "substitution", "boguscf", "flattening", "linear-mba"]
-        passes = f"strip-signature,pdata-strip,virtualize,function({','.join(function_passes)}),anti-debug,indirect-call"
-        log("LLVM-OBF", f"Passes ({len(function_passes) + 5} total - FULL OLLVM SUITE): {passes}")
+        # Note: pdata-strip not available in toolchain, using core OLLVM passes
+        passes = f"strip-signature,virtualize,function({','.join(function_passes)}),anti-debug,indirect-call"
+        log("LLVM-OBF", f"Passes ({len(function_passes) + 4} total - CORE OLLVM SUITE): {passes}")
         log("LLVM-OBF", f"  Recommended order: strip metadata, virtualize, function rewrites, anti-debug, indirect-call last")
         run([str(opt), f"-load-pass-plugin={plugin}", f"-passes={passes}", str(bc_path), "-o", str(obf_bc)],
             "LLVM obfuscation")
