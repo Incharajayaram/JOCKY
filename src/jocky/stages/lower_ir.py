@@ -10,7 +10,8 @@ class LowerIRStage(Stage):
 
     def run(self, ctx: BuildContext) -> BuildContext:
         ast = ctx.state["ast"]
-        gen = CodeGen()
+        target_platform = ctx.config.get("target", "windows")
+        gen = CodeGen(target_platform=target_platform)
         ir_text = gen.gen(ast)
         out_dir = ctx.get_stage_output_dir(self.name)
         ir_path = out_dir / "output.ll"

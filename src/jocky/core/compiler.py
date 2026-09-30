@@ -13,9 +13,10 @@ from jocky.core.cache import CacheManager, get_cache
 class CachingCompiler:
     """Compiler wrapper that adds incremental caching to the pipeline."""
 
-    def __init__(self, cache_manager: Optional[CacheManager] = None, use_cache: bool = True):
+    def __init__(self, cache_manager: Optional[CacheManager] = None, use_cache: bool = True, target_platform: str = "windows"):
         self.cache = cache_manager or get_cache()
         self.use_cache = use_cache
+        self.target_platform = target_platform
 
     def lex_with_cache(self, source: str, file_path: Optional[str] = None) -> Tuple[list, bool]:
         """
@@ -98,7 +99,7 @@ class CachingCompiler:
             Tuple of (ir, from_cache)
         """
         if not self.use_cache or not file_path:
-            codegen = CodeGen()
+            codegen = CodeGen(target_platform=self.target_platform)
             # Pre-populate codegen with type info
             codegen.structs = checker.structs
             codegen.enums = checker.enums
@@ -111,7 +112,7 @@ class CachingCompiler:
             return cached_ir, True
 
         # Not cached, generate IR
-        codegen = CodeGen()
+        codegen = CodeGen(target_platform=self.target_platform)
         codegen.structs = checker.structs
         codegen.enums = checker.enums
         codegen.functions = checker.functions

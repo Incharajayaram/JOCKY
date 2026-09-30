@@ -6,7 +6,34 @@ class CodeGenError(BaseCodeGenError):
     pass
 
 class CodeGen:
-    def __init__(self):
+    LINUX_ONLY_FFI = {
+        # Module loading (Linux-specific)
+        "jocky_module_load", "jocky_module_unload", "jocky_module_has_symbol",
+        "jocky_module_base", "jocky_module_resolve_symbol", "jocky_module_stomp",
+        # Process operations (Linux-specific)
+        "jocky_process_hollow_linux", "jocky_process_ptrace_attach", "jocky_process_ptrace_detach",
+        "jocky_process_get_maps", "jocky_thread_hijack",
+        # Kernel operations (Linux-specific)
+        "jocky_kread", "jocky_kwrite",
+        "jocky_fence2pwn_detect_kfence", "jocky_fence2pwn_get_pool_info", "jocky_fence2pwn_spray",
+        "jocky_fence2pwn_trigger", "jocky_fence2pwn_verify_spray", "jocky_fence2pwn_trigger_allocations",
+        "jocky_fence2pwn_exploit_uaf", "jocky_fence2pwn_manipulate_creds", "jocky_fence2pwn_allocate_cred_objects",
+        "jocky_fence2pwn_write_cred", "jocky_fence2pwn_trigger_reclamation", "jocky_fence2pwn_elevate_to_root",
+        "jocky_fence2pwn_find_uaf_primitive",
+        # eBPF (Linux-specific)
+        "jocky_ebpf_load", "jocky_ebpf_attach", "jocky_ebpf_run",
+        # LKM (Linux kernel module - Linux-specific)
+        "jocky_lkm_load", "jocky_lkm_unload", "jocky_lkm_get_symbol",
+        # Syscall operations (Linux-specific)
+        "jocky_syscall_hook", "jocky_syscall_unhook", "jocky_syscall_trace", "jocky_get_syscall_number",
+        # ftrace (Linux-specific)
+        "jocky_ftrace_attach", "jocky_ftrace_detach",
+        # Forensics (Linux-specific)
+        "linux_forensics_wipe_bash_history", "jocky_linux_cleanup_syslog", "jocky_linux_cleanup_journal",
+    }
+
+    def __init__(self, target_platform: str = "windows"):
+        self.target_platform = target_platform
         self.output_lines: List[str] = []
         self.string_constants: Dict[str, str] = {}
         self.string_counter = 0
@@ -86,12 +113,13 @@ class CodeGen:
             if isinstance(decl, (ConstDecl, VarDecl)):
                 self.emit_global_decl(decl)
 
-        # Emit FFI declarations (deduplicated)
+        # Emit FFI declarations (deduplicated, platform-filtered)
         emitted_ffis: set = set()
         for decl in prog.decls:
             if isinstance(decl, FFIDecl):
                 if decl.name not in emitted_ffis:
-                    self.emit_ffi_decl(decl)
+                    if not self._should_skip_ffi(decl.name):
+                        self.emit_ffi_decl(decl)
                     emitted_ffis.add(decl.name)
 
         # Emit function definitions (skip generic functions)
@@ -106,8 +134,19 @@ class CodeGen:
                 if func_decl.name == mono.base_name:
                     self.emit_monomorphized_func(func_decl, mono)
 
-        # Prepend string constants
-        prelude = []
+        # Build target directives and string constants at the start
+        preamble = []
+
+        # Emit LLVM target directives first (for mlir-translate)
+        if self.target_platform == "windows":
+            preamble.append("target triple = \"x86_64-w64-windows-gnu\"")
+            preamble.append("target datalayout = \"e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128\"")
+        else:  # linux
+            preamble.append("target triple = \"x86_64-unknown-linux-gnu\"")
+            preamble.append("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128\"")
+        preamble.append("")
+
+        # Then add string constants
         for s, name in self.string_constants.items():
             raw = s.encode("utf-8")
             length = len(raw) + 1
@@ -118,9 +157,9 @@ class CodeGen:
                 else:
                     parts.append(f"\\{b:02X}")
             escaped = "".join(parts)
-            prelude.append(f'{name} = private constant [{length} x i8] c"{escaped}\\00"')
+            preamble.append(f'{name} = private constant [{length} x i8] c"{escaped}\\00"')
 
-        return "\n".join(prelude + [""] + self.output_lines)
+        return "\n".join(preamble + [""] + self.output_lines)
 
     def emit_struct_def(self, struct_def: StructDef):
         """Emit LLVM struct type definition."""
@@ -192,6 +231,11 @@ class CodeGen:
             if isinstance(decl.init, IntLiteral):
                 init_val = str(decl.init.value)
             self.emit(f"@{decl.name} = global {llvm_t} {init_val}")
+
+    def _should_skip_ffi(self, ffi_name: str) -> bool:
+        if self.target_platform == "windows" and ffi_name in self.LINUX_ONLY_FFI:
+            return True
+        return False
 
     def emit_ffi_decl(self, decl: FFIDecl):
         params = ", ".join(self.llvm_type(t) for t in [p.type for p in decl.params])
