@@ -52,13 +52,6 @@ LLVM_PASSES = [
         "flag": "strip-signature",
     },
     {
-        "id": "pdata_strip",
-        "name": "PDATA Strip",
-        "description": "Removes exception handling and unwinding metadata",
-        "default": True,
-        "flag": "pdata-strip",
-    },
-    {
         "id": "virtualize",
         "name": "Function Virtualization",
         "description": "Converts functions to virtualized bytecode dispatchers",
