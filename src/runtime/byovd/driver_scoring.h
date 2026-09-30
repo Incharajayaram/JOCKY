@@ -33,7 +33,7 @@ typedef struct {
 } BYOVD_DRIVER_METADATA;
 
 typedef struct {
-    int                count;
+    int                driver_count;
     BYOVD_DRIVER_METADATA* drivers;
 } BYOVD_DRIVER_MANIFEST;
 

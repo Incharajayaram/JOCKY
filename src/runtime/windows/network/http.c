@@ -2,11 +2,14 @@
 #include <wininet.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
 
 #pragma comment(lib, "wininet.lib")
 #pragma comment(lib, "ws2_32.lib")
 
-i64 jocky_http_get(const char* url, char* out_buf, i64 max_size) {
+uint64_t jocky_http_get(const char* url, char* out_buf, uint64_t max_size) {
     HINTERNET hInternetSession = InternetOpen("JOCKY", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternetSession) return 0;
 
@@ -17,8 +20,8 @@ i64 jocky_http_get(const char* url, char* out_buf, i64 max_size) {
     }
 
     DWORD dwBytesRead = 0;
-    i64 total_read = 0;
-    DWORD bufferSize = (max_size < 4096) ? max_size : 4096;
+    uint64_t total_read = 0;
+    DWORD bufferSize = (max_size < 4096) ? (DWORD)max_size : 4096;
     char* buffer = (char*)malloc(bufferSize);
 
     if (buffer) {
@@ -37,9 +40,9 @@ i64 jocky_http_get(const char* url, char* out_buf, i64 max_size) {
     return total_read;
 }
 
-bool jocky_http_post(const char* url, i8* data, i32 data_size, const char* headers) {
+unsigned char jocky_http_post(const char* url, unsigned char* data, uint32_t data_size, const char* headers) {
     HINTERNET hSession = InternetOpen("JOCKY", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
-    if (!hSession) return false;
+    if (!hSession) return 0;
 
     URL_COMPONENTS urlComp = {0};
     char szHostName[256] = {0};
@@ -53,23 +56,23 @@ bool jocky_http_post(const char* url, i8* data, i32 data_size, const char* heade
 
     if (!InternetCrackUrl(url, 0, 0, &urlComp)) {
         InternetCloseHandle(hSession);
-        return false;
+        return 0;
     }
 
     HINTERNET hConnect = InternetConnect(hSession, szHostName, INTERNET_DEFAULT_HTTP_PORT, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
     if (!hConnect) {
         InternetCloseHandle(hSession);
-        return false;
+        return 0;
     }
 
     HINTERNET hRequest = HttpOpenRequest(hConnect, "POST", szPath, NULL, NULL, NULL, 0, 0);
     if (!hRequest) {
         InternetCloseHandle(hConnect);
         InternetCloseHandle(hSession);
-        return false;
+        return 0;
     }
 
-    bool result = HttpSendRequest(hRequest, headers, strlen(headers ? headers : ""), data, data_size);
+    unsigned char result = (unsigned char)HttpSendRequest(hRequest, headers, (DWORD)strlen(headers ? headers : ""), data, data_size);
 
     InternetCloseHandle(hRequest);
     InternetCloseHandle(hConnect);
@@ -77,26 +80,26 @@ bool jocky_http_post(const char* url, i8* data, i32 data_size, const char* heade
     return result;
 }
 
-bool jocky_download_file(const char* url, const char* dest_path) {
+unsigned char jocky_download_file(const char* url, const char* dest_path) {
     HINTERNET hSession = InternetOpen("JOCKY", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
-    if (!hSession) return false;
+    if (!hSession) return 0;
 
     HINTERNET hFile = InternetOpenUrl(hSession, url, NULL, 0, INTERNET_FLAG_RELOAD, 0);
     if (!hFile) {
         InternetCloseHandle(hSession);
-        return false;
+        return 0;
     }
 
     FILE* fpDest = fopen(dest_path, "wb");
     if (!fpDest) {
         InternetCloseHandle(hFile);
         InternetCloseHandle(hSession);
-        return false;
+        return 0;
     }
 
     char buffer[4096];
     DWORD dwBytesRead = 0;
-    bool bRead = true;
+    unsigned char bRead = 1;
 
     while (bRead && InternetReadFile(hFile, buffer, sizeof(buffer), &dwBytesRead)) {
         if (dwBytesRead == 0) break;
@@ -106,5 +109,5 @@ bool jocky_download_file(const char* url, const char* dest_path) {
     fclose(fpDest);
     InternetCloseHandle(hFile);
     InternetCloseHandle(hSession);
-    return true;
+    return 1;
 }

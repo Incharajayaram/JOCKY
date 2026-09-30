@@ -149,6 +149,10 @@ static void test_driver_selection()
 {
     printf("Testing driver selection...\n");
 
+    uint32_t caps1[] = {BYOVD_CAP_PHYS_READ, BYOVD_CAP_PHYS_WRITE, BYOVD_CAP_MSR_READ, BYOVD_CAP_MSR_WRITE, BYOVD_CAP_PCI_READ, BYOVD_CAP_PCI_WRITE};
+    uint32_t caps2[] = {BYOVD_CAP_PHYS_READ, BYOVD_CAP_PHYS_WRITE, BYOVD_CAP_MSR_READ, BYOVD_CAP_MSR_WRITE, BYOVD_CAP_PORT_READ};
+    uint32_t caps3[] = {BYOVD_CAP_PHYS_READ, BYOVD_CAP_PHYS_WRITE, BYOVD_CAP_MSR_READ, BYOVD_CAP_MSR_WRITE};
+
     BYOVD_DRIVER_METADATA drivers[3] = {
         {
             .name = "rtkiow10x64.sys",
@@ -156,7 +160,8 @@ static void test_driver_selection()
             .is_microsoft_blocked = 0,
             .is_on_edr_list = 0,
             .compilation_date = 2019,
-            .capability_count = 6
+            .capability_count = 6,
+            .capabilities = caps1
         },
         {
             .name = "speedfan.sys",
@@ -164,7 +169,8 @@ static void test_driver_selection()
             .is_microsoft_blocked = 0,
             .is_on_edr_list = 0,
             .compilation_date = 2008,
-            .capability_count = 5
+            .capability_count = 5,
+            .capabilities = caps2
         },
         {
             .name = "blocked.sys",
@@ -172,7 +178,8 @@ static void test_driver_selection()
             .is_microsoft_blocked = 1,
             .is_on_edr_list = 0,
             .compilation_date = 2019,
-            .capability_count = 4
+            .capability_count = 4,
+            .capabilities = caps3
         }
     };
 
@@ -209,6 +216,8 @@ static void test_fallback_chain()
 {
     printf("Testing fallback chain generation...\n");
 
+    uint32_t def_caps[] = {BYOVD_CAP_PHYS_READ, BYOVD_CAP_PHYS_WRITE, BYOVD_CAP_MSR_READ, BYOVD_CAP_MSR_WRITE};
+
     BYOVD_DRIVER_METADATA drivers[4] = {
         {
             .name = "driver1.sys",
@@ -216,7 +225,8 @@ static void test_fallback_chain()
             .is_microsoft_blocked = 0,
             .is_on_edr_list = 0,
             .compilation_date = 2020,
-            .capability_count = 4
+            .capability_count = 4,
+            .capabilities = def_caps
         },
         {
             .name = "driver2.sys",
@@ -224,7 +234,8 @@ static void test_fallback_chain()
             .is_microsoft_blocked = 0,
             .is_on_edr_list = 0,
             .compilation_date = 2018,
-            .capability_count = 4
+            .capability_count = 4,
+            .capabilities = def_caps
         },
         {
             .name = "driver3.sys",
@@ -232,7 +243,8 @@ static void test_fallback_chain()
             .is_microsoft_blocked = 0,
             .is_on_edr_list = 0,
             .compilation_date = 2016,
-            .capability_count = 4
+            .capability_count = 4,
+            .capabilities = def_caps
         },
         {
             .name = "driver4.sys",
@@ -240,7 +252,8 @@ static void test_fallback_chain()
             .is_microsoft_blocked = 0,
             .is_on_edr_list = 0,
             .compilation_date = 2014,
-            .capability_count = 4
+            .capability_count = 4,
+            .capabilities = def_caps
         }
     };
 

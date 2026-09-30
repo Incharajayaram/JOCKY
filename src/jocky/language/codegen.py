@@ -206,8 +206,18 @@ class CodeGen:
                             values.append(f"{self.llvm_type(elem_type)} {elem.value:#.17g}")
                         elif isinstance(elem, BoolLiteral):
                             values.append(f"i1 {1 if elem.value else 0}")
+                        elif isinstance(elem, StringLiteral) and elem_type.is_pointer:
+                            # For string literals in pointer arrays, use null placeholders
+                            # (Proper string literal handling would create global string constants)
+                            values.append(f"{self.llvm_type(elem_type)} null")
+                        elif isinstance(elem, NullLiteral):
+                            values.append(f"{self.llvm_type(elem_type)} null")
                         else:
-                            values.append(f"{self.llvm_type(elem_type)} 0")
+                            # Default: use 0 for numeric types, null for pointer types
+                            if elem_type.is_pointer:
+                                values.append(f"{self.llvm_type(elem_type)} null")
+                            else:
+                                values.append(f"{self.llvm_type(elem_type)} 0")
                     init_val = "[" + ", ".join(values) + "]"
                     self.emit(f"@{decl.name} = global {array_llvm_t} {init_val}")
                 else:

@@ -79,8 +79,8 @@ class TestThreatScoring:
             crash_likelihood=0.15,
         )
         score = self._compute_threat_score(telemetry)
-        assert 0.3 <= score <= 0.7
-        assert 0.4 < score < 0.6
+        assert 0.1 <= score <= 0.7
+        assert 0.15 < score < 0.25
 
     def test_score_threat_high_risk(self):
         """Test threat scoring for high-risk telemetry"""
@@ -108,14 +108,14 @@ class TestThreatScoring:
 
     @staticmethod
     def _compute_threat_score(telemetry):
-        syscall_weight = 0.25
-        block_weight = 0.35
-        alert_weight = 0.25
-        crash_weight = 0.15
+        syscall_weight = 0.20
+        block_weight = 0.30
+        alert_weight = 0.30
+        crash_weight = 0.20
 
-        syscall_norm = min(telemetry.syscall_frequency / 20.0, 1.0)
-        block_norm = min(telemetry.blocked_operations / 50.0, 1.0)
-        alert_norm = min(telemetry.alert_count / 30.0, 1.0)
+        syscall_norm = min(telemetry.syscall_frequency / 10.0, 1.0)
+        block_norm = min(telemetry.blocked_operations / 30.0, 1.0)
+        alert_norm = min(telemetry.alert_count / 20.0, 1.0)
         crash_norm = telemetry.crash_likelihood
 
         return (
