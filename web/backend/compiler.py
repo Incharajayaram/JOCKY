@@ -57,22 +57,40 @@ def _build_obfuscation_config(obfuscation: dict) -> dict:
         if enabled:
             mlir_flags.append(p["flag"])
 
+    # Categorize passes: some must be top-level, some go in function() wrapper
     llvm_function_passes = []
-    llvm_module_passes = []
+    llvm_toplevel_passes = []
+
     for p in LLVM_PASSES:
         enabled = llvm_cfg.get(p["id"], p["default"])
         if enabled:
-            if p["flag"] in ("indirect-call", "strip-signature"):
-                llvm_module_passes.append(p["flag"])
+            # These passes must be top-level, not wrapped in function()
+            if p["flag"] in ("strip-signature", "virtualize", "anti-debug", "indirect-call"):
+                llvm_toplevel_passes.append(p["flag"])
             else:
                 llvm_function_passes.append(p["flag"])
 
+    # Build pass string: strip-signature,virtualize,function(...),anti-debug,indirect-call
     llvm_pass_str = ""
     parts = []
+
+    # Add strip-signature first if present
+    if "strip-signature" in llvm_toplevel_passes:
+        parts.append("strip-signature")
+        llvm_toplevel_passes.remove("strip-signature")
+
+    # Add virtualize before function wrapper if present
+    if "virtualize" in llvm_toplevel_passes:
+        parts.append("virtualize")
+        llvm_toplevel_passes.remove("virtualize")
+
+    # Add function passes
     if llvm_function_passes:
         parts.append(f"function({','.join(llvm_function_passes)})")
-    if llvm_module_passes:
-        parts.append(f"module({','.join(llvm_module_passes)})")
+
+    # Add remaining top-level passes (anti-debug, indirect-call)
+    parts.extend(llvm_toplevel_passes)
+
     if parts:
         llvm_pass_str = ",".join(parts)
 
@@ -100,6 +118,9 @@ async def run_compilation(
             await notify_callback(job)
 
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> origin/main
         # Use project-relative directories (Docker-mountable)
         project_root = Path(__file__).resolve().parent.parent.parent
         build_base = project_root / "build"
@@ -126,18 +147,8 @@ async def run_compilation(
         # Get compile script (already have project_root from build_dir setup)
         compile_script = project_root / "scripts" / "compile_pipeline.py"
 
-        # Try Docker first, fall back to local compilation
+        # Use local compilation only (Docker disabled for development)
         use_docker = False
-        try:
-            result = subprocess.run(["docker", "ps"], capture_output=True, timeout=5)
-            if result.returncode == 0:
-                use_docker = True
-                # Verify jocky-compiler image exists
-                result = subprocess.run(["docker", "images", "-q", "jocky-compiler:latest"],
-                                       capture_output=True, timeout=5)
-                use_docker = bool(result.stdout.strip())
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            use_docker = False
 
         if use_docker:
             job.progress = 15
@@ -187,6 +198,10 @@ async def run_compilation(
         env = os.environ.copy()
         env["PYTHONPATH"] = str(project_root / "src")
         env["TOOLCHAIN_PATH"] = str(project_root / "toolchain")
+        toolchain_lib = str(project_root / "toolchain" / "lib")
+        env["LD_LIBRARY_PATH"] = f"{toolchain_lib}:{env.get('LD_LIBRARY_PATH', '')}"
+
+        job.logs.append(f"[PIPELINE] LD_LIBRARY_PATH={env.get('LD_LIBRARY_PATH', 'NOT SET')}")
 
         # Try Docker with automatic local fallback on mount failures
         docker_failed_mount = False
