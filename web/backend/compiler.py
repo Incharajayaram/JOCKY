@@ -99,7 +99,6 @@ async def run_compilation(
         if notify_callback:
             await notify_callback(job)
 
-<<<<<<< HEAD
         # Use project-relative directories (Docker-mountable)
         project_root = Path(__file__).resolve().parent.parent.parent
         build_base = project_root / "build"
@@ -126,18 +125,8 @@ async def run_compilation(
         # Get compile script (already have project_root from build_dir setup)
         compile_script = project_root / "scripts" / "compile_pipeline.py"
 
-        # Try Docker first, fall back to local compilation
+        # Use local compilation only (Docker disabled for development)
         use_docker = False
-        try:
-            result = subprocess.run(["docker", "ps"], capture_output=True, timeout=5)
-            if result.returncode == 0:
-                use_docker = True
-                # Verify jocky-compiler image exists
-                result = subprocess.run(["docker", "images", "-q", "jocky-compiler:latest"],
-                                       capture_output=True, timeout=5)
-                use_docker = bool(result.stdout.strip())
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            use_docker = False
 
         if use_docker:
             job.progress = 15
