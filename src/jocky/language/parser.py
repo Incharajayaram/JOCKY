@@ -145,7 +145,8 @@ class Parser:
         self.expect(TokenType.LPAREN)
         params = self.parse_params()
         self.expect(TokenType.RPAREN)
-        ret_type = JType("void")
+        # Default: main() returns i32, others return void
+        ret_type = JType("i32" if name == "main" else "void")
         if self.match(TokenType.ARROW):
             self.advance()
             ret_type = self.parse_type()
