@@ -224,6 +224,54 @@ git push -f origin feature/pattern-matching
 
 ---
 
+## Backend & Compilation Testing
+
+### 1. Backend Testing Strategy
+- **Use dev launch sh only** — No Docker for debugging backend services
+  - Docker setup and debugging takes too long; dev mode is faster iteration
+  - Test backend services via `./dev_launch.sh` or equivalent dev runner
+  - Verify both Windows and Linux script compilation through main pipeline
+
+### 2. Runtime API Deduplication Strategy
+- **Central Reference:** See `docs/RUNTIME_API_STRUCTURE.md` for complete organization
+- **Windows & Linux APIs:** Do NOT duplicate implementations across platforms
+  - Shared APIs (crypto, io, network, etc.) live in `src/runtime/common/`
+  - Platform-specific APIs (win_* in `windows/`, linux_* in `linux/`)
+  - Search `src/runtime` thoroughly before implementing new APIs
+- **Before adding ANY runtime API:** Check `src/runtime/RUNTIME_API.md` and `docs/RUNTIME_API_STRUCTURE.md`
+
+### 3. Forensic Pipeline Integration
+- **Status:** Kamimi's forensic pipeline integrated halfway; needs full integration
+- **Scope:** Main pipeline → Backend → Both research chain files
+- **See:** `docs/FORENSIC_INTEGRATION_STATUS.md` for detailed checklist
+- **Action Items:**
+  - Integrate forensic analysis APIs into main compilation pipeline
+  - Add forensic APIs to `research_chain_windows_production.jky` and `research_chain_linux_production.jky`
+  - Link forensic APIs into prelude, backend, and all compilation stages
+  - Ensure compiled code with forensic APIs compiles without errors
+
+### 4. Research Chain File Guidelines
+- **Files affected:** 
+  - `examples/research_chain_windows_production.jky`
+  - `examples/research_chain_linux_production.jky`
+  - `examples/authorized_research_full_chain.jky`
+- **Before ANY edit:** Read the entire file first to verify what exists
+  - Prevents duplicate API implementations and variable declarations
+  - Check for existing forensic analysis APIs before adding new ones
+- **Forensic Analysis APIs Missing:** Must add and test these (see forensic integration doc)
+
+### 5. Compiler & Toolchain Issues
+- **Issue Tracking:** See `docs/CODEGEN_COMPILER_ISSUES.md`
+- **Scope:** Codegen errors, LLVM issues, MLIR problems, obfuscation pass failures
+- **When Issues Found:** Document with:
+  - Error message (full output)
+  - Reproduction steps
+  - Affected file(s) and line numbers
+  - Temporary workaround if any
+  - Priority level (critical/high/medium/low)
+
+---
+
 ## DO NOT
 
 - ❌ Commit directly to main
@@ -241,9 +289,26 @@ git push -f origin feature/pattern-matching
   - **Why:** Broken infrastructure affects all developers and wastes time on rebuilds
   - **How:** Build Docker image locally, test compilation pipeline, verify outputs work
 - ❌ Add stub implementations without checking for real implementations first
-  - **Rule:** Search runtime C files for real function implementations before adding stubs
+  - **Rule:** Use real runtime API implementations before writing any stub
+  - **If real API doesn't exist:** Ask user if this particular API should be implemented from scratch
   - **Why:** Duplicates waste code, wrong signatures cause linker errors, stubs hide real bugs
-  - **How:** `grep -r "function_name" src/runtime --include="*.c" --include="*.h"` to verify if real impl exists
+  - **How:** `grep -r "function_name" src/runtime --include="*.c" --include="*.h"` to verify if real impl exists, check `src/runtime/RUNTIME_API.md`
+- ❌ Duplicate runtime APIs between Windows and Linux platforms
+  - **Rule:** Check `docs/RUNTIME_API_STRUCTURE.md` for existing implementations
+  - **Why:** Duplicates cause linker conflicts, maintenance burden, and inconsistent behavior
+  - **How:** Place shared APIs in `src/runtime/common/`, platform-specific in `windows/` or `linux/`
+- ❌ Add forensic analysis APIs without full pipeline integration
+  - **Rule:** Forensic APIs must be integrated into main pipeline → backend → research chains
+  - **Why:** Incomplete integration causes compilation errors and unused code
+  - **How:** Follow checklist in `docs/FORENSIC_INTEGRATION_STATUS.md`
+- ❌ Edit research chain files without reading them fully first
+  - **Rule:** Read entire file before making changes to avoid duplicates
+  - **Why:** Prevents duplicate API declarations and variable redefinitions
+  - **Files:** `research_chain_windows_production.jky`, `research_chain_linux_production.jky`, `authorized_research_full_chain.jky`
+- ❌ Use Docker for backend debugging
+  - **Rule:** Use dev launch script only for backend testing
+  - **Why:** Docker setup and debugging takes significantly longer
+  - **How:** `./dev_launch.sh` or equivalent dev runner
 
 ---
 
