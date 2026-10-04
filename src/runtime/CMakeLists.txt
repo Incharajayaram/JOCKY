@@ -43,6 +43,19 @@ set(RUNTIME_SOURCES
     # Encoding utilities
     common/encoding.c
 
+    # Core APIs
+    core/sandbox.c
+    core/plugin.c
+
+    # Cryptography
+    crypto/crypto.c
+
+    # Networking
+    network/network.c
+
+    # Obfuscation
+    obfuscation.c
+
     # Forensic analysis APIs
     forensics/forensic_api_impl.c
     forensics/forensic_engine.c

