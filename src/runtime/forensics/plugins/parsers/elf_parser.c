@@ -1,4 +1,4 @@
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 /**
  * ELF Parser Plugin
  * 
@@ -6,7 +6,7 @@
  * symbols, and metadata. Runs in sandboxed child process.
  */
 
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

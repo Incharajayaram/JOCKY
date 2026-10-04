@@ -1,4 +1,4 @@
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 /**
  * MFT Parser Plugin
  * 
@@ -6,7 +6,7 @@
  * and deleted entries. On Linux: parses filesystem metadata.
  */
 
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

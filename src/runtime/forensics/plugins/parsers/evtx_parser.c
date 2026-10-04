@@ -1,4 +1,4 @@
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 /**
  * EVTX Parser Plugin
  * 
@@ -6,7 +6,7 @@
  * On Linux: parses syslog, journald, and auditd logs.
  */
 
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

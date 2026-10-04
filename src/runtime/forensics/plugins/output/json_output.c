@@ -1,11 +1,11 @@
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 /**
  * JSON Output Plugin
  * 
  * Generates human-readable JSON report from analysis results.
  */
 
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

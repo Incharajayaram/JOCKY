@@ -347,6 +347,12 @@ git push -f origin feature/pattern-matching
   - **Rule:** Use dev launch script only for backend testing
   - **Why:** Docker setup and debugging takes significantly longer
   - **How:** `./dev_launch.sh` or equivalent dev runner
+- ❌ Delete code that has missing dependencies
+  - **Rule:** Implement the missing dependencies instead of removing code
+  - **Why:** Removing code loses functionality; implementing headers/stubs preserves it
+  - **How:** Create missing header files, add forward declarations, implement missing functions
+  - **Example:** If file X needs `helper.h`, create `helper.h` with proper definitions, don't delete file X
+  - Every implementation file must compile — if it depends on something missing, provide it
 
 ---
 

@@ -1,11 +1,11 @@
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 /**
  * ARP Entry Parser Plugin
  * 
  * Parses ARP table entries (IP to MAC mappings).
  */
 
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

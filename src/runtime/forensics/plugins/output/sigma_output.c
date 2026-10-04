@@ -1,11 +1,11 @@
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 /**
  * Sigma Output Plugin
  * 
  * Generates Sigma detection rules (YAML) from IOCs and correlations.
  */
 
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,11 +1,11 @@
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 /**
  * File Collector Plugin
  * 
  * Collects recent files, executables, temp files, startup folder contents.
  */
 
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

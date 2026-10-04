@@ -1,4 +1,4 @@
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 /**
  * Registry Parser Plugin
  * 
@@ -6,7 +6,7 @@
  * On Linux: parses systemd service files, cron entries, shell configs.
  */
 
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

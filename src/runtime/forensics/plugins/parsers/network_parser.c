@@ -1,4 +1,4 @@
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 /**
  * Network Parser Plugin
  * 
@@ -6,7 +6,7 @@
  * On Linux: parses /proc/net/* and connection data.
  */
 
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

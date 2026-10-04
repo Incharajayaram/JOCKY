@@ -1,4 +1,4 @@
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 /**
  * Prefetch Collector Plugin
  * 
@@ -7,7 +7,7 @@
  * On Linux: mounted Windows volumes or copied prefetch files
  */
 
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
