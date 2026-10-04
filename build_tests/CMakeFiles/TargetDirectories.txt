@@ -1,5 +1,0 @@
-/home/incharanew/JOCKY/build_tests/CMakeFiles/test_fence2pwn.dir
-/home/incharanew/JOCKY/build_tests/CMakeFiles/test_ai_evasion.dir
-/home/incharanew/JOCKY/build_tests/CMakeFiles/test.dir
-/home/incharanew/JOCKY/build_tests/CMakeFiles/edit_cache.dir
-/home/incharanew/JOCKY/build_tests/CMakeFiles/rebuild_cache.dir
