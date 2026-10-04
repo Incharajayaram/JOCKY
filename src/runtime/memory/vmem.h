@@ -14,6 +14,7 @@
 /* Memory allocation types */
 #define JOCKY_MEM_COMMIT   0x1000
 #define JOCKY_MEM_RESERVE  0x2000
+#define JOCKY_MEM_RELEASE  0x8000
 #define JOCKY_MEM_RESET    0x80000
 
 /* Memory protection flags */

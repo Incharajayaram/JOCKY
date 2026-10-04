@@ -148,8 +148,8 @@ static int collect_matching_keys(HKEY hParent, const wchar_t* value_name,
 
 bool jocky_patch_amcache(void)
 {
-    enable_privilege(SE_BACKUP_NAME);
-    enable_privilege(SE_RESTORE_NAME);
+    enable_privilege(L"SeBackupPrivilege");
+    enable_privilege(L"SeRestorePrivilege");
 
     if (RegLoadKeyW(HKEY_LOCAL_MACHINE, AMCACHE_TMPKEY, AMCACHE_HIVE)
             != ERROR_SUCCESS)
