@@ -100,9 +100,8 @@ set(RUNTIME_SOURCES
     # Encoding utilities
     common/encoding.c
 
-    # Compression - existing implementations with jocky_* FFI functions
+    # Compression - FFI bindings with real zlib compression
     compression/compression.c
-    compression/compression_simple.c
 
     # Core APIs
     core/sandbox.c
