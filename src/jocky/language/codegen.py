@@ -32,6 +32,17 @@ class CodeGen:
         "linux_forensics_wipe_bash_history", "jocky_linux_cleanup_syslog", "jocky_linux_cleanup_journal",
     }
 
+    WINDOWS_ONLY_FFI = {
+        # Windows Registry API (Windows-specific)
+        "jocky_reg_open", "jocky_reg_create", "jocky_reg_close",
+        "jocky_reg_query_value", "jocky_reg_set_value", "jocky_reg_delete_value",
+        "jocky_reg_delete_key", "jocky_reg_enum_key", "jocky_reg_enum_value",
+        "jocky_reg_key_count", "jocky_reg_value_count",
+        "jocky_reg_query_dword", "jocky_reg_set_dword",
+        "jocky_reg_query_string", "jocky_reg_set_string",
+        "jocky_reg_query_binary", "jocky_reg_set_binary",
+    }
+
     def __init__(self, target_platform: str = "windows"):
         self.target_platform = target_platform
         self.output_lines: List[str] = []
@@ -244,6 +255,8 @@ class CodeGen:
 
     def _should_skip_ffi(self, ffi_name: str) -> bool:
         if self.target_platform == "windows" and ffi_name in self.LINUX_ONLY_FFI:
+            return True
+        if self.target_platform == "linux" and ffi_name in self.WINDOWS_ONLY_FFI:
             return True
         return False
 
@@ -1196,6 +1209,72 @@ class CodeGen:
         else:
             raise CodeGenError(f"Unknown unary op: {op}")
 
+    def is_forensic_type(self, jtype: JType) -> bool:
+        """Check if type is a forensic struct that needs marshaling."""
+        forensic_types = {
+            "forensic_bytes_t", "forensic_kv_t", "forensic_metadata_t",
+            "forensic_artifact_t", "forensic_artifact_list_t", "forensic_ioc_t",
+            "forensic_ioc_list_t", "forensic_event_t", "forensic_timeline_t",
+            "forensic_parsed_artifact_t", "forensic_parsed_artifact_list_t"
+        }
+        return jtype.name in forensic_types
+
+    def marshal_forensic_return(self, raw_value: str, forensic_type: JType) -> Tuple[str, JType]:
+        """Marshal C forensic struct to JOCKY record type.
+
+        For forensic structs, we need to extract fields and convert them to
+        JOCKY-compatible types (records, lists, strings).
+        """
+        type_name = forensic_type.name
+
+        # Map forensic types to their JOCKY record representations
+        # For now, return as opaque pointer to be accessed via field access
+        # In full implementation, would deserialize struct contents
+
+        if type_name == "forensic_bytes_t":
+            # forensic_bytes_t { data: i8*, len: usize }
+            # Return as JOCKY record {data: string, len: i64}
+            record_val = self.next_reg()
+            self.emit(f"  {record_val} = alloca {self.llvm_type(forensic_type)}")
+            self.emit(f"  store {self.llvm_type(forensic_type)} {raw_value}, {self.llvm_type(forensic_type)}* {record_val}")
+            return (record_val, forensic_type)
+
+        elif type_name == "forensic_metadata_t":
+            # forensic_metadata_t { items: forensic_kv_t*, count: usize, capacity: usize }
+            # Return as JOCKY record with field access
+            record_val = self.next_reg()
+            self.emit(f"  {record_val} = alloca {self.llvm_type(forensic_type)}")
+            self.emit(f"  store {self.llvm_type(forensic_type)} {raw_value}, {self.llvm_type(forensic_type)}* {record_val}")
+            return (record_val, forensic_type)
+
+        elif type_name == "forensic_artifact_t":
+            # Store pointer to artifact for field access
+            record_val = self.next_reg()
+            self.emit(f"  {record_val} = alloca {self.llvm_type(forensic_type)}")
+            self.emit(f"  store {self.llvm_type(forensic_type)} {raw_value}, {self.llvm_type(forensic_type)}* {record_val}")
+            return (record_val, forensic_type)
+
+        elif type_name == "forensic_artifact_list_t":
+            # Store pointer to list for field access
+            record_val = self.next_reg()
+            self.emit(f"  {record_val} = alloca {self.llvm_type(forensic_type)}")
+            self.emit(f"  store {self.llvm_type(forensic_type)} {raw_value}, {self.llvm_type(forensic_type)}* {record_val}")
+            return (record_val, forensic_type)
+
+        elif type_name == "forensic_timeline_t":
+            # Store pointer to timeline for field access
+            record_val = self.next_reg()
+            self.emit(f"  {record_val} = alloca {self.llvm_type(forensic_type)}")
+            self.emit(f"  store {self.llvm_type(forensic_type)} {raw_value}, {self.llvm_type(forensic_type)}* {record_val}")
+            return (record_val, forensic_type)
+
+        else:
+            # For other forensic types, return as-is with pointer storage
+            record_val = self.next_reg()
+            self.emit(f"  {record_val} = alloca {self.llvm_type(forensic_type)}")
+            self.emit(f"  store {self.llvm_type(forensic_type)} {raw_value}, {self.llvm_type(forensic_type)}* {record_val}")
+            return (record_val, forensic_type)
+
     def emit_call(self, expr: CallExpr) -> Tuple[str, JType]:
         if expr.name not in self.functions:
             raise CodeGenError(f"Undefined function: {expr.name}")
@@ -1256,6 +1335,11 @@ class CodeGen:
             return ("", ret)
         r = self.next_reg()
         self.emit(f"  {r} = call {self.llvm_type(ret)} @{func_name}({arg_str})")
+
+        # Marshal forensic return types to JOCKY-compatible representations
+        if self.is_forensic_type(ret):
+            return self.marshal_forensic_return(r, ret)
+
         return (r, ret)
 
     def emit_match(self, expr: MatchExpr) -> Tuple[str, JType]:
