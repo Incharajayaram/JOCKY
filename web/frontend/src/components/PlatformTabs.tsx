@@ -18,22 +18,23 @@ function tabStyle(active: boolean, hovered: boolean): CSSProperties {
   return {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '10px 24px',
-    fontSize: 13,
+    gap: 10,
+    padding: '12px 28px',
+    fontSize: 15,
     fontWeight: 600,
     fontFamily: "'JetBrains Mono', monospace",
     letterSpacing: 0.5,
     cursor: 'pointer',
     border: 'none',
-    borderBottom: active ? '2px solid var(--accent-blue)' : '2px solid transparent',
     background: active
-      ? 'rgba(59, 130, 246, 0.08)'
+      ? 'rgba(255, 149, 0, 0.1)'
       : hovered
-        ? 'rgba(255, 255, 255, 0.03)'
+        ? 'rgba(255, 255, 255, 0.05)'
         : 'transparent',
-    color: active ? 'var(--accent-blue)' : 'var(--text-secondary)',
-    transition: 'all 0.15s ease',
+    color: active ? 'var(--accent-orange)' : 'var(--text-secondary)',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    borderBottom: active ? '3px solid var(--accent-orange)' : '3px solid transparent',
+    clipPath: 'polygon(5% 0%, 100% 0%, 95% 100%, 0% 100%)',
   };
 }
 

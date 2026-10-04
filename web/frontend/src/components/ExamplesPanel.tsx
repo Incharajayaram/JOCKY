@@ -8,17 +8,18 @@ const styles: Record<string, CSSProperties> = {
   container: {
     background: 'var(--bg-secondary)',
     border: '1px solid var(--border)',
-    borderRadius: 4,
-    marginBottom: 8,
+    borderRadius: 0,
+    marginBottom: 10,
+    clipPath: 'polygon(2% 0%, 100% 0%, 98% 100%, 0% 100%)',
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '8px 12px',
+    padding: '10px 14px',
     cursor: 'pointer',
     userSelect: 'none',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: 600,
     color: 'var(--text-secondary)',
   },
@@ -28,11 +29,11 @@ const styles: Record<string, CSSProperties> = {
     borderTop: '1px solid var(--border)',
   },
   example: {
-    padding: '8px 12px',
+    padding: '10px 14px',
     borderBottom: '1px solid var(--border)',
     cursor: 'pointer',
     transition: 'background 0.15s ease',
-    fontSize: 11,
+    fontSize: 13,
   },
   exampleHovered: {
     background: 'rgba(255, 255, 255, 0.05)',
@@ -40,11 +41,11 @@ const styles: Record<string, CSSProperties> = {
   exampleName: {
     color: 'var(--text-primary)',
     fontWeight: 500,
-    marginBottom: 2,
+    marginBottom: 3,
   },
   exampleDesc: {
     color: 'var(--text-secondary)',
-    fontSize: 10,
+    fontSize: 12,
   },
 };
 
@@ -72,9 +73,9 @@ export default function ExamplesPanel({ platform, onLoadExample }: ExamplesPanel
       {expanded && (
         <div style={styles.content}>
           {loading ? (
-            <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-secondary)' }}>Loading...</div>
+            <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--text-secondary)' }}>Loading...</div>
           ) : filtered.length === 0 ? (
-            <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-secondary)' }}>No examples for {platform}</div>
+            <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--text-secondary)' }}>No examples for {platform}</div>
           ) : (
             filtered.map((ex) => (
               <div

@@ -14,8 +14,8 @@ const styles: Record<string, CSSProperties> = {
     flexDirection: 'column',
   },
   header: {
-    padding: '8px 16px',
-    fontSize: 11,
+    padding: '12px 20px',
+    fontSize: 13,
     fontFamily: "'JetBrains Mono', monospace",
     color: 'var(--text-secondary)',
     background: 'var(--bg-secondary)',
@@ -82,11 +82,11 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
             onChange={(v) => onChange(v ?? '')}
             onMount={handleMount}
             options={{
-              fontSize: 14,
+              fontSize: 15,
               fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
-              padding: { top: 12, bottom: 12 },
+              padding: { top: 16, bottom: 16 },
               lineNumbers: 'on',
               renderLineHighlight: 'line',
               cursorBlinking: 'smooth',
