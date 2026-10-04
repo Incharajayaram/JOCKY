@@ -1,1 +1,0 @@
-/usr/bin/cc  -Wall -Wextra -O2 CMakeFiles/test_ai_evasion.dir/test_ai_evasion.c.o CMakeFiles/test_ai_evasion.dir/home/incharanew/JOCKY/src/runtime/ai/mutation_engine.c.o -o test_ai_evasion  -lm 
