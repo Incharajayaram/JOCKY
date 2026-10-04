@@ -116,15 +116,6 @@ int32_t jocky_wipe_temp_files(const char* path1, const char* path2) {
     return 1;
 }
 
-uint64_t jocky_download_file(const char* url, const char* dest_path) {
-    if (!url || !dest_path) return 0;
-    return 1;
-}
-
-uint64_t jocky_http_get(const char* url, char* out_buf, uint64_t max_size) {
-    if (!url || !out_buf || max_size == 0) return 0;
-    return 1;
-}
 
 int8_t* jocky_thread_get_info(int32_t pid) {
     static char info[256] = "thread_info";

@@ -126,23 +126,6 @@ int32_t jocky_disable_wdfilter(void) {
     return 0;
 }
 
-int32_t jocky_download_file(const char *url, const char *dest_path) {
-    if (!url || !dest_path) return -1;
-
-    /* Real: Download file over HTTP/HTTPS */
-    #ifdef _WIN32
-    /* Windows: Use WINHTTP API */
-    #endif
-
-    FILE *fp = fopen(dest_path, "wb");
-    if (fp) {
-        fprintf(fp, "downloaded data from %s\n", url);
-        fclose(fp);
-        return 0;
-    }
-    return -1;
-}
-
 int32_t jocky_enable_direct_syscalls(void) {
     /* Real: Patch syscall dispatch table */
     #ifdef _WIN32
@@ -157,25 +140,6 @@ int32_t jocky_hide_from_usermode(void) {
     /* Windows: Unlink from PEB/LDR lists */
     #endif
     return 0;
-}
-
-int64_t jocky_http_get(const char *url, void *out_buf, int64_t max_size) {
-    if (!url || !out_buf || max_size <= 0) return -1;
-
-    /* Real: HTTP GET request */
-    #ifdef _WIN32
-    /* Windows: Use WINHTTP API */
-    #endif
-
-    const char *response = "HTTP/1.1 200 OK\r\nContent-Length: 26\r\n\r\nResponse from HTTP GET call";
-    int64_t response_len = strlen(response);
-
-    if (response_len < max_size) {
-        memcpy(out_buf, response, response_len);
-        return response_len;
-    }
-
-    return -1;
 }
 
 int32_t jocky_patch_amcache(void) {

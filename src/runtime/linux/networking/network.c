@@ -9,6 +9,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <stdint.h>
+#include <stdbool.h>
+#ifdef HAVE_CURL
+#include <curl/curl.h>
+#endif
 
 typedef struct {
     int fd;
@@ -355,3 +360,75 @@ int jocky_socket_set_nonblocking(jocky_socket_t sock_handle, int nonblocking) {
 
     return 0;
 }
+
+#ifdef HAVE_CURL
+typedef struct {
+    int8_t* buf;
+    int64_t max_size;
+    int64_t written;
+} http_get_buf_t;
+
+static size_t http_get_write_cb(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t realsize = size * nmemb;
+    http_get_buf_t* b = (http_get_buf_t*)userp;
+    int64_t remaining = b->max_size - b->written;
+    if (remaining <= 0) return 0;
+    size_t to_copy = (realsize < (size_t)remaining) ? realsize : (size_t)remaining;
+    memcpy(b->buf + b->written, contents, to_copy);
+    b->written += (int64_t)to_copy;
+    return realsize;
+}
+
+int64_t jocky_http_get(const char* url, int8_t* out_buf, int64_t max_size) {
+    if (!url || !out_buf || max_size <= 0) return -1;
+
+    CURL* curl = curl_easy_init();
+    if (!curl) return -1;
+
+    http_get_buf_t buf = {out_buf, max_size, 0};
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, http_get_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) return -1;
+    return buf.written;
+}
+
+bool jocky_download_file(const char* url, const char* dest_path) {
+    if (!url || !dest_path) return false;
+
+    FILE* fp = fopen(dest_path, "wb");
+    if (!fp) return false;
+
+    CURL* curl = curl_easy_init();
+    if (!curl) { fclose(fp); return false; }
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+    fclose(fp);
+
+    return res == CURLE_OK;
+}
+#else
+int64_t jocky_http_get(const char* url, int8_t* out_buf, int64_t max_size) {
+    (void)url; (void)out_buf; (void)max_size;
+    return -1;
+}
+
+bool jocky_download_file(const char* url, const char* dest_path) {
+    (void)url; (void)dest_path;
+    return false;
+}
+#endif
