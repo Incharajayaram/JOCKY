@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD 14)
 set(RUNTIME_SOURCES
     init/anti_analysis.c
     util/mem.c
+    util/strings.c
+    util/process.c
     windows/evasion/unhook.c
     windows/evasion/syscalls.c
     windows/evasion/stack_spoof.c

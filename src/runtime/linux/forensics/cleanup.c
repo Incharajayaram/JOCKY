@@ -71,6 +71,16 @@ int jocky_self_delete(void) {
     return -1;
 }
 
+int32_t forensics_flush_arp_cache(void) {
+    system("arp -d > /dev/null 2>&1");
+    return 1;
+}
+
+int32_t forensics_clear_dns_cache(void) {
+    system("systemctl restart systemd-resolved 2>/dev/null || true");
+    return 1;
+}
+
 int jocky_cleanup_all(void) {
     linux_forensics_wipe_bash_history();
     jocky_linux_cleanup_syslog();

