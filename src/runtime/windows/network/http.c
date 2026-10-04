@@ -10,25 +10,27 @@
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "winhttp.lib")
 
-uint64_t jocky_http_get(const char* url, char* out_buf, uint64_t max_size) {
+int64_t jocky_http_get(const char* url, int8_t* out_buf, int64_t max_size) {
+    if (!url || !out_buf || max_size <= 0) return -1;
+
     HINTERNET hInternetSession = InternetOpen("JOCKY", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
-    if (!hInternetSession) return 0;
+    if (!hInternetSession) return -1;
 
     HINTERNET hInternetFile = InternetOpenUrl(hInternetSession, url, NULL, 0, INTERNET_FLAG_RELOAD, 0);
     if (!hInternetFile) {
         InternetCloseHandle(hInternetSession);
-        return 0;
+        return -1;
     }
 
     DWORD dwBytesRead = 0;
-    uint64_t total_read = 0;
+    int64_t total_read = 0;
     DWORD bufferSize = (max_size < 4096) ? (DWORD)max_size : 4096;
     char* buffer = (char*)malloc(bufferSize);
 
     if (buffer) {
         while (InternetReadFile(hInternetFile, buffer, bufferSize, &dwBytesRead)) {
             if (dwBytesRead == 0) break;
-            if (out_buf && total_read + dwBytesRead <= max_size) {
+            if (total_read + dwBytesRead <= (uint64_t)max_size) {
                 memcpy(out_buf + total_read, buffer, dwBytesRead);
             }
             total_read += dwBytesRead;
@@ -81,28 +83,29 @@ unsigned char jocky_http_post(const char* url, unsigned char* data, uint32_t dat
     return result;
 }
 
-unsigned char jocky_download_file(const char* url, const char* dest_path) {
+bool jocky_download_file(const char* url, const char* dest_path) {
+    if (!url || !dest_path) return false;
+
     HINTERNET hSession = InternetOpen("JOCKY", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
-    if (!hSession) return 0;
+    if (!hSession) return false;
 
     HINTERNET hFile = InternetOpenUrl(hSession, url, NULL, 0, INTERNET_FLAG_RELOAD, 0);
     if (!hFile) {
         InternetCloseHandle(hSession);
-        return 0;
+        return false;
     }
 
     FILE* fpDest = fopen(dest_path, "wb");
     if (!fpDest) {
         InternetCloseHandle(hFile);
         InternetCloseHandle(hSession);
-        return 0;
+        return false;
     }
 
     char buffer[4096];
     DWORD dwBytesRead = 0;
-    unsigned char bRead = 1;
 
-    while (bRead && InternetReadFile(hFile, buffer, sizeof(buffer), &dwBytesRead)) {
+    while (InternetReadFile(hFile, buffer, sizeof(buffer), &dwBytesRead)) {
         if (dwBytesRead == 0) break;
         fwrite(buffer, 1, dwBytesRead, fpDest);
     }
@@ -110,5 +113,5 @@ unsigned char jocky_download_file(const char* url, const char* dest_path) {
     fclose(fpDest);
     InternetCloseHandle(hFile);
     InternetCloseHandle(hSession);
-    return 1;
+    return true;
 }

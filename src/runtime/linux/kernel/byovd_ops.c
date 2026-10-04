@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
@@ -17,17 +18,15 @@ typedef struct {
 
 static byovd_context_t* g_byovd = NULL;
 
-int jocky_byovd_new(void) {
-    if (g_byovd) return 1;  /* Already allocated */
-
-    g_byovd = malloc(sizeof(byovd_context_t));
-    if (!g_byovd) return -1;
-
-    memset(g_byovd, 0, sizeof(byovd_context_t));
-    g_byovd->handle = -1;
-    g_byovd->fd = -1;
-
-    return 1;
+int8_t* jocky_byovd_new(void) {
+    if (!g_byovd) {
+        g_byovd = malloc(sizeof(byovd_context_t));
+        if (!g_byovd) return NULL;
+        memset(g_byovd, 0, sizeof(byovd_context_t));
+        g_byovd->handle = -1;
+        g_byovd->fd = -1;
+    }
+    return (int8_t*)g_byovd;
 }
 
 int jocky_byovd_load(const char* driver) {
@@ -78,15 +77,11 @@ int jocky_byovd_unload(int handle) {
     return 0;
 }
 
-int jocky_byovd_destroy(int handle) {
-    if (!g_byovd) return -1;
-
-    jocky_byovd_unload(handle);
-
+void jocky_byovd_destroy(int8_t* ctx) {
+    if (!ctx || !g_byovd) return;
+    jocky_byovd_unload(g_byovd->handle);
     free(g_byovd);
     g_byovd = NULL;
-
-    return 0;
 }
 
 int byovd_test_exploit(int handle) {

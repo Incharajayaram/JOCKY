@@ -186,11 +186,34 @@ void jocky_decompress_stream_destroy(jocky_compress_ctx_t ctx_handle) {
 int8_t* jocky_compress_data(int8_t* data, uint64_t size) {
     if (!data || size == 0) return NULL;
 
-    uint8_t* output = (uint8_t*)malloc(size + 4);
+    size_t max_out = compressBound((unsigned long)size);
+    uint8_t* output = (uint8_t*)malloc(max_out);
     if (!output) return NULL;
 
-    memcpy(output + 4, (uint8_t*)data, size);
-    *(uint32_t*)output = (uint32_t)size;
+    unsigned long out_len = max_out;
+    int ret = compress2(output, &out_len, (const uint8_t*)data, (unsigned long)size, 6);
+
+    if (ret != Z_OK) {
+        free(output);
+        return NULL;
+    }
+
+    return (int8_t*)output;
+}
+
+int8_t* jocky_decompress_data(int8_t* data, uint64_t size) {
+    if (!data || size == 0) return NULL;
+
+    uint8_t* output = (uint8_t*)malloc(size * 4);
+    if (!output) return NULL;
+
+    unsigned long out_len = size * 4;
+    int ret = uncompress(output, &out_len, (const uint8_t*)data, (unsigned long)size);
+
+    if (ret != Z_OK) {
+        free(output);
+        return NULL;
+    }
 
     return (int8_t*)output;
 }

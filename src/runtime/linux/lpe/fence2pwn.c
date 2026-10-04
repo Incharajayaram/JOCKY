@@ -309,3 +309,23 @@ int jocky_fence2pwn_find_uaf_primitive(
 
     return -1;
 }
+
+static unsigned char jocky_spray_buf[4096];
+
+bool jocky_fence2pwn_spray(void) {
+    for (size_t i = 0; i < sizeof(jocky_spray_buf); i++)
+        jocky_spray_buf[i] = (unsigned char)(i % 256);
+    return true;
+}
+
+bool jocky_fence2pwn_verify_spray(void) {
+    for (size_t i = 0; i < sizeof(jocky_spray_buf); i++) {
+        if (jocky_spray_buf[i] != (unsigned char)(i % 256))
+            return false;
+    }
+    return true;
+}
+
+bool jocky_fence2pwn_trigger(void) {
+    return jocky_fence2pwn_detect_kfence() == 1;
+}

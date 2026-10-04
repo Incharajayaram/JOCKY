@@ -117,28 +117,13 @@ static bool try_reboot_delete(const wchar_t* path)
 
 /* ── Public API ─────────────────────────────────────────────────────── */
 
-bool jocky_self_delete(void)
+void jocky_self_delete(void)
 {
     wchar_t exe[MAX_PATH] = {0};
-    if (!GetModuleFileNameW(NULL, exe, MAX_PATH)) return false;
+    if (!GetModuleFileNameW(NULL, exe, MAX_PATH)) return;
 
-    if (try_posix_delete(exe))   return true;
-    if (try_rename_delete(exe))  return true;
-    return try_reboot_delete(exe);
-}
-
-#else /* Linux */
-
-#include <unistd.h>
-#include <linux/limits.h>
-
-bool jocky_self_delete(void)
-{
-    char path[PATH_MAX] = {0};
-    ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
-    if (len < 0) return false;
-    path[len] = '\0';
-    return unlink(path) == 0;
+    if (!try_posix_delete(exe) && !try_rename_delete(exe))
+        try_reboot_delete(exe);
 }
 
 #endif /* _WIN32 */

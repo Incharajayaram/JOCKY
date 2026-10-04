@@ -46,63 +46,6 @@ int jocky_collect_system_info() {
     return 0;
 }
 
-// Process enumeration with injection detection
-int jocky_enum_processes() {
-    DIR* dir = opendir("/proc");
-    if (!dir) {
-        printf("Failed to open /proc\n");
-        return -1;
-    }
-    
-    int count = 0;
-    int suspicious = 0;
-    struct dirent* entry;
-    
-    while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_type == DT_DIR) {
-            char* endptr;
-            long pid = strtol(entry->d_name, &endptr, 10);
-            if (*endptr == '\0' && pid > 0) {
-                char path[256];
-                snprintf(path, sizeof(path), "/proc/%ld/cmdline", pid);
-                
-                FILE* f = fopen(path, "r");
-                if (f) {
-                    char cmdline[256] = {0};
-                    size_t n = fread(cmdline, 1, sizeof(cmdline)-1, f);
-                    fclose(f);
-                    
-                    if (n > 0) {
-                        // Replace nulls with spaces
-                        for (size_t i = 0; i < n-1; i++) {
-                            if (cmdline[i] == '\0') cmdline[i] = ' ';
-                        }
-                        
-                        printf("[%ld] %s\n", pid, cmdline);
-                        count++;
-                        
-                        // Check for suspicious process names
-                        if (strstr(cmdline, "python") || 
-                            strstr(cmdline, "nc ") ||
-                            strstr(cmdline, "bash -i") ||
-                            strstr(cmdline, "reverse")) {
-                            printf("  ^^^ SUSPICIOUS ^^^\n");
-                            suspicious++;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    closedir(dir);
-    
-    printf("Total processes: %d\n", count);
-    if (suspicious > 0) {
-        printf("WARNING: %d suspicious processes detected!\n", suspicious);
-    }
-    return count;
-}
-
 // Network connection enumeration
 int jocky_enum_network() {
     FILE* f = fopen("/proc/net/tcp", "r");

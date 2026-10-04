@@ -234,12 +234,10 @@ uint32_t jocky_check_analysis_environment(void)
  * Crypto Helpers
  * ============================================================================ */
 
-void jocky_decrypt_xor(uint8_t* data, size_t len, uint8_t key)
+void jocky_decrypt_xor(uint8_t* data, size_t len, uint8_t key, size_t key_len)
 {
-    for (size_t i = 0; i < len; i++) {
-        data[i] ^= key;
-        key = (key << 1) | (key >> 7); /* rotate left */
-    }
+    (void)key_len;
+    for (size_t i = 0; i < len; i++) data[i] ^= key;
 }
 
 void jocky_decrypt_rc4(uint8_t* data, size_t len, const uint8_t* key, size_t key_len)

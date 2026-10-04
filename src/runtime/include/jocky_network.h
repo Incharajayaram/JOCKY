@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 /* Socket address families */
 #define JOCKY_AF_INET  1  /* IPv4 */
@@ -165,5 +166,10 @@ int jocky_socket_init(void);
  * Call once when done using sockets.
  */
 int jocky_socket_cleanup(void);
+
+/* ========== HTTP OPERATIONS ========== */
+
+int64_t jocky_http_get(const char* url, int8_t* out_buf, int64_t max_size);
+bool jocky_download_file(const char* url, const char* dest_path);
 
 #endif // JOCKY_NETWORK_H

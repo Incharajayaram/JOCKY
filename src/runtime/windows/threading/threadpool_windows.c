@@ -81,9 +81,6 @@ int jocky_threadpool_submit(jocky_threadpool_t pool_handle, jocky_task_callback 
         return -1;
     }
 
-    /* Associate with cleanup group so we can wait on them all */
-    SetThreadpoolCallbackCleanupGroup((PTP_CALLBACK_ENVIRON)&pool->cleanup_group, pool->cleanup_group, NULL);
-
     /* Submit work */
     AcquireSRWLockExclusive(&pool->lock);
     pool->pending_count++;

