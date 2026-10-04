@@ -32,6 +32,29 @@ When documenting a new issue, use this structure:
 
 ## Known Issues
 
+### Issue: Forensic Pipeline Header Include Dependencies UNRESOLVED
+- **ID:** ISSUE-0011
+- **Component:** Build system, forensics
+- **Severity:** critical
+- **Status:** open
+- **Date Found:** 2026-10-04
+- **Affected File(s):**
+  - `src/runtime/forensics/store/evidence_store.h` (line 22)
+  - `src/runtime/forensics/control/capabilities.h`
+  - Multiple forensics subdirectory headers
+- **Error Message:** `fatal error: engine/provenance.h: No such file or directory`
+- **Reproduction Steps:**
+  1. cd src/runtime && cmake .
+  2. make
+  3. Compiler fails on forensic_engine.c during evidence_store.h inclusion
+- **Root Cause:** Forensic pipeline integrated with incorrect header relative paths. Evidence store (in store/) tries to include engine/provenance.h with wrong path syntax. Multiple headers have circular or incorrect include paths.
+- **Workaround:** None until paths fixed
+- **Priority:** CRITICAL — Blocks full compilation of main pipeline
+- **Related Issues:** None yet
+- **Notes:** Forensic agents committed files without resolving include paths. Need comprehensive path restructuring in forensics subsystem.
+
+---
+
 ### Issue: Undefined Symbol Linker Errors on Linux Runtime APIs
 - **ID:** ISSUE-0001
 - **Component:** linker
