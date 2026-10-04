@@ -1,4 +1,4 @@
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 /**
  * Memory Collector Plugin
  * 
@@ -6,7 +6,7 @@
  * On Linux: reads /proc/<pid>/maps, /proc/<pid>/smaps, /proc/<pid>/mem
  */
 
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

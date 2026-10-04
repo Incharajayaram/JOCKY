@@ -19,7 +19,7 @@
 #pragma once
 
 #include "../forensic_types.h"
-#include "engine/provenance.h"
+#include "../engine/provenance.h"
 
 #ifdef __cplusplus
 extern "C" {

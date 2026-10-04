@@ -1,11 +1,11 @@
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 /**
  * File Parser Plugin
  * 
  * Parses file paths, detects PE files, extracts basic metadata.
  */
 
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -9,6 +9,17 @@
 #include <sys/resource.h>
 #include <sched.h>
 
+/* Fallback definitions if not available on this system */
+#ifndef CLONE_NEWPID
+#define CLONE_NEWPID 0x20000000
+#endif
+#ifndef CLONE_NEWNET
+#define CLONE_NEWNET 0x40000000
+#endif
+#ifndef CLONE_NEWIPC
+#define CLONE_NEWIPC 0x08000000
+#endif
+
 /* Spawn sandboxed process */
 int sandbox_spawn(const char* exe, const char* args) {
     if (!exe) return -1;

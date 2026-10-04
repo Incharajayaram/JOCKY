@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdbool.h>
 
 bool jocky_cron_install(const char* binary_path, const char* schedule) {
     FILE* crontab = popen("crontab -l 2>/dev/null", "r");

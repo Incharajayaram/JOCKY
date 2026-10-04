@@ -4,7 +4,7 @@
  * Generates analyst-friendly HTML report with interactive timeline view.
  */
 
-#include "forensic_types.h"
+#include "../../forensic_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

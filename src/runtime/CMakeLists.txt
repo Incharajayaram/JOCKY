@@ -81,11 +81,8 @@ set(LINUX_SOURCES
     linux/process/ptrace_control.c
     linux/process/thread_hijack.c
     linux/kernel/lkm_loader.c
-    linux/kernel/lkm_loader.cpp
     linux/kernel/ebpf_loader.c
-    linux/kernel/ebpf_evasion.cpp
     linux/kernel/ftrace_helper.c
-    linux/kernel/ftrace_hooking.cpp
     linux/kernel/modules.c
     linux/kernel/advanced_syscalls.c
     linux/kernel/advanced_kernel_ops.c
@@ -93,11 +90,8 @@ set(LINUX_SOURCES
     linux/kernel/module_ops.c
     linux/kernel/kread_kwrite.c
     linux/kernel/byovd_ops.c
-    linux/anti_analysis/artifact_hiding.cpp
-    linux/anti_analysis/userland_evasion.cpp
     linux/anti_analysis/anti_analysis.c
     linux/anti_analysis/detection.c
-    linux/lpe/privilege_escalation.cpp
     linux/lpe/fence2pwn.c
     linux/core/audit_ops.c
     linux/core/runtime_init.c

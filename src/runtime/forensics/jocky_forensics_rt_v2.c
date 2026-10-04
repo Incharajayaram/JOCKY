@@ -14,7 +14,7 @@
 #include <sys/types.h>
 
 /* Include the forensic engine */
-#include "src/runtime/forensics/forensic_engine.h"
+#include "forensic_engine.h"
 
 /* ============================================================================
  * Global Engine Instance
