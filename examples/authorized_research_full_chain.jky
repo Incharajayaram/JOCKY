@@ -308,6 +308,44 @@ fn record_operation_provenance(source: str, transform: str, output: str) {
     operations_logged = operations_logged + 1
 }
 
+fn collect_forensic_evidence() {
+    println("[*] Collecting forensic evidence for analysis...")
+
+    // Collect Windows evidence
+    let event_logs = forensic_collect_event_logs("")
+    println("  [+] Event logs collected")
+
+    // Collect Linux evidence
+    let journal_entries = forensic_collect_journal_entries()
+    println("  [+] Journal entries collected")
+
+    let syslog_lines = forensic_collect_syslog_lines()
+    println("  [+] Syslog collected")
+
+    let process_list = forensic_collect_process_list()
+    println("  [+] Process list collected")
+
+    // Analyze process tree
+    forensic_analyze_process_tree()
+    println("  [+] Process tree analyzed")
+
+    // Build timeline from collected evidence
+    let timeline = forensic_timeline_builder()
+    println("  [+] Forensic timeline constructed")
+
+    // Correlation analysis
+    forensic_correlation_engine()
+    println("  [+] Forensic correlation complete")
+
+    // Export findings to JSON
+    let report = forensic_generate_report()
+    forensic_export_json(report)
+    println("  [+] Forensic report exported")
+
+    audit_log("forensics", "evidence_collected", "all_sources", "completed")
+    operations_logged = operations_logged + 1
+}
+
 fn main() {
     println("================================================================================")
     println("JOCKY Complete Research Chain - Authorized Security Research")
@@ -387,6 +425,12 @@ fn main() {
     )
 
     println("[+] Exfiltration complete via multiple channels")
+    println("")
+
+    // Phase 7.5: Forensic Evidence Collection
+    println("[PHASE 7.5] Forensic Evidence Collection & Analysis")
+    println("---")
+    collect_forensic_evidence()
     println("")
 
     // Phase 8: Forensic Cleanup
