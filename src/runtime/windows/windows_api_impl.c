@@ -265,10 +265,6 @@ void *jocky_credentials_enumerate_impl(void) {
     return malloc(256);
 }
 
-void *jocky_token_enumerate(void) {
-    /* Real: Enumerate Windows access tokens */
-    return malloc(1024);
-}
 
 int32_t jocky_impersonate_user(const char *username, const char *domain, const char *password) {
     if (!username) return -1;

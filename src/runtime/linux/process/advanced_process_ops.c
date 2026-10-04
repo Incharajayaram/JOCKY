@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sched.h>
@@ -256,4 +257,39 @@ int jocky_process_modify_signal_handlers(
 
     fclose(maps);
     return 0;
+}
+
+/* Enumerate all PIDs that the current process can open (have accessible credentials).
+ * Returns a malloc'd int32_t[] terminated by 0, or NULL on failure. */
+int32_t* jocky_token_enumerate(void)
+{
+    int32_t* pids = (int32_t*)malloc(sizeof(int32_t) * 1024);
+    if (!pids) return NULL;
+
+    int count = 0;
+
+    DIR* proc = opendir("/proc");
+    if (!proc) { free(pids); return NULL; }
+
+    struct dirent* entry;
+    while ((entry = readdir(proc)) != NULL && count < 1023) {
+        if (entry->d_type != DT_DIR) continue;
+
+        char* end;
+        long pid = strtol(entry->d_name, &end, 10);
+        if (*end != '\0' || pid <= 0) continue;
+
+        char status_path[64];
+        snprintf(status_path, sizeof(status_path), "/proc/%ld/status", pid);
+
+        FILE* f = fopen(status_path, "r");
+        if (f) {
+            pids[count++] = (int32_t)pid;
+            fclose(f);
+        }
+    }
+
+    closedir(proc);
+    pids[count] = 0;
+    return pids;
 }

