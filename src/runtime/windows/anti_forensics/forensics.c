@@ -702,7 +702,7 @@ bool jocky_cleanup_all(void)
     ok &= jocky_patch_shimcache();
     ok &= jocky_patch_amcache();
     ok &= jocky_clear_srum();
-    ok &= jocky_wipe_artifacts();
+    jocky_wipe_artifacts(NULL);
     ok &= jocky_self_delete();
     return ok;
 }

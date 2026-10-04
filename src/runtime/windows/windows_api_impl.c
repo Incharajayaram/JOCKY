@@ -199,17 +199,6 @@ int32_t jocky_registry_dump_security(void) {
     return 0;
 }
 
-int32_t jocky_wipe_artifacts(const char *dir) {
-    if (!dir) return -1;
-
-    /* Real: Securely delete artifacts with multiple passes */
-    FILE *fp = fopen(dir, "r");
-    if (fp) {
-        fclose(fp);
-        return 1;
-    }
-    return 0;
-}
 
 int32_t jocky_wipe_jumplist(void) {
     /* Real: Wipe Windows Jump Lists */

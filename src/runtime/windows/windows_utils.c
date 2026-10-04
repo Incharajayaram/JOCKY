@@ -305,7 +305,6 @@ int32_t audit_export(const char* path) { return -1; }
 
 /* Cleanup/Forensics */
 int32_t jocky_cleanup_usn_journal(void) { return -1; }
-int32_t jocky_cleanup_event_logs(void) { return -1; }
 int32_t jocky_linux_cleanup_journal(void) { return -1; }
 int32_t forensics_wipe_cmd_history(void) { return -1; }
 int32_t forensics_wipe_powershell_history(void) { return -1; }

