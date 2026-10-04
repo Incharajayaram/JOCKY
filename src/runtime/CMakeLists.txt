@@ -30,9 +30,16 @@ set(RUNTIME_SOURCES
     io/io.c
     memory/vmem.c
     windows/registry/registry.c
+    windows/windows_api_impl.c
     byovd/driver_scoring.c
     byovd/byovd_manifest.c
     byovd/byovd_modular.c
+
+    # Forensic analysis APIs
+    forensics/forensic_api_impl.c
+    forensics/forensic_engine.c
+    forensics/forensics_rt.c
+    forensics/forensic_utils.c
 
     # Linux syscall wrappers (FIXED PATHS: linux/syscalls/ not linux/)
     linux/syscalls/syscall.c
