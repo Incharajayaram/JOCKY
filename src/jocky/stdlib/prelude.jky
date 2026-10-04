@@ -285,3 +285,175 @@ ffi jocky_edr_get_syscall_delay(mode: i32) -> i32;
 ffi jocky_edr_should_reduce_syscalls(mode: i32) -> bool;
 ffi jocky_edr_should_batch_operations(mode: i32) -> bool;
 ffi jocky_edr_profiler_shutdown(profiler: i8*) -> void;
+
+// ---- Forensic Engine ----
+ffi forensic_engine_create(config: i8*) -> i8*;
+ffi forensic_engine_destroy(engine: i8*) -> i32;
+ffi forensic_engine_config_default(config: i8*) -> i32;
+ffi forensic_engine_register_default_plugins(engine: i8*) -> i32;
+ffi forensic_engine_run_collection(engine: i8*, output: i8*) -> i8*;
+ffi forensic_engine_run_analysis(engine: i8*, parsed: i8*, result: i8*) -> i8*;
+ffi forensic_engine_generate_outputs(engine: i8*, result: i8*) -> i32;
+ffi forensic_engine_run_full_pipeline(engine: i8*, result: i8*) -> i8*;
+
+// ---- Forensic Artifact Management ----
+ffi forensic_artifact_list_create(capacity: i32) -> i8*;
+ffi forensic_artifact_list_destroy(list: i8*) -> i32;
+ffi forensic_artifact_list_add(list: i8*, artifact: i8*) -> i32;
+ffi forensic_artifact_list_add_deep(list: i8*, artifact: i8*) -> i32;
+ffi forensic_bytes_create(data: i8*, len: i32) -> i8*;
+ffi forensic_bytes_destroy(bytes: i8*) -> i32;
+
+// ---- Forensic Metadata ----
+ffi forensic_metadata_create(capacity: i32) -> i8*;
+ffi forensic_metadata_destroy(meta: i8*) -> i32;
+ffi forensic_metadata_add(meta: i8*, key: string, value: string) -> i32;
+ffi forensic_metadata_get(meta: i8*, key: string) -> string;
+
+// ---- Forensic Analysis ----
+ffi forensic_analysis_create() -> i8*;
+ffi forensic_analysis_destroy(result: i8*) -> i32;
+ffi forensic_analysis_build_timeline(parsed: i8*, timeline: i8*) -> i8*;
+ffi forensic_analysis_extract_iocs(parsed: i8*, iocs: i8*) -> i8*;
+ffi forensic_analysis_correlate(timeline: i8*, iocs: i8*, graph: i8*) -> i32;
+ffi forensic_analysis_run(parsed: i8*, result: i8*) -> i8*;
+
+// ---- Forensic Provenance Tracking ----
+ffi forensic_provenance_create() -> i8*;
+ffi forensic_provenance_destroy(prov: i8*) -> i32;
+ffi forensic_provenance_record(prov: i8*, source: i8*, transform: i8*, output: i8*) -> i32;
+ffi forensic_provenance_verify_chain(prov: i8*) -> i32;
+ffi forensic_provenance_get(prov: i8*) -> i8*;
+ffi forensic_provenance_save(prov: i8*, path: string) -> i32;
+ffi forensic_provenance_load(prov: i8*, path: string) -> i32;
+
+// ---- Forensic Evidence Storage ----
+ffi forensic_evidence_store_open(base_path: string) -> i8*;
+ffi forensic_evidence_store_close(store: i8*) -> i32;
+ffi forensic_evidence_store_add(store: i8*, artifact: i8*, parsed: i8*, prov: i8*) -> i32;
+ffi forensic_evidence_store_get(store: i8*, id: string) -> i8*;
+ffi forensic_evidence_store_list(store: i8*) -> i8*;
+ffi forensic_evidence_store_query(store: i8*, params: i8*, result: i8*) -> i8*;
+ffi forensic_evidence_store_save_index(store: i8*) -> i32;
+ffi forensic_evidence_store_cleanup(store: i8*) -> i32;
+
+// ---- Forensic Audit Logging ----
+ffi forensic_audit_log_open(path: string) -> i8*;
+ffi forensic_audit_log_close(log: i8*) -> i32;
+ffi forensic_audit_log_append(log: i8*, entry: string) -> i32;
+ffi forensic_audit_log_verify(log: i8*) -> i32;
+
+// ---- Forensic Permissions & Capabilities ----
+ffi forensic_permission_check_role(role: i32) -> i32;
+ffi forensic_permission_check_set(set: i8*, permission: i32) -> i32;
+ffi forensic_permission_check_plugin(plugin: i8*, permission: i32) -> i32;
+ffi forensic_capability_name(cap: i32) -> string;
+ffi forensic_role_name(role: i32) -> string;
+
+// ---- Forensic Plugin Registry ----
+ffi forensic_plugin_registry_create() -> i8*;
+ffi forensic_plugin_registry_destroy(registry: i8*) -> i32;
+ffi forensic_plugin_registry_register_collector(registry: i8*, name: string, plugin: i8*) -> i32;
+ffi forensic_plugin_registry_register_parser(registry: i8*, name: string, plugin: i8*) -> i32;
+ffi forensic_plugin_registry_register_output(registry: i8*, name: string, plugin: i8*) -> i32;
+ffi forensic_plugin_registry_find_collector(registry: i8*, name: string) -> i8*;
+ffi forensic_plugin_registry_find_parser(registry: i8*, name: string) -> i8*;
+ffi forensic_plugin_registry_find_output(registry: i8*, name: string) -> i8*;
+
+// ---- Forensic Utilities ----
+ffi forensic_hash_compute(data: i8*, len: i32) -> string;
+ffi forensic_hash_chain_compute(data: i8*, len: i32) -> string;
+ffi forensic_output_format_json(result: i8*) -> string;
+
+// ---- BYOVD/Driver APIs ----
+ffi byovd_get_os_version() -> i32;
+ffi byovd_select_best_driver(reliability_threshold: f32) -> i32;
+ffi byovd_load_driver(driver_name: string) -> i32;
+ffi byovd_unload_driver(handle: i32) -> i32;
+ffi byovd_test_exploit(handle: i32) -> i32;
+
+// ---- Plugin System ----
+ffi plugin_load(path: string) -> i32;
+ffi plugin_run(handle: i32, args: string) -> i32;
+ffi plugin_unload(handle: i32) -> i32;
+ffi plugin_list() -> i32;
+
+// ---- Linux Kernel Module (LKM) Loading ----
+ffi lkm_load(path: string) -> i32;
+ffi lkm_unload(handle: i32) -> i32;
+ffi lkm_hook_syscall(handle: i32, syscall_num: i32) -> i32;
+ffi lkm_unhook_syscall(syscall_num: i32) -> i32;
+ffi lkm_get_syscall_table() -> i64;
+
+// ---- eBPF Program Loading ----
+ffi ebpf_load(name: string, bytecode: i8*) -> i32;
+ffi ebpf_attach(handle: i32, attach_point: string) -> i32;
+ffi ebpf_detach(handle: i32) -> i32;
+ffi ebpf_map_update(handle: i32, key: i8*, value: i8*) -> i32;
+ffi ebpf_map_lookup(handle: i32, key: i8*) -> i32;
+ffi ebpf_unload(handle: i32) -> i32;
+
+// ---- AI Evasion Engine ----
+ffi ai_init() -> i32;
+ffi ai_collect_telemetry() -> i32;
+ffi ai_score_threat() -> f32;
+ffi ai_recommend_strategy() -> i32;
+ffi ai_generate_mutation() -> i32;
+ffi ai_get_current_risk() -> i32;
+ffi ai_get_statistics() -> i32;
+
+// ---- EDRChoker ----
+ffi edrhoker_detect() -> i32;
+ffi edrhoker_throttle(process_id: i32, kb_per_sec: i32) -> i32;
+ffi edrhoker_restore(process_id: i32) -> i32;
+
+// ---- Blindside (Hardware Breakpoint Unhooking) ----
+ffi blindside_unhook_ntdll() -> i32;
+ffi blindside_create_debug_child(executable: string) -> i32;
+
+// ---- Fence2Pwn (Linux LPE) ----
+ffi fence2pwn_detect_kfence() -> i32;
+ffi fence2pwn_exploit() -> i32;
+
+// ---- BTR Reforged (Defender Driver Abuse) ----
+ffi btr_load_driver() -> i32;
+ffi btr_disable_notifications() -> i32;
+ffi btr_mask_module(module_name: string) -> i32;
+ffi btr_delete_file(filename: string) -> i32;
+ffi btr_kill_process(process_id: i32) -> i32;
+
+// ---- PatchGuard Peekaboo (HVCI Process Hiding) ----
+ffi patchguard_hide_process(process_id: i32) -> i32;
+ffi patchguard_unhide_process(process_id: i32) -> i32;
+ffi patchguard_hidden_count() -> i32;
+
+// ---- Windows Registry API ----
+ffi jocky_reg_open(hkey: i64, subkey: string, access: i32) -> i64;
+ffi jocky_reg_create(hkey: i64, subkey: string, access: i32) -> i64;
+ffi jocky_reg_close(key: i64) -> i32;
+ffi jocky_reg_query_value(key: i64, value_name: string, type_ptr: i8*, data: i8*, data_size: i8*) -> i32;
+ffi jocky_reg_set_value(key: i64, value_name: string, type_val: i32, data: i8*, data_size: i32) -> i32;
+ffi jocky_reg_delete_value(key: i64, value_name: string) -> i32;
+ffi jocky_reg_delete_key(hkey: i64, subkey: string) -> i32;
+ffi jocky_reg_enum_key(key: i64, index: i32, name: i8*, name_size: i8*) -> i32;
+ffi jocky_reg_enum_value(key: i64, index: i32, name: i8*, name_size: i8*, type_ptr: i8*) -> i32;
+ffi jocky_reg_key_count(key: i64) -> i32;
+ffi jocky_reg_value_count(key: i64) -> i32;
+ffi jocky_reg_query_dword(key: i64, value_name: string, out_value: i8*) -> i32;
+ffi jocky_reg_set_dword(key: i64, value_name: string, value: i32) -> i32;
+ffi jocky_reg_query_string(key: i64, value_name: string, buffer: i8*, buffer_size: i32) -> i32;
+ffi jocky_reg_set_string(key: i64, value_name: string, value: string) -> i32;
+ffi jocky_reg_query_binary(key: i64, value_name: string, buffer: i8*, buffer_size: i8*) -> i32;
+ffi jocky_reg_set_binary(key: i64, value_name: string, data: i8*, data_size: i32) -> i32;
+
+// ---- Sandbox APIs ----
+ffi sandbox_spawn_adv(executable: string, args: string) -> i32;
+ffi sandbox_kill(pid: i32) -> i32;
+ffi sandbox_set_limits_adv(pid: i32, max_memory: i32, max_cpu_ms: i32) -> i32;
+
+// ---- Audit & Provenance APIs ----
+ffi audit_init_adv(capacity: i32) -> i32;
+ffi audit_log_adv(actor: string, action: string, input_hash: string, output_hash: string) -> i32;
+ffi audit_verify_adv() -> i32;
+ffi audit_export_adv(filename: string) -> i32;
+ffi provenance_record_adv(source: string, transform: string, output: string) -> i32;
