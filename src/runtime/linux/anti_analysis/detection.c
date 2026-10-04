@@ -74,11 +74,3 @@ int jocky_is_vm(void) {
     return 0;
 }
 
-int jocky_check_analysis_environment(void) {
-    /* Combined check for analysis environment */
-    if (jocky_is_debugger_present()) return 1;
-    if (jocky_is_sandbox()) return 1;
-    if (jocky_is_vm()) return 1;
-
-    return 0;
-}

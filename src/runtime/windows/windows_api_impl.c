@@ -429,6 +429,3 @@ int32_t jocky_unhook_kernel32(void) {
     return 0;
 }
 
-void jocky_self_delete(void) {
-    /* Real: Delete executable file */
-}

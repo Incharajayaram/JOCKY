@@ -28,12 +28,12 @@ void jocky_free(void* ptr)
     if (ptr) HeapFree(GetProcessHeap(), 0, ptr);
 }
 
-void* jocky_byovd_new(void)
+int8_t* jocky_byovd_new(void)
 {
-    return jocky_alloc((int64_t)sizeof(jocky_byovd_t));
+    return (int8_t*)jocky_alloc((int64_t)sizeof(jocky_byovd_t));
 }
 
-void jocky_byovd_destroy(void* ctx)
+void jocky_byovd_destroy(int8_t* ctx)
 {
     if (!ctx) return;
     jocky_byovd_unload((jocky_byovd_t*)ctx);

