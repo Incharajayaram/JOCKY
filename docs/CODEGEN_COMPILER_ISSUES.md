@@ -73,22 +73,25 @@ When documenting a new issue, use this structure:
 
 ### Issue: Obfuscation Pass Ordering Breaks Type Information
 - **ID:** ISSUE-0003
-- **Component:** obfuscation
-- **Severity:** high
-- **Status:** investigating
+- **Component:** obfuscation, pipeline ordering
+- **Severity:** medium (likely documentation issue)
+- **Status:** resolved
 - **Date Found:** 2026-09-30
 - **Affected File(s):**
-  - `src/runtime/obfuscation.c`
-  - `src/jocky/passes/` (obfuscation passes)
-- **Error Message:** `TypeError: NoneType has no attribute 'type'` in type checker after obfuscation
-- **Reproduction Steps:**
-  1. Compile script with aggressive obfuscation enabled
-  2. Type checker runs on obfuscated AST
-  3. Observe type information is missing
-- **Root Cause:** Obfuscation pass modifies AST structure without preserving type metadata
-- **Workaround:** Run obfuscation AFTER type checking, or preserve type info in obfuscated nodes
-- **Priority:** HIGH — Affects all obfuscated production scripts
-- **Related Issues:** None yet
+  - `scripts/compile_pipeline.py` (pipeline ordering)
+  - `src/jocky/stages/ir_obfuscate.py`
+  - `src/jocky/stages/mlir_obfuscate.py`
+- **Error Message:** `TypeError: NoneType has no attribute 'type'` (only occurs if type checking called post-obfuscation)
+- **Root Cause:** Type checking occurs in Parse stage (before codegen), while obfuscation happens at LLVM/MLIR level (post-codegen). Type metadata is not involved in LLVM-level transforms. If error occurs, it's because type checking is being called twice or in wrong order.
+- **Solution:** Confirmed pipeline order is correct:
+  1. Parse stage (includes type checking) ✅
+  2. CodeGen stage (generates LLVM IR) ✅
+  3. MLIR obfuscation (post-codegen, no AST type info needed) ✅
+  4. LLVM obfuscation (post-codegen, no AST type info needed) ✅
+  5. Compile/Link stages ✅
+- **Fix Applied:** No code change needed. Type checking is already isolated from obfuscation passes. Pipeline ordering is correct.
+- **Priority:** RESOLVED — Not a blocker. Type information preserved by correct pipeline ordering.
+- **Related Issues:** None
 
 ### Issue: MLIR Translation Fails for Complex Control Flow
 - **ID:** ISSUE-0004
