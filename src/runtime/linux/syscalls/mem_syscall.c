@@ -4,11 +4,6 @@
 #include <string.h>
 #include <stdio.h>
 
-/* Simple heap allocator state */
-#define HEAP_MAX 1048576  /* 1MB max heap allocation */
-static char jocky_heap[HEAP_MAX];
-static size_t jocky_heap_used = 0;
-
 /* ========== MEMORY MAPPING ========== */
 
 void* jocky_mmap(void* addr, size_t length, int prot, int flags, long fd, long offset) {
@@ -39,25 +34,6 @@ int jocky_msync(void* addr, size_t length) {
 
     long result = jocky_syscall3(SYS_msync, (long)addr, length, 0);
     return (result == 0) ? 0 : -1;
-}
-
-/* ========== SIMPLE HEAP ALLOCATOR ========== */
-
-void* jocky_malloc(size_t size) {
-    if (size == 0 || jocky_heap_used + size > HEAP_MAX) {
-        return NULL;
-    }
-
-    void* ptr = &jocky_heap[jocky_heap_used];
-    jocky_heap_used += size;
-
-    return ptr;
-}
-
-int jocky_free(void* ptr) {
-    /* Simple allocator doesn't actually free, but mark for reuse */
-    if (!ptr) return -1;
-    return 0;
 }
 
 long jocky_pagesize(void) {

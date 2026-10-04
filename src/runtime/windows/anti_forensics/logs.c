@@ -13,7 +13,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#include <wevtapi.h>
+#include <winevt.h>
 
 /* ── Event log clearing ─────────────────────────────────────────────── */
 

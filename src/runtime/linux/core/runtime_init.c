@@ -8,14 +8,11 @@
 
 static int runtime_initialized = 0;
 
-int jocky_runtime_init(void) {
-    if (runtime_initialized) return 0;
-
-    /* Initialize OpenSSL */
+__attribute__((constructor))
+static void jocky_openssl_auto_init(void) {
+    if (runtime_initialized) return;
     OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
-
     runtime_initialized = 1;
-    return 0;
 }
 
 /* Crypto wrappers */

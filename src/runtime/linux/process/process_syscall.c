@@ -11,16 +11,8 @@ long jocky_getppid(void) {
     return jocky_syscall0(SYS_getppid);
 }
 
-long jocky_getuid(void) {
-    return jocky_syscall0(SYS_getuid);
-}
-
 long jocky_geteuid(void) {
     return jocky_syscall0(SYS_geteuid);
-}
-
-long jocky_getgid(void) {
-    return jocky_syscall0(SYS_getgid);
 }
 
 long jocky_getegid(void) {
