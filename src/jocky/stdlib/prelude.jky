@@ -393,22 +393,11 @@ ffi ebpf_map_update(handle: i32, key: i8*, value: i8*) -> i32;
 ffi ebpf_map_lookup(handle: i32, key: i8*) -> i32;
 ffi ebpf_unload(handle: i32) -> i32;
 
-// ---- AI Evasion Engine ----
-ffi ai_init() -> i32;
-ffi ai_collect_telemetry() -> i32;
-ffi ai_score_threat() -> f32;
-ffi ai_recommend_strategy() -> i32;
-ffi ai_generate_mutation() -> i32;
-ffi ai_get_current_risk() -> i32;
-ffi ai_get_statistics() -> i32;
-
-// ---- EDRChoker ----
-ffi edrhoker_detect() -> i32;
+// ---- EDRChoker (additional helpers) ----
 ffi edrhoker_throttle(process_id: i32, kb_per_sec: i32) -> i32;
 ffi edrhoker_restore(process_id: i32) -> i32;
 
-// ---- Blindside (Hardware Breakpoint Unhooking) ----
-ffi blindside_unhook_ntdll() -> i32;
+// ---- Blindside (additional helpers) ----
 ffi blindside_create_debug_child(executable: string) -> i32;
 
 // ---- Fence2Pwn (Linux LPE) ----
@@ -417,8 +406,6 @@ ffi fence2pwn_exploit() -> i32;
 
 // ---- BTR Reforged (Defender Driver Abuse) ----
 ffi btr_load_driver() -> i32;
-ffi btr_disable_notifications() -> i32;
-ffi btr_mask_module(module_name: string) -> i32;
 ffi btr_delete_file(filename: string) -> i32;
 ffi btr_kill_process(process_id: i32) -> i32;
 
