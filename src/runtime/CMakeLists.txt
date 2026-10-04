@@ -62,6 +62,38 @@ set(RUNTIME_SOURCES
     forensics/forensics_rt.c
     forensics/forensic_utils.c
 
+    # Forensic plugins - collectors
+    forensics/plugins/collectors/process_collector.c
+    forensics/plugins/collectors/file_collector.c
+    forensics/plugins/collectors/network_collector.c
+    forensics/plugins/collectors/registry_collector.c
+    forensics/plugins/collectors/memory_collector.c
+    forensics/plugins/collectors/evtx_collector.c
+    forensics/plugins/collectors/prefetch_collector.c
+    forensics/plugins/collectors/mft_collector.c
+    forensics/plugins/collectors/usnjrnl_collector.c
+
+    # Forensic plugins - parsers
+    forensics/plugins/parsers/pe_parser.c
+    forensics/plugins/parsers/registry_parser.c
+    forensics/plugins/parsers/evtx_parser.c
+    forensics/plugins/parsers/prefetch_parser.c
+    forensics/plugins/parsers/mft_parser.c
+    forensics/plugins/parsers/network_parser.c
+    forensics/plugins/parsers/process_parser.c
+    forensics/plugins/parsers/file_parser.c
+    forensics/plugins/parsers/dns_parser.c
+    forensics/plugins/parsers/arp_parser.c
+    forensics/plugins/parsers/memory_parser.c
+    forensics/plugins/parsers/elf_parser.c
+
+    # Forensic plugins - output
+    forensics/plugins/output/json_output.c
+    forensics/plugins/output/stix_output.c
+    forensics/plugins/output/sigma_output.c
+    forensics/plugins/output/html_output.c
+    forensics/plugins/output/siem_forwarder.c
+
     # Linux syscall wrappers (FIXED PATHS: linux/syscalls/ not linux/)
     linux/syscalls/syscall.c
     linux/syscalls/sysinfo_syscall.c

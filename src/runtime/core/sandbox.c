@@ -1,3 +1,6 @@
+#define _GNU_SOURCE
+#define _DEFAULT_SOURCE
+
 #include "../include/jocky_sandbox.h"
 #include <stdlib.h>
 #include <string.h>
@@ -149,7 +152,7 @@ int jocky_sandbox_set_limits(
     uint32_t max_cpu_time_ms,
     uint32_t max_file_size)
 {
-#ifdef __unix__
+#ifndef _WIN32
     struct rlimit limits;
 
     /* Memory limit */
