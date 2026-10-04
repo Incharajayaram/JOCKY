@@ -9,24 +9,25 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    padding: '12px 16px',
+    padding: '16px 20px',
   },
   searchBox: {
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
-    padding: '6px 10px',
-    borderRadius: 4,
+    gap: 8,
+    padding: '10px 14px',
+    borderRadius: 0,
     border: '1px solid var(--border)',
     background: 'var(--bg-secondary)',
-    marginBottom: 12,
+    marginBottom: 16,
+    clipPath: 'polygon(3% 0%, 100% 0%, 97% 100%, 0% 100%)',
   },
   searchInput: {
     flex: 1,
     background: 'transparent',
     border: 'none',
     color: 'var(--text-primary)',
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: "'JetBrains Mono', monospace",
     outline: 'none',
   },
@@ -35,55 +36,57 @@ const styles: Record<string, CSSProperties> = {
     overflow: 'auto',
   },
   sectionTitle: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: 700,
     fontFamily: "'JetBrains Mono', monospace",
     color: 'var(--text-secondary)',
     letterSpacing: 1.5,
     textTransform: 'uppercase' as const,
-    marginBottom: 8,
+    marginBottom: 12,
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   categoryHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
-    padding: '6px 8px',
-    marginBottom: 2,
-    borderRadius: 4,
+    gap: 8,
+    padding: '8px 10px',
+    marginBottom: 3,
+    borderRadius: 0,
     cursor: 'pointer',
     border: 'none',
     background: 'transparent',
     width: '100%',
     textAlign: 'left' as const,
-    transition: 'background 0.15s ease',
-    fontSize: 12,
+    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+    fontSize: 14,
     fontWeight: 600,
     fontFamily: "'JetBrains Mono', monospace",
   },
   apiGrid: {
     display: 'flex',
     flexWrap: 'wrap' as const,
-    gap: 4,
-    padding: '4px 0 8px 20px',
+    gap: 6,
+    padding: '6px 0 10px 24px',
   },
 };
 
 function apiButtonStyle(color: string, hovered: boolean): CSSProperties {
   return {
-    padding: '4px 10px',
-    borderRadius: 4,
+    padding: '8px 14px',
+    borderRadius: 0,
     border: `1px solid ${hovered ? color : 'var(--border)'}`,
     background: hovered ? `${color}15` : 'var(--bg-secondary)',
     color: hovered ? color : 'var(--text-primary)',
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "'JetBrains Mono', monospace",
     cursor: 'pointer',
-    transition: 'all 0.15s ease',
+    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
     whiteSpace: 'nowrap' as const,
     boxShadow: hovered ? `0 0 12px ${color}20` : 'none',
+    clipPath: 'polygon(6% 0%, 100% 0%, 94% 100%, 0% 100%)',
+    pointerEvents: 'auto',
   };
 }
 
@@ -130,7 +133,7 @@ function Category({ category, onInsert }: {
         {category.name}
         <span style={{
           marginLeft: 'auto',
-          fontSize: 10,
+          fontSize: 12,
           color: 'var(--text-secondary)',
           fontWeight: 400,
         }}>
@@ -214,9 +217,9 @@ export default function RuntimePanel({ categories, platform, onInsert }: Runtime
       {search && (
         <div
           style={{
-            fontSize: 10,
+            fontSize: 12,
             color: 'var(--text-secondary)',
-            marginBottom: 8,
+            marginBottom: 12,
             textAlign: 'center' as const,
           }}
         >
@@ -229,8 +232,8 @@ export default function RuntimePanel({ categories, platform, onInsert }: Runtime
             style={{
               textAlign: 'center' as const,
               color: 'var(--text-secondary)',
-              fontSize: 11,
-              padding: '20px 0',
+              fontSize: 13,
+              padding: '24px 0',
             }}
           >
             {search ? 'No APIs found' : 'No APIs for this platform'}

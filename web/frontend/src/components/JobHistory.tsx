@@ -12,9 +12,9 @@ const styles: Record<string, CSSProperties> = {
     borderLeft: '1px solid var(--border)',
   },
   header: {
-    padding: '8px 16px',
+    padding: '12px 20px',
     borderBottom: '1px solid var(--border)',
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "'JetBrains Mono', monospace",
     color: 'var(--text-secondary)',
     fontWeight: 600,
@@ -22,14 +22,14 @@ const styles: Record<string, CSSProperties> = {
   list: {
     flex: 1,
     overflow: 'auto',
-    padding: '8px 0',
+    padding: '10px 0',
   },
   item: {
-    padding: '8px 16px',
+    padding: '10px 20px',
     borderBottom: '1px solid var(--border)',
     cursor: 'pointer',
     transition: 'background 0.15s ease',
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "'JetBrains Mono', monospace",
   },
   itemHovered: {
@@ -38,7 +38,7 @@ const styles: Record<string, CSSProperties> = {
   itemContent: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   statusIcon: {
     display: 'flex',
@@ -51,10 +51,10 @@ const styles: Record<string, CSSProperties> = {
   },
   itemTitle: {
     color: 'var(--text-primary)',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   itemMeta: {
-    fontSize: 10,
+    fontSize: 12,
     color: 'var(--text-secondary)',
   },
 };

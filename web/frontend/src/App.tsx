@@ -28,9 +28,8 @@ const styles: Record<string, CSSProperties> = {
     overflow: 'hidden',
   },
   rightPanel: {
-    width: '40%',
+    width: '45%',
     minWidth: 300,
-    maxWidth: 500,
     display: 'flex',
     flexDirection: 'column',
     background: 'var(--bg-primary)',

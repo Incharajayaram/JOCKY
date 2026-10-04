@@ -14,8 +14,8 @@ const styles: Record<string, CSSProperties> = {
     flexDirection: 'column',
   },
   header: {
-    padding: '8px 16px',
-    fontSize: 11,
+    padding: '12px 20px',
+    fontSize: 13,
     fontFamily: "'JetBrains Mono', monospace",
     color: 'var(--text-secondary)',
     background: 'var(--bg-secondary)',
@@ -29,6 +29,7 @@ const styles: Record<string, CSSProperties> = {
 
 export interface CodeEditorHandle {
   insertAtCursor: (text: string) => void;
+  insertAtEnd: (text: string) => void;
 }
 
 interface CodeEditorProps {
@@ -49,6 +50,15 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
         setLanguageRegistered(true);
         editor.setModel(monaco.editor.createModel(value, 'jocky'));
       }
+
+      // Move cursor to end of file by default
+      const model = editor.getModel();
+      if (model) {
+        const lineCount = model.getLineCount();
+        const lastLine = model.getLineContent(lineCount);
+        const endColumn = lastLine ? lastLine.length + 1 : 1;
+        editor.setPosition(new (window as any).monaco.Position(lineCount, endColumn));
+      }
     };
 
     useImperativeHandle(ref, () => ({
@@ -57,15 +67,99 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
         if (!editor) return;
         const position = editor.getPosition();
         if (!position) return;
+
+        const startLine = position.lineNumber;
         const range = new (window as any).monaco.Range(
-          position.lineNumber,
+          startLine,
           position.column,
-          position.lineNumber,
+          startLine,
           position.column,
         );
+
         editor.executeEdits('insert-snippet', [
           { range, text: '\n' + text + '\n', forceMoveMarkers: true },
         ]);
+
+        // Scroll to show inserted code
+        setTimeout(() => {
+          editor.revealLine(startLine + 1);
+        }, 100);
+
+        // Highlight the inserted text temporarily
+        const textLines = text.split('\n').length;
+        const decorations = editor.deltaDecorations([], [
+          {
+            range: new (window as any).monaco.Range(
+              startLine + 1,
+              1,
+              startLine + textLines,
+              1,
+            ),
+            options: {
+              isWholeLine: true,
+              className: 'inserted-code-highlight',
+              glyphMarginClassName: 'myGlyphMarginClass',
+            },
+          },
+        ]);
+
+        // Remove highlight after 2 seconds
+        setTimeout(() => {
+          editor.deltaDecorations(decorations, []);
+        }, 2000);
+
+        editor.focus();
+      },
+      insertAtEnd(text: string) {
+        const editor = editorRef.current;
+        if (!editor) return;
+        const model = editor.getModel();
+        if (!model) return;
+
+        // Get end of file
+        const lineCount = model.getLineCount();
+        const lastLine = model.getLineContent(lineCount);
+        const endColumn = lastLine ? lastLine.length + 1 : 1;
+
+        // Insert at end with newlines
+        const range = new (window as any).monaco.Range(
+          lineCount,
+          endColumn,
+          lineCount,
+          endColumn,
+        );
+
+        editor.executeEdits('insert-at-end', [
+          { range, text: '\n' + text + '\n', forceMoveMarkers: true },
+        ]);
+
+        // Scroll to show inserted code
+        setTimeout(() => {
+          editor.revealLine(lineCount + 1);
+        }, 100);
+
+        // Highlight the inserted text temporarily
+        const decorations = editor.deltaDecorations([], [
+          {
+            range: new (window as any).monaco.Range(
+              lineCount + 1,
+              1,
+              lineCount + text.split('\n').length,
+              1,
+            ),
+            options: {
+              isWholeLine: true,
+              className: 'inserted-code-highlight',
+              glyphMarginClassName: 'myGlyphMarginClass',
+            },
+          },
+        ]);
+
+        // Remove highlight after 2 seconds
+        setTimeout(() => {
+          editor.deltaDecorations(decorations, []);
+        }, 2000);
+
         editor.focus();
       },
     }));
@@ -82,11 +176,11 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
             onChange={(v) => onChange(v ?? '')}
             onMount={handleMount}
             options={{
-              fontSize: 14,
+              fontSize: 15,
               fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
-              padding: { top: 12, bottom: 12 },
+              padding: { top: 16, bottom: 16 },
               lineNumbers: 'on',
               renderLineHighlight: 'line',
               cursorBlinking: 'smooth',

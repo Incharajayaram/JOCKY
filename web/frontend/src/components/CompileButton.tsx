@@ -5,18 +5,20 @@ import type { CSSProperties } from 'react';
 const baseStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 8,
-  padding: '8px 20px',
-  borderRadius: 6,
-  border: '1px solid var(--accent-blue)',
-  background: 'rgba(59, 130, 246, 0.1)',
-  color: 'var(--accent-blue)',
-  fontSize: 14,
+  gap: 10,
+  padding: '10px 28px',
+  borderRadius: 0,
+  border: '2px solid var(--accent-orange)',
+  background: 'rgba(255, 149, 0, 0.1)',
+  color: 'var(--accent-orange)',
+  fontSize: 15,
   fontWeight: 600,
   fontFamily: "'JetBrains Mono', monospace",
   cursor: 'pointer',
-  transition: 'all 0.2s ease',
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   letterSpacing: 0.5,
+  clipPath: 'polygon(8% 0%, 100% 0%, 92% 100%, 0% 100%)',
+  pointerEvents: 'auto',
 };
 
 interface CompileButtonProps {
@@ -31,7 +33,7 @@ export default function CompileButton({ onClick, loading }: CompileButtonProps) 
     ...baseStyle,
     ...(hovered && !loading
       ? {
-          background: 'rgba(59, 130, 246, 0.2)',
+          background: 'rgba(255, 149, 0, 0.25)',
           boxShadow: 'var(--glow-blue)',
         }
       : {}),

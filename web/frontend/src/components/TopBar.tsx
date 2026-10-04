@@ -1,4 +1,4 @@
-import { Terminal, HelpCircle, Settings } from 'lucide-react';
+import { HelpCircle, Settings } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useState } from 'react';
 import CompileButton from './CompileButton';
@@ -10,43 +10,43 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '12px 24px',
+    padding: '14px 28px',
     background: 'var(--bg-secondary)',
     borderBottom: '1px solid var(--border)',
-    height: 56,
+    height: 64,
     flexShrink: 0,
   },
   logo: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 700,
-    letterSpacing: 2,
-    background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    fontSize: 26,
+    fontWeight: 900,
+    letterSpacing: 0.5,
+    color: 'var(--accent-orange)',
+    fontFamily: "'Courier New', 'Courier', monospace",
+    textTransform: 'uppercase',
   },
   version: {
-    fontSize: 11,
+    fontSize: 12,
     color: 'var(--text-secondary)',
-    marginLeft: 4,
-    fontFamily: "'JetBrains Mono', monospace",
+    marginLeft: 8,
+    fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontWeight: 500,
   },
   rightSection: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
   },
   iconButton: {
     background: 'none',
     border: 'none',
     color: 'var(--text-secondary)',
     cursor: 'pointer',
-    padding: 4,
+    padding: 6,
     display: 'flex',
     transition: 'color 0.15s ease',
   },
@@ -65,7 +65,6 @@ export default function TopBar({ onCompile, compiling }: TopBarProps) {
     <>
       <div style={styles.container}>
         <div style={styles.logo}>
-          <Terminal size={22} color="var(--accent-blue)" />
           <span style={styles.title}>JOCKY</span>
           <span style={styles.version}>v1.0</span>
         </div>

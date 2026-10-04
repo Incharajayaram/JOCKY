@@ -16,7 +16,7 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '6px 16px',
+    padding: '10px 20px',
     cursor: 'pointer',
     borderBottom: '1px solid var(--border)',
     userSelect: 'none' as const,
@@ -24,8 +24,8 @@ const styles: Record<string, CSSProperties> = {
   headerLeft: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    fontSize: 11,
+    gap: 10,
+    fontSize: 13,
     fontWeight: 600,
     fontFamily: "'JetBrains Mono', monospace",
     color: 'var(--text-secondary)',
@@ -34,13 +34,13 @@ const styles: Record<string, CSSProperties> = {
   headerRight: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   logArea: {
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 12,
+    fontSize: 13,
     lineHeight: 1.6,
-    padding: '8px 16px',
+    padding: '12px 20px',
     overflow: 'auto',
     background: '#06060a',
   },
@@ -50,9 +50,9 @@ const styles: Record<string, CSSProperties> = {
   },
   emptyState: {
     color: 'var(--text-secondary)',
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "'JetBrains Mono', monospace",
-    padding: '16px',
+    padding: '20px',
     textAlign: 'center' as const,
     opacity: 0.6,
   },
@@ -62,23 +62,25 @@ const logColors: Record<string, string> = {
   info: 'var(--text-primary)',
   warn: 'var(--accent-orange)',
   error: 'var(--accent-red)',
-  success: 'var(--accent-green)',
+  success: 'var(--accent-orange)',
 };
 
 function downloadButtonStyle(hovered: boolean): CSSProperties {
   return {
     display: 'flex',
     alignItems: 'center',
-    gap: 4,
-    padding: '3px 10px',
-    borderRadius: 4,
-    border: '1px solid var(--accent-green)',
-    background: hovered ? 'rgba(34, 197, 94, 0.15)' : 'transparent',
-    color: 'var(--accent-green)',
-    fontSize: 11,
+    gap: 6,
+    padding: '8px 16px',
+    borderRadius: 0,
+    border: '1px solid var(--accent-orange)',
+    background: hovered ? 'rgba(255, 149, 0, 0.15)' : 'transparent',
+    color: 'var(--accent-orange)',
+    fontSize: 12,
     fontFamily: "'JetBrains Mono', monospace",
     cursor: 'pointer',
-    transition: 'all 0.15s ease',
+    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+    clipPath: 'polygon(6% 0%, 100% 0%, 94% 100%, 0% 100%)',
+    pointerEvents: 'auto',
   };
 }
 
@@ -140,7 +142,7 @@ export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOu
           <Terminal size={13} />
           Build Output
           {logs.length > 0 && (
-            <span style={{ color: 'var(--accent-blue)', fontWeight: 400 }}>
+            <span style={{ color: 'var(--accent-orange)', fontWeight: 400 }}>
               ({filteredLogs.length}/{logs.length} lines)
             </span>
           )}
