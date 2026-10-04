@@ -5,6 +5,7 @@
 #include <string.h>
 #include <time.h>
 #include <syslog.h>
+#include <unistd.h>
 
 static FILE* audit_file = NULL;
 

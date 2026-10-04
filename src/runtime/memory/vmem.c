@@ -7,6 +7,7 @@
 #include "vmem.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -254,8 +255,8 @@ int32_t jocky_flush_icache(void* addr, size_t size) {
 
     // On Linux x86-64, instruction cache is coherent
     // But we can use __builtin_clear_cache for ARM/other architectures
-    #if defined(__GNUC__)
-    __builtin_clear_cache((char*)addr, (char*)addr + size);
+    #if defined(__GNUC__) && (defined(__arm__) || defined(__aarch64__))
+    __builtin___clear_cache((char*)addr, (char*)addr + size);
     #endif
 
     return 0;
