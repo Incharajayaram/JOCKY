@@ -247,13 +247,40 @@ When documenting a new issue, use this structure:
 
 ---
 
+### Issue: LLVM IR Generation Invalid Pointer Array Initialization
+- **ID:** ISSUE-0012
+- **Component:** codegen, LLVM
+- **Severity:** critical
+- **Status:** open
+- **Date Found:** 2026-10-04
+- **Affected File(s):**
+  - `src/jocky/language/codegen.py` (array initialization codegen)
+  - Generated LLVM IR files during compilation
+- **Error Message:** `error: integer constant must have integer type` when importing LLVM IR to MLIR
+- **Reproduction Steps:**
+  1. Compile any JOCKY file with global array of pointers
+  2. Check generated `examples/.jocky-build/lower_ir/output.ll`
+  3. Look for `@DATA_PATHS = global [6 x i8*] [i8* 0, i8* 0, ...]`
+  4. Run `mlir-translate --import-llvm output.ll -o input.mlir`
+  5. MLIR translation fails on invalid pointer initialization
+- **Root Cause:** Codegen outputs `i8* 0` for pointer array initialization instead of `i8* null`. LLVM requires `null` keyword for pointer nullification, not `0`.
+- **Workaround:** None - requires codegen fix
+- **Priority:** CRITICAL — Blocks all research chain compilation (Windows/Linux)
+- **Related Issues:** None
+- **Example Bad Output:** `@DATA_PATHS = global [6 x i8*] [i8* 0, i8* 0, i8* 0, i8* 0, i8* 0, i8* 0]`
+- **Expected Output:** `@DATA_PATHS = global [6 x i8*] [i8* null, i8* null, i8* null, i8* null, i8* null, i8* null]`
+- **Fix Location:** In codegen array initialization, replace `0` with `null` for pointer array elements
+- **Testing After Fix:** Must recompile research_chain_windows_production.jky and research_chain_linux_production.jky, verify MLIR translation succeeds
+
+---
+
 ## Issue Statistics
 
-- **Total Known Issues:** 10
-- **Critical:** 3 (ISSUE-0001, ISSUE-0006, ISSUE-0010)
+- **Total Known Issues:** 12
+- **Critical:** 4 (ISSUE-0001, ISSUE-0006, ISSUE-0010, ISSUE-0012)
 - **High:** 5 (ISSUE-0002, ISSUE-0003, ISSUE-0005, ISSUE-0009, ISSUE-0004)
 - **Medium:** 2 (ISSUE-0007, ISSUE-0008)
-- **Resolved:** 0
+- **Resolved:** 1 (ISSUE-0003)
 
 ---
 

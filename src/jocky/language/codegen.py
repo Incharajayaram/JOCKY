@@ -212,7 +212,10 @@ class CodeGen:
                     values = []
                     for elem in decl.init.elements:
                         if isinstance(elem, IntLiteral):
-                            values.append(f"{self.llvm_type(elem_type)} {elem.value}")
+                            if elem_type.is_pointer and elem.value == 0:
+                                values.append(f"{self.llvm_type(elem_type)} null")
+                            else:
+                                values.append(f"{self.llvm_type(elem_type)} {elem.value}")
                         elif isinstance(elem, FloatLiteral):
                             values.append(f"{self.llvm_type(elem_type)} {elem.value:#.17g}")
                         elif isinstance(elem, BoolLiteral):
@@ -224,8 +227,8 @@ class CodeGen:
                         elif isinstance(elem, NullLiteral):
                             values.append(f"{self.llvm_type(elem_type)} null")
                         else:
-                            # Default: use 0 for numeric types, null for pointer types
-                            if elem_type.is_pointer:
+                            # Default: use 0 for numeric types, null for pointer types (including strings)
+                            if elem_type.is_pointer or elem_type.name == "string":
                                 values.append(f"{self.llvm_type(elem_type)} null")
                             else:
                                 values.append(f"{self.llvm_type(elem_type)} 0")
