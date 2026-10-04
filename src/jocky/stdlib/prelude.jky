@@ -96,6 +96,31 @@ ffi jocky_linux_cleanup_journal() -> i32;
 ffi jocky_cleanup_event_logs(channels: string) -> i32;
 ffi jocky_cleanup_usn_journal() -> i32;
 
+// ---- Forensic Collection (Evidence Gathering) ----
+// Windows-specific
+ffi forensic_collect_event_logs(log_type: string) -> i8*;
+ffi forensic_collect_registry_hive(hive_name: string) -> i8*;
+ffi forensic_collect_mft() -> i8*;
+// Linux-specific
+ffi forensic_collect_journal_entries() -> i8*;
+ffi forensic_collect_syslog_lines() -> i8*;
+ffi forensic_collect_process_list() -> i8*;
+
+// ---- Forensic Analysis (Parsing & Correlation) ----
+// Windows-specific
+ffi forensic_analysis_mft() -> i8*;
+ffi forensic_analysis_jump_lists() -> i8*;
+ffi forensic_analysis_browser_artifacts() -> i8*;
+// Cross-platform
+ffi forensic_analyze_process_tree() -> i8*;
+ffi forensic_timeline_builder() -> i8*;
+ffi forensic_correlation_engine() -> i32;
+ffi forensic_generate_report() -> i8*;
+// Linux-specific
+ffi forensic_analysis_inode_metadata() -> i8*;
+ffi forensic_analysis_syscall_trace() -> i8*;
+ffi forensic_timeline_from_logs() -> i8*;
+
 // ---- Filesystem ----
 ffi fs_exists(path: string) -> bool;
 ffi fs_list_files(path: string, recursive: bool) -> [string];
