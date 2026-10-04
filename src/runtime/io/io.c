@@ -471,5 +471,3 @@ int32_t jocky_fflush(jocky_file_t f) {
 }
 
 #endif
-
-#include <limits.h>
