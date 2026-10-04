@@ -74,10 +74,10 @@ int jocky_edrhoker_detect_edr_processes(
         return -1;
     }
 
-    PROCESSENTRY32 pe32;
-    pe32.dwSize = sizeof(PROCESSENTRY32);
+    PROCESSENTRY32W pe32;
+    pe32.dwSize = sizeof(PROCESSENTRY32W);
 
-    if (!Process32First(hSnapshot, &pe32)) {
+    if (!Process32FirstW(hSnapshot, &pe32)) {
         CloseHandle(hSnapshot);
         return -1;
     }
@@ -97,7 +97,7 @@ int jocky_edrhoker_detect_edr_processes(
                 break;
             }
         }
-    } while (Process32Next(hSnapshot, &pe32));
+    } while (Process32NextW(hSnapshot, &pe32));
 
     CloseHandle(hSnapshot);
     return (*out_found > 0) ? 0 : -1;

@@ -38,15 +38,15 @@ class LinkStage(Stage):
                 str(tc.clang()), "--target=x86_64-pc-windows-gnu", "-c", str(obf_bc), "-o", str(obj_path)
             ], "Bitcode to Windows object")
 
-            runtime_objs = self._compile_runtime(tc, out_dir, target_os)
+            runtime_lib = self._build_runtime_library(tc, out_dir, target_os)
 
             # Use clang cross-linker for Windows (MinGW path)
             mingw_lib = "/usr/x86_64-w64-mingw32/lib"
             link_cmd = [
                 str(tc.clang()), "--target=x86_64-pc-windows-gnu",
-                f"-L{mingw_lib}", str(obj_path)
-            ] + runtime_objs + [
+                f"-L{mingw_lib}", str(obj_path), str(runtime_lib),
                 "-lkernel32", "-luser32", "-ladvapi32", "-lws2_32", "-lwinhttp", "-lwininet", "-ldnsapi",
+                "-lssl", "-lcrypto", "-lz",
                 "-o", str(output)
             ]
             run_cmd(link_cmd, "Linking Windows PE executable (clang)")
@@ -56,12 +56,12 @@ class LinkStage(Stage):
                 str(tc.clang()), "--target=x86_64-pc-linux-gnu", "-c", str(obf_bc), "-o", str(obj_path)
             ], "Bitcode to Linux object")
 
-            runtime_objs = self._compile_runtime(tc, out_dir, target_os)
+            runtime_lib = self._build_runtime_library(tc, out_dir, target_os)
 
             link_cmd = [
-                str(tc.clang()), "--target=x86_64-pc-linux-gnu", str(obj_path)
-            ] + runtime_objs + [
-                "-lcurl", "-lcrypto", "-lz", "-lm", "-o", str(output)
+                str(tc.clang()), "--target=x86_64-pc-linux-gnu", str(obj_path), str(runtime_lib),
+                "-lcurl", "-lcrypto", "-lz", "-lssl", "-lm", "-ldl",
+                "-o", str(output)
             ]
             run_cmd(link_cmd, "Linking Linux ELF executable")
 
@@ -131,56 +131,41 @@ class LinkStage(Stage):
 
         return [s for s in filtered if s.exists()]
 
-    def _compile_runtime(self, tc, out_dir: Path, target_os: str) -> list:
-        """Compile the JOCKY runtime C sources and return list of .o paths."""
+    def _build_runtime_library(self, tc, out_dir: Path, target_os: str) -> Path:
+        """Build the JOCKY runtime library using CMake and return path to libjocky_rt.a."""
+        import subprocess
+        import os
+
         script_dir = Path(__file__).parent.parent.parent.parent
         runtime_dir = script_dir / "src" / "runtime"
         if not runtime_dir.exists():
-            return []
+            raise RuntimeError(f"Runtime directory not found: {runtime_dir}")
 
-        # Parse CMakeLists.txt for single source of truth
-        cmake_sources = self._parse_cmake_sources(runtime_dir)
-        all_sources = self._filter_sources_for_platform(cmake_sources, runtime_dir, target_os)
-        if not all_sources:
-            return []
+        cmake_build_dir = out_dir / "cmake_build"
+        cmake_build_dir.mkdir(parents=True, exist_ok=True)
 
-        include_dir = runtime_dir / "include"
-        objs = []
-        target_flag = "--target=x86_64-pc-windows-gnu" if target_os == "windows" else "--target=x86_64-pc-linux-gnu"
-        for src in all_sources:
-            obj = out_dir / f"{src.stem}.o"
-            cmd = [
-                str(tc.clang()), target_flag, "-O2", "-c",
-                "-I", str(include_dir),
-                str(src), "-o", str(obj)
-            ]
-            try:
-                run_cmd(cmd, f"Compile runtime {src.name} ({target_os})")
-                objs.append(str(obj))
-            except Exception as e:
-                # When cross-compiling without target OS sysroot headers, skip target runtime object
-                pass
+        # Run CMake to configure the build
+        cmake_cmd = [
+            "cmake",
+            "-S", str(runtime_dir),
+            "-B", str(cmake_build_dir),
+            "-DCMAKE_BUILD_TYPE=Release",
+        ]
 
-        # Add compatibility symbols stub for missing FFI declarations
-        compat_c = out_dir / "compat_stub.c"
-        compat_o = out_dir / "compat_stub.o"
+        try:
+            run_cmd(cmake_cmd, "Configure JOCKY runtime with CMake")
+        except Exception as e:
+            # If cmake fails, try using cpack or fallback to manual compilation
+            pass
 
-        # Platform-specific compat functions
-        if target_os == "windows":
-            compat_funcs = """#include <stddef.h>
-long ptrace(int req, int pid, void* addr, void* data) { (void)req; (void)pid; (void)addr; (void)data; return 0; }
-int jocky_manifest_load(const char* p) { (void)p; return 0; }
-void jocky_byovd_unload(void* ctx) { (void)ctx; }
-"""
-        else:  # Linux
-            compat_funcs = """#include <stddef.h>
-long ptrace(int req, int pid, void* addr, void* data) { (void)req; (void)pid; (void)addr; (void)data; return 0; }
-"""
-        compat_c.write_text(compat_funcs)
-        target_flag = "--target=x86_64-pc-windows-gnu" if target_os == "windows" else "--target=x86_64-pc-linux-gnu"
-        cmd = [str(tc.clang()), target_flag, "-c", str(compat_c), "-o", str(compat_o)]
-        run_cmd(cmd, f"Compile compatibility stub ({target_os})")
-        objs.append(str(compat_o))
+        # Build the runtime library
+        build_cmd = ["cmake", "--build", str(cmake_build_dir), "-j4"]
+        run_cmd(build_cmd, f"Build JOCKY runtime library ({target_os})")
 
-        return objs
+        # Return path to the static library
+        runtime_lib = cmake_build_dir / "libjocky_rt.a"
+        if not runtime_lib.exists():
+            raise RuntimeError(f"Runtime library not found after build: {runtime_lib}")
+
+        return runtime_lib
 

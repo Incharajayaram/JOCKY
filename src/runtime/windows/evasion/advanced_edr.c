@@ -5,6 +5,10 @@
 #include <stdbool.h>
 #include <psapi.h>
 
+#ifndef STATUS_SUCCESS
+#define STATUS_SUCCESS 0x00000000L
+#endif
+
 #pragma comment(lib, "psapi.lib")
 
 typedef NTSTATUS (WINAPI *pNtSetInformationProcess)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG);
