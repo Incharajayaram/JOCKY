@@ -522,8 +522,8 @@ void  jocky_byovd_destroy(void* ctx);
  * Crypto: String / Data Decryption
  * ============================================================================ */
 
-/* Simple XOR decrypt in-place. Key rotates per byte. */
-void jocky_decrypt_xor(uint8_t* data, size_t len, uint8_t key);
+/* Simple XOR decrypt in-place. key_len unused (single-byte key), kept for prelude.jky ABI. */
+void jocky_decrypt_xor(uint8_t* data, size_t len, uint8_t key, size_t key_len);
 
 /* RC4-based stream decrypt */
 void jocky_decrypt_rc4(uint8_t* data, size_t len, const uint8_t* key, size_t key_len);

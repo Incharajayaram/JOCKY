@@ -73,21 +73,3 @@ void* crypto_aes256_decrypt(void* data, int len, void* key) {
     return decrypted;
 }
 
-/* Decryption utilities */
-void* jocky_decrypt_rc4(void* data, int size, void* key, int key_size) {
-    /* RC4 implementation would go here */
-    return NULL;
-}
-
-void* jocky_decrypt_xor(void* data, int size, void* key, int key_size) {
-    if (!data || !key || size <= 0 || key_size <= 0) return NULL;
-
-    unsigned char* result = malloc(size);
-    if (!result) return NULL;
-
-    for (int i = 0; i < size; i++) {
-        ((unsigned char*)result)[i] = ((unsigned char*)data)[i] ^ ((unsigned char*)key)[i % key_size];
-    }
-
-    return result;
-}
