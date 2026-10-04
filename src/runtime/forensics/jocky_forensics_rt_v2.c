@@ -1,7 +1,6 @@
-#include "forensic_types.h"
 /**
  * JOCKY Forensic Runtime v2
- * 
+ *
  * Implements FFI functions for the defensive forensic agent.
  * Uses the new plugin-based forensic engine.
  */
@@ -13,7 +12,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-/* Include the forensic engine */
+#include "forensic_types.h"
 #include "forensic_engine.h"
 
 /* ============================================================================

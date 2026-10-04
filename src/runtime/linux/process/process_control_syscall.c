@@ -45,6 +45,7 @@ int jocky_execvp(const char* filename, const char* const* argv) {
 }
 
 long jocky_waitpid(long pid, int* status, int flags) {
+    /* Use wait4 syscall which is available on x86-64 */
     long result = jocky_syscall4(SYS_wait4, pid, (long)status, flags, 0);
     return (result < 0) ? -1 : result;
 }
