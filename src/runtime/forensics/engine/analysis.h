@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "forensic_types.h"
+#include "../forensic_types.h"
 
 #ifdef __cplusplus
 extern "C" {

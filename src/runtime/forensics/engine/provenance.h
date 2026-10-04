@@ -1,13 +1,13 @@
 /**
  * Provenance Engine
- * 
+ *
  * Records source -> transform -> output chain for every piece of evidence.
  * Maintains hash chain for tamper-evidence.
  */
 
 #pragma once
 
-#include "forensic_types.h"
+#include "../forensic_types.h"
 
 #ifdef __cplusplus
 extern "C" {

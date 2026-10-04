@@ -7,6 +7,7 @@
 #include "io.h"
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #ifdef _WIN32
 #include <windows.h>
