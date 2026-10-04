@@ -270,6 +270,44 @@ git push -f origin feature/pattern-matching
   - Temporary workaround if any
   - Priority level (critical/high/medium/low)
 
+### 6. End-to-End Testing Requirements (MANDATORY BEFORE PUSH)
+- **Golden Rule:** NO COMMITS TO MAIN WITHOUT FULL END-TO-END TESTING
+- **Pipeline must compile BOTH:**
+  - ✅ Windows production script (`examples/production_windows_complete.jky`)
+  - ✅ Linux production script (`examples/production_linux_complete.jky`)
+  - ✅ Research chains (`research_chain_windows_production.jky`, `research_chain_linux_production.jky`)
+- **Testing procedure:**
+  1. Run: `./dev_launch.sh` (dev launcher, NOT Docker)
+  2. Attempt compilation of both Windows and Linux production scripts
+  3. Verify no linker errors (undefined symbols)
+  4. Verify no type checking errors
+  5. Verify no codegen errors
+  6. Verify compiled binaries are generated
+  7. Document all test results before pushing
+
+### 7. Code Quality Gates (Pre-Push Verification)
+- ❌ **NO STUBS** — Only real implementations allowed
+  - Verify all APIs are real implementations, not placeholders
+  - NO stub files in repository (e.g., `*_stubs.c`, `*_placeholder.c`)
+  - If stub files exist, they MUST be deleted before pushing
+  - Any file containing only `return -1;` or `return 0;` without logic is a stub — DELETE IT
+  - Check: `find src/runtime -name "*stub*.c" -o -name "*placeholder*.c"` (should be empty)
+  - All function implementations must have real logic, not just error returns
+- ❌ **NO PROGRESS FILES** — Only committed code allowed
+  - No "work in progress" markers
+  - No "TODO" tracking files
+  - No "partial implementation" markers
+  - Only complete, tested code
+- ❌ **NO UNRELATED FILES**
+  - No test output files
+  - No build artifacts (CMakeFiles, Makefile, *.o, etc.)
+  - No debug scripts or temporary files
+  - Only source code and configuration
+- ✅ **MEANINGFUL CHANGES ONLY**
+  - Every file change must serve a purpose
+  - No placeholder changes or refactoring without reason
+  - Each commit must have clear, reviewable changes
+
 ---
 
 ## DO NOT
