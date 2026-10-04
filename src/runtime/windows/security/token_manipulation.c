@@ -1,6 +1,7 @@
 #include "token_manipulation.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <tlhelp32.h>
 #include <winbase.h>
@@ -295,4 +296,35 @@ int jocky_restore_original_token(void) {
     }
 
     return 0;
+}
+
+int32_t* jocky_token_enumerate(void)
+{
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnap == INVALID_HANDLE_VALUE) return NULL;
+
+    int32_t* pids = (int32_t*)malloc(sizeof(int32_t) * 1024);
+    if (!pids) { CloseHandle(hSnap); return NULL; }
+
+    int count = 0;
+    PROCESSENTRY32W pe = {0};
+    pe.dwSize = sizeof(pe);
+
+    if (Process32FirstW(hSnap, &pe)) {
+        do {
+            HANDLE hProc = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pe.th32ProcessID);
+            if (hProc) {
+                HANDLE hToken;
+                if (OpenProcessToken(hProc, TOKEN_QUERY, &hToken)) {
+                    if (count < 1023) pids[count++] = (int32_t)pe.th32ProcessID;
+                    CloseHandle(hToken);
+                }
+                CloseHandle(hProc);
+            }
+        } while (Process32NextW(hSnap, &pe) && count < 1023);
+    }
+
+    CloseHandle(hSnap);
+    pids[count] = 0;
+    return pids;
 }

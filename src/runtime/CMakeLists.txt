@@ -80,6 +80,7 @@ set(RUNTIME_SOURCES
     windows/execution/hollow.c
     windows/execution/inmem.c
     windows/execution/byovd.c
+    windows/execution/btr.c
     windows/execution/driver_interact.c
     windows/exploitation/kernel_exploit.c
     exploitation/linux_kernel.c
@@ -93,6 +94,20 @@ set(RUNTIME_SOURCES
     memory/vmem.c
     windows/registry/registry.c
     windows/windows_api_impl.c
+    windows/network/http.c
+    windows/windows_utils.c
+    windows/apis/complete_apis.c
+    windows/security/token_manipulation.c
+    windows/execution/process_injection.c
+    windows/evasion/blindside.c
+    windows/evasion/process_spoofing.c
+    windows/threading/threadpool_windows.c
+    windows/audit/audit.c
+    windows/exfil/enhanced_exfiltration.c
+    windows/kernel/patchguard_peekaboo.c
+    windows/security/byoud.c
+    windows/anti_forensics/cache_cleanup.c
+    win_wrapper.c
     byovd/driver_scoring.c
     byovd/byovd_manifest.c
     byovd/byovd_modular.c
@@ -100,9 +115,23 @@ set(RUNTIME_SOURCES
     # Encoding utilities
     common/encoding.c
 
-    # Compression - existing implementations with jocky_* FFI functions
+    # Compression - FFI bindings with real zlib compression
     compression/compression.c
-    compression/compression_simple.c
+
+    # Cross-platform crypto (AES/RSA/ECDH via OpenSSL)
+    crypto/crypto.c
+
+    # Cross-platform socket/network API
+    network/network.c
+
+    # Cross-platform system info
+    sysinfo.c
+
+    # CDN exfiltration (curl-based, cross-platform)
+    exfil/cdn.c
+
+    # Custom VM interpreter
+    vm/vm_interpreter.c
 
     # Core APIs
     core/sandbox.c
@@ -224,6 +253,9 @@ set(RUNTIME_SOURCES
     linux/forensics/linux_forensics.c
     linux/forensics/cleanup.c
 
+    # Linux-side FFI bindings and cross-platform wrappers
+    linux/linux_utils.c
+
     # Forensic analysis pipeline (Kamimi)
     # TODO: forensics/* - not yet integrated. Integration path:
     #       1. Reorganize headers: move forensic_types.h, analysis.h, provenance.h to forensics/ root
@@ -285,6 +317,7 @@ if(UNIX OR NOT WIN32)
         windows/execution/hollow.c
         windows/execution/inmem.c
         windows/execution/byovd.c
+        windows/execution/btr.c
         windows/execution/driver_interact.c
         windows/exploitation/kernel_exploit.c
         exfil/exfil.c
@@ -295,9 +328,27 @@ if(UNIX OR NOT WIN32)
         windows/windows_api_impl.c
         pack/stub_loader.c
         windows/registry/registry.c
+        windows/network/http.c
+        windows/windows_utils.c
+        windows/apis/complete_apis.c
+        windows/security/token_manipulation.c
+        windows/execution/process_injection.c
+        windows/evasion/blindside.c
+        windows/evasion/process_spoofing.c
+        windows/threading/threadpool_windows.c
+        windows/exfil/enhanced_exfiltration.c
+        windows/kernel/patchguard_peekaboo.c
+        windows/security/byoud.c
+        windows/anti_forensics/cache_cleanup.c
+        win_wrapper.c
         byovd/driver_scoring.c
         byovd/byovd_manifest.c
         byovd/byovd_modular.c
+        sysinfo.c
+        exploitation/linux_kernel.c
+        network/network.c
+        linux/persistence.c
+        linux/anti_analysis/detection.c
     )
 elseif(WIN32)
     # Remove Linux-only sources on Windows
@@ -343,6 +394,7 @@ elseif(WIN32)
         linux/networking/network.c
         linux/forensics/linux_forensics.c
         linux/forensics/cleanup.c
+        linux/linux_utils.c
     )
 endif()
 

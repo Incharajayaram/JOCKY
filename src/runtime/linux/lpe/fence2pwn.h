@@ -2,6 +2,7 @@
 #define JOCKY_FENCE2PWN_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <sys/types.h>
 
 /* Fence2Pwn: KFENCE-Based Linux Privilege Escalation
@@ -79,5 +80,9 @@ uid_t jocky_fence2pwn_elevate_to_root(void);
 int jocky_fence2pwn_find_uaf_primitive(
     void** out_uaf_address,
     size_t* out_object_size);
+
+bool jocky_fence2pwn_spray(void);
+bool jocky_fence2pwn_verify_spray(void);
+bool jocky_fence2pwn_trigger(void);
 
 #endif /* JOCKY_FENCE2PWN_H */

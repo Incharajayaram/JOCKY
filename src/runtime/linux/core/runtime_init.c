@@ -8,14 +8,11 @@
 
 static int runtime_initialized = 0;
 
-int jocky_runtime_init(void) {
-    if (runtime_initialized) return 0;
-
-    /* Initialize OpenSSL */
+__attribute__((constructor))
+static void jocky_openssl_auto_init(void) {
+    if (runtime_initialized) return;
     OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
-
     runtime_initialized = 1;
-    return 0;
 }
 
 /* Crypto wrappers */
@@ -73,21 +70,3 @@ void* crypto_aes256_decrypt(void* data, int len, void* key) {
     return decrypted;
 }
 
-/* Decryption utilities */
-void* jocky_decrypt_rc4(void* data, int size, void* key, int key_size) {
-    /* RC4 implementation would go here */
-    return NULL;
-}
-
-void* jocky_decrypt_xor(void* data, int size, void* key, int key_size) {
-    if (!data || !key || size <= 0 || key_size <= 0) return NULL;
-
-    unsigned char* result = malloc(size);
-    if (!result) return NULL;
-
-    for (int i = 0; i < size; i++) {
-        ((unsigned char*)result)[i] = ((unsigned char*)data)[i] ^ ((unsigned char*)key)[i % key_size];
-    }
-
-    return result;
-}

