@@ -187,14 +187,10 @@ export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOu
 
   const toggleFilter = (level: string) => {
     setActiveFilters(prev => {
-      const next = new Set(prev);
-      if (next.has(level)) next.delete(level);
-      else next.add(level);
-      return next;
+      if (prev.has(level)) return new Set();
+      return new Set([level]);
     });
   };
-
-  const clearFilters = () => setActiveFilters(new Set());
 
   const copyLogs = () => {
     const text = displayedLogs.map(log => log.text).join('\n');
@@ -317,7 +313,6 @@ export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOu
           <LogFilter
             activeFilters={activeFilters}
             onToggle={toggleFilter}
-            onClear={clearFilters}
           />
         </>
       )}

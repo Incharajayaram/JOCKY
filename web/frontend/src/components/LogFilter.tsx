@@ -1,4 +1,4 @@
-import { Filter, X } from 'lucide-react';
+import { Filter } from 'lucide-react';
 import type { CSSProperties } from 'react';
 
 const styles: Record<string, CSSProperties> = {
@@ -37,15 +37,6 @@ const styles: Record<string, CSSProperties> = {
     color: 'var(--accent-orange)',
     background: 'rgba(255, 149, 0, 0.1)',
   },
-  clearBtn: {
-    background: 'none',
-    border: 'none',
-    color: 'var(--text-secondary)',
-    cursor: 'pointer',
-    padding: 4,
-    display: 'flex',
-    marginLeft: 'auto',
-  },
 };
 
 const LEVEL_COLORS: Record<string, string> = {
@@ -58,10 +49,9 @@ const LEVEL_COLORS: Record<string, string> = {
 interface LogFilterProps {
   activeFilters: Set<string>;
   onToggle: (level: string) => void;
-  onClear: () => void;
 }
 
-export default function LogFilter({ activeFilters, onToggle, onClear }: LogFilterProps) {
+export default function LogFilter({ activeFilters, onToggle }: LogFilterProps) {
   const levels = ['info', 'warn', 'error', 'success'] as const;
 
   return (
@@ -84,11 +74,6 @@ export default function LogFilter({ activeFilters, onToggle, onClear }: LogFilte
           </button>
         );
       })}
-      {activeFilters.size > 0 && (
-        <button style={styles.clearBtn} onClick={onClear} title="Clear filters">
-          <X size={11} />
-        </button>
-      )}
     </div>
   );
 }
