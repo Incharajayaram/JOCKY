@@ -20,6 +20,7 @@ import time
 import argparse
 import subprocess
 import struct
+import yaml
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -30,49 +31,47 @@ RUNTIME_DIR = SRC_DIR / "runtime"
 
 sys.path.insert(0, str(SRC_DIR))
 
-# Obfuscation presets (base)
-PRESETS = {
-    "none": {
-        "llvm": [],
-        "mlir": [],
-    },
-    "light": {
-        "llvm": ["strip-signature", "substitution"],
-        "mlir": ["string-encrypt"],
-    },
-    "standard": {
-        "llvm": ["strip-signature", "boguscf", "flattening", "substitution", "split", "indirect-call"],
-        "mlir": ["string-encrypt", "constant-obfuscate", "symbol-obfuscate"],
-    },
-    "aggressive": {
-        "llvm": ["strip-signature", "boguscf", "flattening", "substitution", "split", "indirect-call"],
-        "mlir": ["string-encrypt", "constant-obfuscate", "symbol-obfuscate"],
-    },
-}
+from jocky.passes.registry import PASS_REGISTRY, MLIR_PASSES as MLIR_PASS_SET, MODULE_PASSES as MODULE_PASS_SET
+
+
+def _load_preset_from_yaml(name: str) -> dict:
+    profile_path = PROJECT_ROOT / "src" / "jocky" / "passes" / "profiles" / f"{name}.yaml"
+    if not profile_path.exists():
+        return {"llvm": [], "mlir": []}
+    with open(profile_path) as f:
+        data = yaml.safe_load(f)
+    llvm_passes = []
+    mlir_passes = []
+    for friendly in data.get("passes", []):
+        flag = PASS_REGISTRY.get(friendly, friendly)
+        if flag in MLIR_PASS_SET:
+            mlir_passes.append(flag)
+        else:
+            llvm_passes.append(flag)
+    return {"llvm": llvm_passes, "mlir": mlir_passes}
+
+
+PRESETS = {name: _load_preset_from_yaml(name) for name in ("none", "light", "standard", "aggressive")}
 
 # AI Threat Engine threat level to obfuscation preset mapping
 AI_THREAT_PRESETS = {
     "critical": {  # JOCKY_AI_RISK_CRITICAL (3)
-        "llvm": ["strip-signature", "boguscf", "flattening", "substitution", "split", "indirect-call"],
-        "mlir": ["string-encrypt", "constant-obfuscate", "symbol-obfuscate"],
+        **_load_preset_from_yaml("aggressive"),
         "ai_mutations": ["stack-frame", "syscall-encoding", "memory-pattern", "api-reorder", "register-rand", "code-padding", "encoding-variation", "entry-shuffle"],
         "obf_level": 10,
     },
     "high": {  # JOCKY_AI_RISK_HIGH (2)
-        "llvm": ["strip-signature", "boguscf", "flattening", "substitution", "indirect-call"],
-        "mlir": ["string-encrypt", "constant-obfuscate", "symbol-obfuscate"],
+        **_load_preset_from_yaml("aggressive"),
         "ai_mutations": ["syscall-encoding", "memory-pattern", "api-reorder", "register-rand", "code-padding"],
         "obf_level": 8,
     },
     "medium": {  # JOCKY_AI_RISK_MEDIUM (1)
-        "llvm": ["strip-signature", "substitution", "indirect-call"],
-        "mlir": ["string-encrypt", "constant-obfuscate"],
+        **_load_preset_from_yaml("standard"),
         "ai_mutations": ["stack-frame", "syscall-encoding", "memory-pattern"],
         "obf_level": 5,
     },
     "low": {  # JOCKY_AI_RISK_LOW (0)
-        "llvm": ["strip-signature"],
-        "mlir": ["string-encrypt"],
+        **_load_preset_from_yaml("light"),
         "ai_mutations": ["code-padding", "encoding-variation"],
         "obf_level": 2,
     },
@@ -778,14 +777,14 @@ def main():
         if ai_preset:
             llvm_list = ai_preset["llvm"]
             if llvm_list:
-                # Separate function passes from module passes
-                function_passes = [p for p in llvm_list if p not in ("strip-signature", "indirect-call")]
-                module_passes = [p for p in llvm_list if p in ("strip-signature", "indirect-call")]
+                # Separate function passes from module passes using registry
+                function_passes = [p for p in llvm_list if p not in MODULE_PASS_SET]
+                module_passes = [p for p in llvm_list if p in MODULE_PASS_SET]
                 parts = []
                 if function_passes:
                     parts.append(f"function({','.join(function_passes)})")
                 if module_passes:
-                    parts.append(",".join(module_passes))
+                    parts.extend(module_passes)
                 llvm_passes_arg = ",".join(parts) if parts else ""
                 log("PIPELINE", f"Using AI threat-based LLVM passes (level={threat_level}): {llvm_passes_arg}")
     else:
@@ -793,14 +792,14 @@ def main():
         # Convert preset LLVM list to the format expected by stage_llvm_obfuscate
         llvm_list = preset["llvm"]
         if llvm_list:
-            # Separate function passes from module passes
-            function_passes = [p for p in llvm_list if p not in ("strip-signature", "indirect-call")]
-            module_passes = [p for p in llvm_list if p in ("strip-signature", "indirect-call")]
+            # Separate function passes from module passes using registry
+            function_passes = [p for p in llvm_list if p not in MODULE_PASS_SET]
+            module_passes = [p for p in llvm_list if p in MODULE_PASS_SET]
             parts = []
             if function_passes:
                 parts.append(f"function({','.join(function_passes)})")
             if module_passes:
-                parts.append(",".join(module_passes))
+                parts.extend(module_passes)
             llvm_passes_arg = ",".join(parts) if parts else ""
             if llvm_passes_arg:
                 log("PIPELINE", f"Using LLVM passes from '{args.preset}' preset: {llvm_passes_arg}")
