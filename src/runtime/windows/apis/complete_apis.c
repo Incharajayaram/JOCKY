@@ -219,16 +219,6 @@ int8_t* jocky_module_info(int8_t* handle) {
     return (int8_t*)info;
 }
 
-int8_t* jocky_decompress_data(int8_t* data, uint64_t size) {
-    if (!data || size < 4) return NULL;
-    uint32_t orig_size = *(uint32_t*)data;
-    if (orig_size == 0 || orig_size > 10*1024*1024) return NULL;
-    int8_t* output = (int8_t*)malloc(orig_size);
-    if (output) {
-        memcpy(output, data + 4, size - 4 < orig_size ? size - 4 : orig_size);
-    }
-    return output;
-}
 
 int8_t* jocky_thread_get_info(int32_t pid) {
     static char info[256] = "thread_info";
