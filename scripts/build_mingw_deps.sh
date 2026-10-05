@@ -17,7 +17,7 @@ JOBS="$(nproc 2>/dev/null || echo 4)"
 
 ZLIB_VER="1.3.1"
 OPENSSL_VER="3.3.2"
-CURL_VER="8.10.1"
+CURL_VER="8.9.1"
 
 FORCE="${1:-}"
 
@@ -58,7 +58,8 @@ if need_build "zlib_${ZLIB_VER}"; then
     log "Building zlib $ZLIB_VER..."
     cd "$BUILD_TMP"
     [ -f "zlib-${ZLIB_VER}.tar.gz" ] || \
-        curl -fsSL "https://zlib.net/zlib-${ZLIB_VER}.tar.gz" -o "zlib-${ZLIB_VER}.tar.gz"
+        curl -fsSL "https://github.com/madler/zlib/releases/download/v${ZLIB_VER}/zlib-${ZLIB_VER}.tar.gz" \
+             -o "zlib-${ZLIB_VER}.tar.gz"
     rm -rf "zlib-${ZLIB_VER}"
     tar xf "zlib-${ZLIB_VER}.tar.gz"
     cd "zlib-${ZLIB_VER}"
@@ -83,7 +84,7 @@ if need_build "openssl_${OPENSSL_VER}"; then
     log "Building OpenSSL $OPENSSL_VER (this takes a few minutes)..."
     cd "$BUILD_TMP"
     [ -f "openssl-${OPENSSL_VER}.tar.gz" ] || \
-        curl -fsSL "https://www.openssl.org/source/openssl-${OPENSSL_VER}.tar.gz" \
+        curl -fsSL "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VER}/openssl-${OPENSSL_VER}.tar.gz" \
              -o "openssl-${OPENSSL_VER}.tar.gz"
     rm -rf "openssl-${OPENSSL_VER}"
     tar xf "openssl-${OPENSSL_VER}.tar.gz"
@@ -92,6 +93,7 @@ if need_build "openssl_${OPENSSL_VER}"; then
     ./Configure \
         --prefix="$SYSROOT" \
         --openssldir="$SYSROOT/ssl" \
+        --libdir=lib \
         --cross-compile-prefix="${CROSS}-" \
         no-shared \
         no-tests \
@@ -112,16 +114,19 @@ if need_build "curl_${CURL_VER}"; then
     log "Building libcurl $CURL_VER..."
     cd "$BUILD_TMP"
     [ -f "curl-${CURL_VER}.tar.gz" ] || \
-        curl -fsSL "https://curl.se/download/curl-${CURL_VER}.tar.gz" \
+        curl -fsSL "https://github.com/curl/curl/releases/download/curl-$(echo ${CURL_VER} | tr '.' '_')/curl-${CURL_VER}.tar.gz" \
              -o "curl-${CURL_VER}.tar.gz"
     rm -rf "curl-${CURL_VER}"
     tar xf "curl-${CURL_VER}.tar.gz"
     cd "curl-${CURL_VER}"
 
+    # Copy OpenSSL pkgconfig to lib/pkgconfig so curl finds it without lib64
+    cp "${SYSROOT}/lib64/pkgconfig"/*.pc "${SYSROOT}/lib/pkgconfig/" 2>/dev/null || true
+
     ./configure \
         --host="$CROSS" \
         --prefix="$SYSROOT" \
-        --with-openssl="$SYSROOT" \
+        --with-openssl \
         --disable-shared \
         --enable-static \
         --disable-debug \
@@ -131,9 +136,10 @@ if need_build "curl_${CURL_VER}"; then
         --without-libidn2 \
         --without-libpsl \
         --without-nghttp2 \
-        CFLAGS="-O2 -I${SYSROOT}/include" \
-        LDFLAGS="-L${SYSROOT}/lib" \
-        PKG_CONFIG_PATH="${SYSROOT}/lib/pkgconfig"
+        CPPFLAGS="-I${SYSROOT}/include" \
+        LDFLAGS="-L${SYSROOT}/lib -L${SYSROOT}/lib64" \
+        LIBS="-lssl -lcrypto -lws2_32 -lgdi32 -lcrypt32" \
+        PKG_CONFIG_PATH="${SYSROOT}/lib/pkgconfig:${SYSROOT}/lib64/pkgconfig"
 
     make -j"$JOBS"
     make install
