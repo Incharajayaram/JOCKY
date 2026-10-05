@@ -158,6 +158,7 @@ ffi provenance_record(path: string, operation: string, detail: string) -> void;
 ffi ai_init() -> i32;
 ffi ai_collect_telemetry() -> [i8];
 ffi ai_score_threat() -> f64;
+ffi ai_apply_mutation() -> i32;
 
 // ---- BYOVD helpers ----
 ffi byovd_load_driver(name: string) -> i32;

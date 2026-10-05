@@ -6,6 +6,7 @@
 #include <time.h>
 #include <syslog.h>
 #include <unistd.h>
+#include "../../ai/jocky_ai.h"
 
 static FILE* audit_file = NULL;
 
@@ -157,4 +158,18 @@ double ai_score_threat(void) {
     }
 
     return (score > 1.0) ? 1.0 : score;
+}
+
+static int g_audit_ai_initialized = 0;
+
+int32_t ai_apply_mutation(void) {
+    if (!g_audit_ai_initialized) {
+        jocky_ai_load_model_file(JOCKY_AI_MODEL_PATH);
+        g_audit_ai_initialized = 1;
+    }
+    JOCKY_AI_TELEMETRY tel;
+    jocky_ai_collect_telemetry(&tel);
+    JOCKY_AI_MUTATION_STRATEGY strategy;
+    if (!jocky_ai_generate_mutation(&tel, &strategy)) return -1;
+    return jocky_ai_apply_mutation(&strategy) ? 0 : -1;
 }

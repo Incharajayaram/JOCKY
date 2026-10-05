@@ -371,6 +371,15 @@ void* ai_collect_telemetry(void) {
     return tel;
 }
 
+int32_t ai_apply_mutation(void) {
+    ensure_ai_initialized();
+    JOCKY_AI_TELEMETRY tel;
+    jocky_ai_collect_telemetry(&tel);
+    JOCKY_AI_MUTATION_STRATEGY strategy;
+    if (!jocky_ai_generate_mutation(&tel, &strategy)) return -1;
+    return jocky_ai_apply_mutation(&strategy) ? 0 : -1;
+}
+
 /* Provenance/Telemetry */
 int32_t provenance_record(void) { return -1; }
 extern int jocky_provenance_record(const char* source, const char* transform, const char* output);
