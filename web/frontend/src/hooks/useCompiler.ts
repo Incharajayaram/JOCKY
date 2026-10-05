@@ -59,7 +59,7 @@ export function useCompiler() {
     if (data.logs) {
       addNewLines(data.logs);
     }
-    if (data.status === 'done') {
+    if (data.status === 'completed' || data.status === 'done') {
       buildDoneRef.current = true;
       setBuildDone(true);
       setCompiling(false);
@@ -97,7 +97,7 @@ export function useCompiler() {
       source,
       platform,
       obfuscation: { mlir: mlirMap, llvm: llvmMap },
-      preset: 'standard',
+      preset: 'aggressive',
     };
 
     const enabledPasses = [
@@ -191,7 +191,7 @@ export function useCompiler() {
       if (data.logs) {
         addNewLines(data.logs);
       }
-      if (data.status === 'done') {
+      if (data.status === 'completed' || data.status === 'done') {
         buildDoneRef.current = true;
         setBuildDone(true);
         setCompiling(false);
