@@ -78,7 +78,7 @@ class CompileRequest(BaseModel):
     source: str
     platform: str = "windows"
     obfuscation: ObfuscationConfig = Field(default_factory=ObfuscationConfig)
-    preset: str = "standard"
+    preset: str = "aggressive"
     ai_enabled: bool = False
     ai_model_path: Optional[str] = None
     ai_aggressive: bool = False

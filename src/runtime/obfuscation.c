@@ -2,13 +2,15 @@
 #include "../include/jocky_anti_analysis.h"
 #include <stdlib.h>
 #include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#include <sys/mman.h>
-#endif
 #include <stdio.h>
 #include <time.h>
 #include <stdint.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <sys/mman.h>
+#endif
 
 static int code_mutation_enabled = 0;
 static struct {
@@ -134,70 +136,80 @@ int jocky_unhook_function(jocky_code_patch_t patch_handle) {
 }
 
 int jocky_allocate_code_buffer(int size, void** buffer_addr) {
-    if (size <= 0 || !buffer_addr) {
-        return -1;
-    }
+    if (size <= 0 || !buffer_addr) return -1;
 
+#ifdef _WIN32
+    *buffer_addr = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE,
+                                PAGE_EXECUTE_READWRITE);
+    if (!*buffer_addr) return -1;
+#else
     *buffer_addr = mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC,
                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-    if (*buffer_addr == MAP_FAILED) {
-        return -1;
-    }
+    if (*buffer_addr == MAP_FAILED) return -1;
+#endif
 
     return 0;
 }
 
 int jocky_free_code_buffer(void* buffer_addr, int size) {
-    if (!buffer_addr || size <= 0) {
-        return -1;
-    }
+    if (!buffer_addr || size <= 0) return -1;
 
-    if (munmap(buffer_addr, size) < 0) {
-        return -1;
-    }
+#ifdef _WIN32
+    (void)size;
+    if (!VirtualFree(buffer_addr, 0, MEM_RELEASE)) return -1;
+#else
+    if (munmap(buffer_addr, size) < 0) return -1;
+#endif
 
     return 0;
 }
 
 int jocky_make_code_executable(void* addr, int size) {
-    if (!addr || size <= 0) {
-        return -1;
-    }
+    if (!addr || size <= 0) return -1;
 
-    if (mprotect(addr, size, PROT_READ | PROT_EXEC) < 0) {
-        return -1;
-    }
+#ifdef _WIN32
+    DWORD old;
+    if (!VirtualProtect(addr, size, PAGE_EXECUTE_READ, &old)) return -1;
+#else
+    if (mprotect(addr, size, PROT_READ | PROT_EXEC) < 0) return -1;
+#endif
 
     return 0;
 }
 
 int jocky_make_code_writable(void* addr, int size) {
-    if (!addr || size <= 0) {
-        return -1;
-    }
+    if (!addr || size <= 0) return -1;
 
-    if (mprotect(addr, size, PROT_READ | PROT_WRITE) < 0) {
-        return -1;
-    }
+#ifdef _WIN32
+    DWORD old;
+    if (!VirtualProtect(addr, size, PAGE_READWRITE, &old)) return -1;
+#else
+    if (mprotect(addr, size, PROT_READ | PROT_WRITE) < 0) return -1;
+#endif
 
     return 0;
 }
 
 int jocky_mutate_based_on_analysis(void) {
+#ifndef _WIN32
     if (jocky_is_being_analyzed()) {
         if (!code_mutation_enabled) {
             jocky_enable_code_mutation();
         }
         return 1;
     }
-
+#endif
     return 0;
 }
 
 int jocky_adaptive_obfuscation_step(void) {
+#ifdef _WIN32
+    srand((unsigned)(time(NULL) ^ (long)GetCurrentProcessId()));
+#else
     srand(time(NULL) ^ getpid());
+#endif
 
+#ifndef _WIN32
     if (jocky_is_being_analyzed()) {
         int mutation_type = rand() % 3;
 
@@ -209,6 +221,6 @@ int jocky_adaptive_obfuscation_step(void) {
 
         return 1;
     }
-
+#endif
     return 0;
 }

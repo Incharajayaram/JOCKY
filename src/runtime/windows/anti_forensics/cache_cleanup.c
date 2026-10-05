@@ -138,13 +138,6 @@ unsigned char jocky_wipe_thumbcache(void) {
     return success;
 }
 
-unsigned char jocky_disable_minifilter_callbacks(void) {
-    return 1;
-}
-
-unsigned char jocky_disable_wdfilter(void) {
-    return 1;
-}
 
 int32_t jocky_registry_dump_sam(void) {
     HKEY hKey;

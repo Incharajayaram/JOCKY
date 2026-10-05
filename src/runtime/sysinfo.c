@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef _WIN32
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <unistd.h>
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
@@ -39,6 +41,13 @@ int jocky_sysinfo_cpu(jocky_cpu_info_t* out) {
 
     memset(out, 0, sizeof(jocky_cpu_info_t));
 
+#ifdef _WIN32
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    out->cores = (int)si.dwNumberOfProcessors;
+    if (out->cores <= 0) out->cores = 1;
+    out->logical_processors = out->cores;
+#else
     /* Get core count */
     out->cores = sysconf(_SC_NPROCESSORS_ONLN);
     if (out->cores <= 0) out->cores = 1;
@@ -66,6 +75,7 @@ int jocky_sysinfo_cpu(jocky_cpu_info_t* out) {
         }
         fclose(f);
     }
+#endif
 
     /* Get CPU features via CPUID (x86/x64 only) */
     #ifdef __GNUC__
@@ -117,21 +127,24 @@ int jocky_sysinfo_has_aes_ni(void) {
 int jocky_sysinfo_memory(jocky_memory_info_t* out) {
     if (!out) return -1;
 
+#ifdef _WIN32
+    MEMORYSTATUSEX ms;
+    ms.dwLength = sizeof(ms);
+    if (!GlobalMemoryStatusEx(&ms)) return -1;
+    out->total = ms.ullTotalPhys;
+    out->free = ms.ullAvailPhys;
+    out->available = ms.ullAvailPhys;
+    out->used = out->total - out->free;
+    out->percent_used = (out->total > 0) ? (int)(100 * out->used / out->total) : 0;
+#else
     struct sysinfo si;
-    if (sysinfo(&si) != 0) {
-        return -1;
-    }
-
+    if (sysinfo(&si) != 0) return -1;
     out->total = si.totalram * si.mem_unit;
     out->free = si.freeram * si.mem_unit;
     out->available = out->free + (si.bufferram * si.mem_unit);
     out->used = out->total - out->free;
-
-    if (out->total > 0) {
-        out->percent_used = (int)(100 * out->used / out->total);
-    } else {
-        out->percent_used = 0;
-    }
+    out->percent_used = (out->total > 0) ? (int)(100 * out->used / out->total) : 0;
+#endif
 
     return 0;
 }
@@ -153,42 +166,61 @@ int jocky_sysinfo_osinfo(jocky_osinfo_t* out) {
 
     memset(out, 0, sizeof(jocky_osinfo_t));
 
+#ifdef _WIN32
+    strncpy(out->os_name, "Windows", sizeof(out->os_name) - 1);
+    OSVERSIONINFOEXA vi;
+    memset(&vi, 0, sizeof(vi));
+    vi.dwOSVersionInfoSize = sizeof(vi);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    GetVersionExA((OSVERSIONINFOA*)&vi);
+#pragma GCC diagnostic pop
+    snprintf(out->kernel_release, sizeof(out->kernel_release), "%lu.%lu",
+             vi.dwMajorVersion, vi.dwMinorVersion);
+    snprintf(out->kernel_version, sizeof(out->kernel_version), "Build %lu",
+             vi.dwBuildNumber);
+#if defined(_WIN64)
+    strncpy(out->machine, "x86_64", sizeof(out->machine) - 1);
+    out->bits = 64;
+#else
+    strncpy(out->machine, "i686", sizeof(out->machine) - 1);
+    out->bits = 32;
+#endif
+#else
     struct utsname uts;
-    if (uname(&uts) != 0) {
-        return -1;
-    }
-
+    if (uname(&uts) != 0) return -1;
     strncpy(out->os_name, uts.sysname, sizeof(out->os_name) - 1);
     strncpy(out->kernel_release, uts.release, sizeof(out->kernel_release) - 1);
     strncpy(out->kernel_version, uts.version, sizeof(out->kernel_version) - 1);
     strncpy(out->machine, uts.machine, sizeof(out->machine) - 1);
-
-    /* Determine if 32 or 64-bit */
-    if (strstr(out->machine, "64") != NULL ||
-        strstr(out->machine, "x86_64") != NULL ||
-        strcmp(out->machine, "aarch64") == 0) {
+    if (strstr(out->machine, "64") != NULL || strcmp(out->machine, "aarch64") == 0)
         out->bits = 64;
-    } else {
+    else
         out->bits = 32;
-    }
+#endif
 
     return 0;
 }
 
 uint64_t jocky_sysinfo_uptime(void) {
+#ifdef _WIN32
+    return (uint64_t)(GetTickCount64() / 1000ULL);
+#else
     struct sysinfo si;
-    if (sysinfo(&si) != 0) {
-        return 0;
-    }
+    if (sysinfo(&si) != 0) return 0;
     return (uint64_t)si.uptime;
+#endif
 }
 
 int jocky_sysinfo_hostname(char* buffer, size_t size) {
     if (!buffer || size == 0) return -1;
 
-    if (gethostname(buffer, size) != 0) {
-        return -1;
-    }
+#ifdef _WIN32
+    DWORD sz = (DWORD)size;
+    if (!GetComputerNameA(buffer, &sz)) return -1;
+#else
+    if (gethostname(buffer, size) != 0) return -1;
+#endif
 
     buffer[size - 1] = '\0';
     return 0;
@@ -197,12 +229,9 @@ int jocky_sysinfo_hostname(char* buffer, size_t size) {
 int jocky_sysinfo_kernel_release(char* buffer, size_t size) {
     if (!buffer || size == 0) return -1;
 
-    struct utsname uts;
-    if (uname(&uts) != 0) {
-        return -1;
-    }
-
-    strncpy(buffer, uts.release, size - 1);
+    jocky_osinfo_t info;
+    if (jocky_sysinfo_osinfo(&info) != 0) return -1;
+    strncpy(buffer, info.kernel_release, size - 1);
     buffer[size - 1] = '\0';
     return 0;
 }
@@ -210,26 +239,25 @@ int jocky_sysinfo_kernel_release(char* buffer, size_t size) {
 int jocky_sysinfo_arch(char* buffer, size_t size) {
     if (!buffer || size == 0) return -1;
 
-    struct utsname uts;
-    if (uname(&uts) != 0) {
-        return -1;
-    }
-
-    strncpy(buffer, uts.machine, size - 1);
+    jocky_osinfo_t info;
+    if (jocky_sysinfo_osinfo(&info) != 0) return -1;
+    strncpy(buffer, info.machine, size - 1);
     buffer[size - 1] = '\0';
     return 0;
 }
 
 int jocky_sysinfo_pagesize(void) {
+#ifdef _WIN32
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    return (int)si.dwPageSize;
+#else
     long pagesize = sysconf(_SC_PAGESIZE);
-    if (pagesize <= 0) {
-        return 4096;  /* Default fallback */
-    }
-    return (int)pagesize;
+    return (pagesize > 0) ? (int)pagesize : 4096;
+#endif
 }
 
 int jocky_sysinfo_init(void) {
-    /* Pre-cache CPU info */
     jocky_cpu_info_t dummy;
     return jocky_sysinfo_cpu(&dummy);
 }
@@ -237,9 +265,11 @@ int jocky_sysinfo_init(void) {
 int jocky_sysinfo_load_average(double* out) {
     if (!out) return -1;
 
-    if (getloadavg(out, 3) != 3) {
-        return -1;
-    }
-
+#ifdef _WIN32
+    out[0] = out[1] = out[2] = -1.0;
+    return -1;
+#else
+    if (getloadavg(out, 3) != 3) return -1;
     return 0;
+#endif
 }

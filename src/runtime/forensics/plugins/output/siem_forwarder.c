@@ -11,12 +11,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
+#ifndef _WIN32
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
-#include <errno.h>
+#endif
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
@@ -24,6 +26,7 @@
  * Global OpenSSL Context
  * ============================================================================ */
 
+#ifndef _WIN32
 static SSL_CTX* g_ssl_ctx = NULL;
 
 static void init_openssl(void) {
@@ -243,6 +246,7 @@ static void siem_forwarder_cleanup(void) {
     cleanup_openssl();
     printf("[siem_forwarder] Cleanup\n");
 }
+#endif /* !_WIN32 */
 
 /* ============================================================================
  * Plugin Definition
@@ -257,9 +261,11 @@ forensic_output_plugin_t siem_forwarder_plugin = {
     .name = "siem_forwarder",
     .version = "1.0.0",
     .description = "Forwards forensic results to SIEM via HTTP/HTTPS POST (Splunk HEC, Elastic, etc.)",
+#ifndef _WIN32
     .init = siem_forwarder_init,
     .generate = siem_forwarder_generate,
     .cleanup = siem_forwarder_cleanup,
+#endif
     .required_capabilities = siem_capabilities,
     .capability_count = sizeof(siem_capabilities) / sizeof(siem_capabilities[0])
 };

@@ -22,14 +22,19 @@
  * - UNWIND_CODE: Atomic unwinding operations (push, alloca, etc.)
  */
 
-/* On Windows, winnt.h already defines RUNTIME_FUNCTION, UNWIND_INFO, UNWIND_CODE */
-#ifndef _WIN32
+/* RUNTIME_FUNCTION: MinGW winnt.h provides this inside _AMD64_ guards; skip ours there.
+ * UNWIND_CODE/UNWIND_INFO: neither MSVC SDK nor MinGW expose these in public headers;
+ * we always define them ourselves (no conflict risk). */
+#if !defined(_MSC_VER) && !defined(_AMD64_)
 typedef struct {
     uint32_t BeginAddress;
     uint32_t EndAddress;
     uint32_t UnwindData;
 } RUNTIME_FUNCTION;
+#endif
 
+#ifndef JOCKY_UNWIND_INFO_DEFINED
+#define JOCKY_UNWIND_INFO_DEFINED
 typedef struct {
     uint8_t Version;
     uint8_t Flags;
@@ -38,13 +43,16 @@ typedef struct {
     uint8_t FrameRegister;
     uint8_t FrameOffset;
 } UNWIND_INFO;
+#endif
 
+#ifndef JOCKY_UNWIND_CODE_DEFINED
+#define JOCKY_UNWIND_CODE_DEFINED
 typedef struct {
     uint8_t CodeOffset;
     uint8_t OpCode;
     uint8_t OpInfo;
 } UNWIND_CODE;
-#endif /* !_WIN32 */
+#endif
 
 /* BYOUD function API */
 
