@@ -452,8 +452,11 @@ def stage_compile_runtime(build_dir, platform="windows"):
     log("RUNTIME", f"  sources from CMakeLists.txt: {len(sources)} files")
 
     if platform == "linux":
-        compiler = "gcc"
+        toolchain_clang = TOOLCHAIN / "bin" / "clang"
+        compiler = str(toolchain_clang) if toolchain_clang.exists() else "gcc"
+        clang_target = ["--target=x86_64-linux-gnu"] if toolchain_clang.exists() else []
         cflags = ["-O2", "-c", "-D_GNU_SOURCE", "-fPIC",
+                  *clang_target,
                   "-I", str(include_dir),
                   "-I", str(RUNTIME_DIR),
                   "-I", str(RUNTIME_DIR / "linux")]
@@ -471,21 +474,19 @@ def stage_compile_runtime(build_dir, platform="windows"):
         return objs
 
     log("RUNTIME", "Compiling JOCKY runtime for Windows")
-    # Try system MinGW first (more reliable), then bundled MinGW, fallback to clang
+    # Prefer bundled MinGW (self-contained toolchain), fall back to system, then clang
     mingw_gcc = None
 
-    # Try system MinGW (more reliable cross-compiler setup)
-    try:
-        subprocess.run(["x86_64-w64-mingw32-gcc", "--version"], capture_output=True, check=True)
-        mingw_gcc = "x86_64-w64-mingw32-gcc"
-        log("RUNTIME", "Using system MinGW")
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        # Fallback to bundled MinGW if system not available
-        bundled_mingw = TOOLCHAIN / "mingw" / "bin" / "x86_64-w64-mingw32-gcc"
-        if bundled_mingw.exists():
-            log("RUNTIME", "System MinGW not found, using bundled MinGW")
-            mingw_gcc = str(bundled_mingw)
-        else:
+    bundled_mingw = TOOLCHAIN / "mingw" / "bin" / "x86_64-w64-mingw32-gcc"
+    if bundled_mingw.exists():
+        mingw_gcc = str(bundled_mingw)
+        log("RUNTIME", "Using bundled MinGW")
+    else:
+        try:
+            subprocess.run(["x86_64-w64-mingw32-gcc", "--version"], capture_output=True, check=True)
+            mingw_gcc = "x86_64-w64-mingw32-gcc"
+            log("RUNTIME", "Using system MinGW")
+        except (FileNotFoundError, subprocess.CalledProcessError):
             log("RUNTIME", "MinGW not found, using clang for Windows PE target")
             mingw_gcc = "clang"
 
@@ -588,21 +589,21 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
         return exe_path
 
     log("LINK", "Linking Windows PE executable")
-    # Try system MinGW first (more reliable), then bundled, fallback to clang
+    # Prefer bundled MinGW (self-contained toolchain), fall back to system, then clang
     link_env = os.environ.copy()
     use_bundled = False
 
-    try:
-        subprocess.run(["x86_64-w64-mingw32-gcc", "--version"], capture_output=True, check=True)
-        linker = "x86_64-w64-mingw32-gcc"
-        log("LINK", "Using system MinGW")
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        bundled_mingw = TOOLCHAIN / "mingw" / "bin" / "x86_64-w64-mingw32-gcc"
-        if bundled_mingw.exists():
-            linker = str(bundled_mingw)
-            use_bundled = True
-            log("LINK", "System MinGW not found, using bundled MinGW")
-        else:
+    bundled_mingw_check = TOOLCHAIN / "mingw" / "bin" / "x86_64-w64-mingw32-gcc"
+    if bundled_mingw_check.exists():
+        linker = str(bundled_mingw_check)
+        use_bundled = True
+        log("LINK", "Using bundled MinGW")
+    else:
+        try:
+            subprocess.run(["x86_64-w64-mingw32-gcc", "--version"], capture_output=True, check=True)
+            linker = "x86_64-w64-mingw32-gcc"
+            log("LINK", "Using system MinGW")
+        except (FileNotFoundError, subprocess.CalledProcessError):
             linker = "clang"
             log("LINK", "Using clang for Windows PE target")
 
