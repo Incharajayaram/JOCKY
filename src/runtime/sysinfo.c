@@ -3,11 +3,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
 #include <sys/types.h>
 #include <netdb.h>
+#endif
 
 /* CPUID function (x86/x64 only) */
 #ifdef __GNUC__

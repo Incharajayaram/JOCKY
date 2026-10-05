@@ -9,14 +9,25 @@ static RUNTIME_FUNCTION* g_original_pdata = NULL;
 static SIZE_T g_pdata_size = 0;
 static BOOLEAN g_cet_enabled = FALSE;
 
+/* Win10 1903+ SDK types — guard for older MinGW toolchains */
+#ifndef ProcessUserShadowStackPolicy
+#define ProcessUserShadowStackPolicy ((PROCESS_MITIGATION_POLICY)11)
+typedef struct _PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY {
+    union {
+        DWORD Flags;
+        struct { DWORD EnableUserShadowStack : 1; DWORD ReservedFlags : 31; };
+    };
+} PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY;
+#endif
+
 int jocky_byoud_initialize(void) {
-    /* Check if CET is enabled via kernel */
     PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY policy;
+    memset(&policy, 0, sizeof(policy));
     if (GetProcessMitigationPolicy(GetCurrentProcess(),
                                    ProcessUserShadowStackPolicy,
                                    &policy,
                                    sizeof(policy))) {
-        g_cet_enabled = policy.EnableUserShadowStack;
+        g_cet_enabled = policy.EnableUserShadowStack ? TRUE : FALSE;
     }
     return 0;
 }

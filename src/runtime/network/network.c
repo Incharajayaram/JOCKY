@@ -3,13 +3,6 @@
 #include <string.h>
 #include <stdio.h>
 
-/* Common includes */
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <sys/types.h>
-
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
@@ -17,6 +10,11 @@
 #pragma comment(lib, "ws2_32.lib")
 typedef int socklen_t;
 #else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
 #define INVALID_SOCKET -1

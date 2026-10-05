@@ -18,6 +18,7 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
+#ifndef _WIN32
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -25,6 +26,7 @@
 #include <pwd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
