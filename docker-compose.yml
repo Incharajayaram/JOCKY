@@ -1,109 +1,48 @@
-version: '3.8'
-
 services:
-  # Frontend service (Node.js + React)
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-      args:
-        - VITE_API_BASE=${VITE_API_BASE:-http://localhost:8000}
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
-    environment:
-      - VITE_API_BASE=${VITE_API_BASE:-http://localhost:8000}
-      - NODE_ENV=${NODE_ENV:-development}
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - jocky-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
-    restart: unless-stopped
-
-  # Backend service (FastAPI)
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
-    environment:
-      - BACKEND_HOST=0.0.0.0
-      - BACKEND_PORT=8000
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://frontend:3000}
-      - DATABASE_URL=${DATABASE_URL:-sqlite:///./jocky_jobs.db}
-      - MAX_COMPILATION_TIME=${MAX_COMPILATION_TIME:-600}
-    depends_on:
-      compiler:
-        condition: service_started
     networks:
-      - jocky-network
+      - jocky-net
     volumes:
-      - ./build:/tmp/jocky_build
-      - backend_data:/app/data
+      # Toolchain is 4.2 GB — bind-mount from host, read-only inside container
+      - ./toolchain:/workspace/jocky/toolchain:ro
+      # Persistent build artifacts (compiled binaries available for download)
+      - jocky_build:/workspace/jocky/build
+      # Persistent SQLite database
+      - jocky_db:/workspace/jocky/data
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DATABASE_URL=sqlite:////workspace/jocky/data/jocky_jobs.db
+      - MAX_COMPILATION_TIME=${MAX_COMPILATION_TIME:-600}
+      # CORS: frontend nginx is on the same host, so same-origin — restrict to internal
+      - CORS_ORIGINS=http://frontend,http://localhost
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/config"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 5s
+      start_period: 15s
     restart: unless-stopped
 
-  # Compiler service (JOCKY toolchain)
-  compiler:
+  frontend:
     build:
       context: .
-      dockerfile: Dockerfile
-      args:
-        - BUILD_TYPE=${BUILD_TYPE:-Release}
-    networks:
-      - jocky-network
-    volumes:
-      - ./src:/workspace/jocky/src
-      - ./scripts:/workspace/jocky/scripts
-      - ./build:/workspace/jocky/build
-      - ./compiler:/workspace/jocky/compiler
-    environment:
-      - BUILD_TYPE=${BUILD_TYPE:-Release}
-    command: tail -f /dev/null
-    restart: unless-stopped
-
-  # Reverse proxy (Caddy) - optional, for production
-  caddy:
-    image: caddy:2.7.6-alpine
+      dockerfile: Dockerfile.frontend
     ports:
-      - "${CADDY_PORT:-443}:443"
-      - "80:80"
-    environment:
-      - FRONTEND_HOST=${FRONTEND_HOST:-frontend:3000}
-      - BACKEND_HOST=${BACKEND_HOST:-backend:8000}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
+      - "${PORT:-80}:80"
     networks:
-      - jocky-network
+      - jocky-net
     depends_on:
-      frontend:
-        condition: service_healthy
       backend:
         condition: service_healthy
-    profiles:
-      - production
     restart: unless-stopped
 
 networks:
-  jocky-network:
+  jocky-net:
     driver: bridge
 
 volumes:
-  backend_data:
-  caddy_data:
-  caddy_config:
+  jocky_build:
+  jocky_db:

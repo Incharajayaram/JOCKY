@@ -1,0 +1,36 @@
+# Toolchain is 4.2GB — mounted as a volume at runtime, never baked in
+toolchain/
+
+# Python bytecode
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Node.js
+web/frontend/node_modules/
+web/frontend/dist/
+web/frontend/test-results/
+
+# Build artifacts (mounted as volume at runtime)
+build/
+build_tests/
+
+# VCS and IDE
+.git/
+.gitignore
+.claude/
+vscode-extension/
+.playwright-mcp/
+*.code-workspace
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
+
+# Backend runtime state
+web/backend/venv/
+web/backend/jocky_jobs.db
+
+# Dev-only compose
+docker-compose.dev.yml
