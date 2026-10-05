@@ -502,12 +502,13 @@ def stage_compile_runtime(build_dir, platform="windows"):
 
     sources_win = sources
 
+    mingw_sysroot = TOOLCHAIN / "mingw" / "x86_64-w64-mingw32"
     cflags_win = [
         "-O2", "-c", "-D_WIN32", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE",
         "-I", str(include_dir),
         "-I", str(RUNTIME_DIR),
         "-I", str(RUNTIME_DIR / "windows"),
-    ]
+    ] + (["-I", str(mingw_sysroot / "include")] if (mingw_sysroot / "include").exists() else [])
 
     # Set up environment for bundled MinGW only if using it
     compile_env = os.environ.copy()
@@ -632,23 +633,32 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
                 f"-fuse-ld={str(bundled_mingw_bin / 'x86_64-w64-mingw32-ld')}"
             ]
 
+    win_sysroot_lib = TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "lib"
+    sysroot_link_flags = ["-L", str(win_sysroot_lib)] if win_sysroot_lib.exists() else []
+    third_party_libs = ["-lz", "-lssl", "-lcrypto", "-lcurl",
+                        "-lcrypt32", "-lgdi32", "-lwldap32"] if win_sysroot_lib.exists() else []
+
     all_objs = [str(obj_path)] + [str(o) for o in runtime_objs]
     if linker == "clang":
         cmd = [
             linker,
             "--target=x86_64-pc-windows-gnu",
+            *sysroot_link_flags,
             *all_objs,
             "-lntdll", "-lwinhttp", "-lwininet", "-ldnsapi", "-lwevtapi",
             "-ladvapi32", "-lkernel32", "-lws2_32", "-lpsapi",
+            *third_party_libs,
             "-o", str(exe_path),
         ]
     else:
         cmd = [
             linker,
             *linker_flags,
+            *sysroot_link_flags,
             *all_objs,
             "-lntdll", "-lwinhttp", "-lwininet", "-ldnsapi", "-lwevtapi",
             "-ladvapi32", "-lkernel32", "-lws2_32", "-lpsapi",
+            *third_party_libs,
             "-o", str(exe_path),
         ]
     run(cmd, "Link PE executable", env=link_env)
