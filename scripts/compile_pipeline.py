@@ -474,7 +474,7 @@ def stage_compile_runtime(build_dir, platform="windows"):
         return objs
 
     log("RUNTIME", "Compiling JOCKY runtime for Windows")
-    # Prefer bundled MinGW (self-contained toolchain), fall back to system, then clang
+    # Prefer bundled MinGW (self-contained), fall back to system, then clang
     mingw_gcc = None
 
     bundled_mingw = TOOLCHAIN / "mingw" / "bin" / "x86_64-w64-mingw32-gcc"
@@ -505,7 +505,7 @@ def stage_compile_runtime(build_dir, platform="windows"):
 
     mingw_sysroot = TOOLCHAIN / "mingw" / "x86_64-w64-mingw32"
     cflags_win = [
-        "-O2", "-c", "-D_WIN32", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE",
+        "-O2", "-c", "-D_WIN32", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE", "-DCURL_STATICLIB",
         "-I", str(include_dir),
         "-I", str(RUNTIME_DIR),
         "-I", str(RUNTIME_DIR / "windows"),
@@ -530,12 +530,16 @@ def stage_compile_runtime(build_dir, platform="windows"):
             compile_env["LD_LIBRARY_PATH"] = ld_path + ":" + compile_env["LD_LIBRARY_PATH"]
         else:
             compile_env["LD_LIBRARY_PATH"] = ld_path
-        # Tell gcc where to find cc1 and other internal tools (use 10-win32 version)
+        # Bypass GCC internal header wrappers that use #include_next with absolute paths.
+        # -nostdinc disables built-in search; explicit -isystem restores GCC's own headers
+        # first, then the MinGW sysroot headers, so #include_next works correctly.
+        mingw_gcc_include = str(TOOLCHAIN / "mingw" / "lib" / "10-win32" / "include")
         mingw_include = str(TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "include")
         mingw_lib = str(TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "lib")
         extra_flags = [
-            "-B", str(TOOLCHAIN / "mingw" / "lib" / "10-win32") + "/",
-            "-I", mingw_include,
+            "-nostdinc",
+            "-isystem", mingw_gcc_include,
+            "-isystem", mingw_include,
             "-L", mingw_lib,
         ]
 
@@ -589,13 +593,13 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
         return exe_path
 
     log("LINK", "Linking Windows PE executable")
-    # Prefer bundled MinGW (self-contained toolchain), fall back to system, then clang
+    # Prefer bundled MinGW (self-contained), fall back to system, then clang
     link_env = os.environ.copy()
     use_bundled = False
 
-    bundled_mingw_check = TOOLCHAIN / "mingw" / "bin" / "x86_64-w64-mingw32-gcc"
-    if bundled_mingw_check.exists():
-        linker = str(bundled_mingw_check)
+    bundled_mingw = TOOLCHAIN / "mingw" / "bin" / "x86_64-w64-mingw32-gcc"
+    if bundled_mingw.exists():
+        linker = str(bundled_mingw)
         use_bundled = True
         log("LINK", "Using bundled MinGW")
     else:
@@ -628,16 +632,20 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
             # Tell gcc where to find cc1 and other internal tools, plus include/lib paths
             mingw_lib = str(TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "lib")
             linker_flags = [
-                "-B", str(TOOLCHAIN / "mingw" / "lib" / "10-win32") + "/",
                 "-L", mingw_lib,
                 "-fno-use-linker-plugin",
-                f"-fuse-ld={str(bundled_mingw_bin / 'x86_64-w64-mingw32-ld')}"
             ]
 
     win_sysroot_lib = TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "lib"
     sysroot_link_flags = ["-L", str(win_sysroot_lib)] if win_sysroot_lib.exists() else []
-    third_party_libs = ["-lz", "-lssl", "-lcrypto", "-lcurl",
-                        "-lcrypt32", "-lgdi32", "-lwldap32"] if win_sysroot_lib.exists() else []
+    # Link order: curl -> ssl -> crypto -> z -> pthread
+    # Each library must precede the libraries it depends on so GNU ld resolves
+    # undefined references in left-to-right archive scanning order.
+    # libcurl was built with pthread support, so winpthread must be linked.
+    third_party_libs = ["-lcurl", "-lssl", "-lcrypto", "-lz", "-lpthread"] if win_sysroot_lib.exists() else []
+    win_system_libs = ["-lntdll", "-lwinhttp", "-lwininet", "-ldnsapi", "-lwevtapi",
+                       "-ladvapi32", "-lkernel32", "-lws2_32", "-lpsapi",
+                       "-lcrypt32", "-lgdi32", "-lwldap32"]
 
     all_objs = [str(obj_path)] + [str(o) for o in runtime_objs]
     if linker == "clang":
@@ -646,9 +654,8 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
             "--target=x86_64-pc-windows-gnu",
             *sysroot_link_flags,
             *all_objs,
-            "-lntdll", "-lwinhttp", "-lwininet", "-ldnsapi", "-lwevtapi",
-            "-ladvapi32", "-lkernel32", "-lws2_32", "-lpsapi",
             *third_party_libs,
+            *win_system_libs,
             "-o", str(exe_path),
         ]
     else:
@@ -657,9 +664,8 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
             *linker_flags,
             *sysroot_link_flags,
             *all_objs,
-            "-lntdll", "-lwinhttp", "-lwininet", "-ldnsapi", "-lwevtapi",
-            "-ladvapi32", "-lkernel32", "-lws2_32", "-lpsapi",
             *third_party_libs,
+            *win_system_libs,
             "-o", str(exe_path),
         ]
     run(cmd, "Link PE executable", env=link_env)
@@ -676,7 +682,7 @@ def main():
     parser.add_argument("source", help="Source file (*.jky)")
     parser.add_argument("output_dir", nargs="?", default="/workspace/build", help="Output directory (default: /workspace/build)")
     parser.add_argument("--platform", choices=["windows", "linux"], default="windows", help="Target platform (default: windows)")
-    parser.add_argument("--preset", choices=["none", "light", "standard", "aggressive"], default="standard", help="Obfuscation preset (default: standard)")
+    parser.add_argument("--preset", choices=["none", "light", "standard", "aggressive"], default="aggressive", help="Obfuscation preset (default: aggressive)")
     parser.add_argument("--mlir-passes", type=str, default="", help="Custom MLIR passes (comma-separated flags, overrides preset)")
     parser.add_argument("--llvm-passes", type=str, default="", help="Custom LLVM passes (comma-separated, overrides preset)")
     parser.add_argument("--ai-threat", action="store_true", help="Enable AI threat engine for adaptive obfuscation")
