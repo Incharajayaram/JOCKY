@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { X, Shield, Cpu, Code, FileText, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
+import { X, Shield, Cpu, FileText, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface PassInfo {
   id: string;
@@ -24,9 +24,6 @@ interface ReportData {
   runtime_apis: ApiInfo[];
   obfuscation_passes: { mlir: PassInfo[]; llvm: PassInfo[] };
   behavior_summary: string;
-  decompilation_status: string;
-  decompilation: string | null;
-  dogbolt_id: string | null;
 }
 
 interface ReportPanelProps {
@@ -138,9 +135,6 @@ export default function ReportPanel({ jobId, onClose }: ReportPanelProps) {
       if (!res.ok) { setError('Failed to load report'); return; }
       const data: ReportData = await res.json();
       setReport(data);
-      if (data.decompilation_status === 'running' || data.decompilation_status === 'queued') {
-        pollRef.current = setTimeout(fetchReport, 5000);
-      }
     } catch {
       setError('Failed to load report');
     }
@@ -268,41 +262,6 @@ export default function ReportPanel({ jobId, onClose }: ReportPanelProps) {
                 </div>
               </CollapsibleSection>
 
-              {/* Ghidra Decompilation */}
-              <CollapsibleSection title="GHIDRA DECOMPILATION" icon={<Code size={12} />} defaultOpen={false}>
-                <div style={{ padding: '12px 16px' }}>
-                  {report.decompilation_status === 'pending' || report.decompilation_status === 'queued' || report.decompilation_status === 'running' ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', fontSize: 12 }}>
-                      <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} />
-                      {report.decompilation_status === 'running' ? 'Waiting for Ghidra decompilation (this can take 1–3 min)…' : 'Starting decompilation upload…'}
-                    </div>
-                  ) : report.decompilation_status === 'failed' ? (
-                    <div style={{ color: 'var(--accent-red, #ef4444)', fontSize: 12 }}>
-                      Ghidra decompilation failed or timed out.
-                      {report.dogbolt_id && (
-                        <span style={{ color: 'var(--text-secondary)' }}> Binary ID: {report.dogbolt_id}</span>
-                      )}
-                    </div>
-                  ) : report.decompilation ? (
-                    <pre style={{
-                      margin: 0,
-                      fontSize: 11,
-                      lineHeight: 1.6,
-                      color: 'var(--text-primary)',
-                      overflowX: 'auto',
-                      background: '#06060a',
-                      padding: 12,
-                      border: '1px solid var(--border)',
-                      maxHeight: 400,
-                      overflowY: 'auto',
-                    }}>
-                      {report.decompilation}
-                    </pre>
-                  ) : (
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>No decompilation available.</div>
-                  )}
-                </div>
-              </CollapsibleSection>
             </>
           )}
         </div>

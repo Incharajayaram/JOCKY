@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import TopBar from './components/TopBar';
-import DecompilePanel from './components/DecompilePanel';
 import PlatformTabs from './components/PlatformTabs';
 import CodeEditor from './components/CodeEditor';
 import type { CodeEditorHandle } from './components/CodeEditor';
@@ -59,7 +58,6 @@ export default function App() {
   const editorRef = useRef<CodeEditorHandle>(null);
   const { categories } = useRuntimeApis();
   const { compiling, logs, jobId, buildDone, compile, clearLogs } = useCompiler();
-  const [decompileOpen, setDecompileOpen] = useState(false);
 
   const handlePlatformChange = useCallback((p: Platform) => {
     setPlatform(p);
@@ -89,7 +87,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div style={styles.app}>
-        <TopBar onCompile={handleCompile} compiling={compiling} onDecompile={() => setDecompileOpen(true)} />
+        <TopBar onCompile={handleCompile} compiling={compiling} />
         <PlatformTabs active={platform} onChange={handlePlatformChange} />
         <div style={styles.main}>
           <CodeEditor
@@ -121,7 +119,6 @@ export default function App() {
           buildDone={buildDone}
           onClear={clearLogs}
         />
-        {decompileOpen && <DecompilePanel onClose={() => setDecompileOpen(false)} />}
       </div>
     </ErrorBoundary>
   );

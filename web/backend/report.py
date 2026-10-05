@@ -1,8 +1,4 @@
-import asyncio
 import re
-from typing import Optional
-
-import httpx
 
 from obfuscation import MLIR_PASSES, LLVM_PASSES
 from runtime_apis import RUNTIME_APIS
@@ -34,9 +30,6 @@ _CATEGORY_BEHAVIORS: dict[str, str] = {
     "Plugin": "loads and executes additional plugin modules at runtime",
     "AI/ML Runtime": "uses on-device ML models for adaptive evasion behaviour",
 }
-
-DOGBOLT_BASE = "https://dogbolt.org/api/binaries/"
-
 
 def extract_used_apis(source: str) -> list[dict]:
     seen: set[str] = set()
@@ -105,59 +98,3 @@ def generate_behavior_summary(platform: str, apis: list[dict], passes: dict) -> 
         )
 
     return f"{behavior_text}\n\n{obf_text}"
-
-
-async def upload_to_dogbolt(binary_path: str) -> Optional[str]:
-    try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            with open(binary_path, "rb") as f:
-                resp = await client.post(
-                    DOGBOLT_BASE,
-                    files={"file": ("binary", f, "application/octet-stream")},
-                )
-            if resp.status_code in (200, 201):
-                return resp.json().get("id")
-    except Exception:
-        pass
-    return None
-
-
-async def poll_ghidra(binary_id: str, max_seconds: int = 180) -> Optional[str]:
-    url = f"{DOGBOLT_BASE}{binary_id}/decompilations/"
-    checks = max(max_seconds // 8, 1)
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            for _ in range(checks):
-                await asyncio.sleep(8)
-                resp = await client.get(url)
-                if resp.status_code != 200:
-                    break
-                for item in resp.json().get("results", []):
-                    if "Ghidra" in item.get("decompiler", {}).get("name", ""):
-                        output = item.get("output")
-                        if output:
-                            return output
-    except Exception:
-        pass
-    return None
-
-
-async def run_dogbolt_analysis(job) -> None:
-    """Upload binary to dogbolt and store Ghidra decompilation on the job."""
-    if not job.output_path:
-        job.decompilation_status = "failed"
-        return
-
-    job.decompilation_status = "running"
-    binary_id = await upload_to_dogbolt(job.output_path)
-    if not binary_id:
-        job.decompilation_status = "failed"
-        return
-
-    job.dogbolt_id = binary_id
-    result = await poll_ghidra(binary_id)
-    if result:
-        job.decompilation = result
-        job.decompilation_status = "done"
-    else:
-        job.decompilation_status = "failed"

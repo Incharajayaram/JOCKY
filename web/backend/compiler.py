@@ -37,9 +37,6 @@ class CompileJob:
     runtime_apis_used: list = field(default_factory=list)
     obfuscation_config: dict = field(default_factory=dict)
     behavior_summary: str = ""
-    dogbolt_id: Optional[str] = None
-    decompilation: Optional[str] = None
-    decompilation_status: str = "pending"
 
 
 jobs: dict[str, CompileJob] = {}
