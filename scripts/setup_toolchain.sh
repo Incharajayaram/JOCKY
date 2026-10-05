@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# Patches a distributed toolchain/ to be self-contained on the current host.
-# Run once after extracting the toolchain package.
+# One-shot toolchain setup. Run after cloning the repo and placing the toolchain/.
+# Ensures all required shared libs are in toolchain/lib so compilation works on
+# any Linux distro (Ubuntu 22.04+, 24.04+, Fedora 37+, Debian 12+, etc.)
 #
-# What this does:
-#   - Bundles libicuuc.so.70 / libicudata.so.70  (missing on Ubuntu 24.04+ which ships ICU 74)
-#   - Bundles liblzma.so.5                        (occasionally missing on minimal installs)
-#   - Verifies all tools execute cleanly
+# Strategy per lib:
+#   1. Already in toolchain/lib → skip
+#   2. Found on the host system → copy it in
+#   3. Not on host (e.g. Ubuntu 24.04 ships ICU 74, not 70) → download .deb from
+#      Ubuntu 22.04 archive and extract just the .so files (no apt changes)
 #
-# Hard requirement: glibc 2.35+ (Ubuntu 22.04+, Fedora 37+, Debian 12+).
-# The LLVM toolchain was compiled against glibc 2.36/2.38 symbols.
+# Hard requirement: glibc 2.35+ (Ubuntu 22.04+). The LLVM binaries were compiled
+# against glibc 2.36/2.38 symbols.
 
 set -e
 
@@ -17,80 +19,129 @@ TOOLCHAIN="${TOOLCHAIN_PATH:-$SCRIPT_DIR/../toolchain}"
 TOOLCHAIN_LIB="$TOOLCHAIN/lib"
 
 err()  { echo "[ERROR] $*" >&2; exit 1; }
+warn() { echo "[WARN]  $*"; }
 info() { echo "[INFO]  $*"; }
 ok()   { echo "[OK]    $*"; }
 
 [ -d "$TOOLCHAIN_LIB" ] || err "toolchain/lib not found at $TOOLCHAIN_LIB"
 
-# ── glibc version check ──────────────────────────────────────────────────────
+# ── glibc version check ───────────────────────────────────────────────────────
 GLIBC_VER=$(ldd --version 2>/dev/null | awk 'NR==1{print $NF}')
-GLIBC_MAJOR=$(echo "$GLIBC_VER" | cut -d. -f1)
 GLIBC_MINOR=$(echo "$GLIBC_VER" | cut -d. -f2)
-if [ "$GLIBC_MAJOR" -lt 2 ] || { [ "$GLIBC_MAJOR" -eq 2 ] && [ "$GLIBC_MINOR" -lt 35 ]; }; then
-    err "glibc $GLIBC_VER too old. Minimum required: glibc 2.35 (Ubuntu 22.04+). Found: $GLIBC_VER"
+if [ "$(echo "$GLIBC_VER" | cut -d. -f1)" -lt 2 ] || [ "$GLIBC_MINOR" -lt 35 ]; then
+    err "glibc $GLIBC_VER is too old. Minimum: 2.35 (Ubuntu 22.04+). Cannot run the LLVM toolchain."
 fi
 info "glibc $GLIBC_VER — OK"
 
+# ── download .deb and extract a .so file ─────────────────────────────────────
+# Used only when the lib is not present on the host (e.g. Ubuntu 24.04 w/ ICU 74).
+# Downloads from Ubuntu 22.04 (jammy) package archive, no apt changes made.
+UBUNTU_ARCHIVE="http://archive.ubuntu.com/ubuntu/pool/main"
+
+fetch_from_deb() {
+    local deb_url="$1"
+    local so_pattern="$2"   # glob pattern inside the deb, e.g. "*/libicuuc.so.70*"
+    local dest_dir="$3"
+    local tmpdir
+    tmpdir=$(mktemp -d)
+
+    info "Downloading $(basename "$deb_url") ..."
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$deb_url" -o "$tmpdir/pkg.deb"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q "$deb_url" -O "$tmpdir/pkg.deb"
+    else
+        err "Neither curl nor wget found. Install one and retry."
+    fi
+
+    cd "$tmpdir"
+    ar x pkg.deb
+    # .deb data archive may be data.tar.xz, data.tar.zst, or data.tar.gz
+    local data_archive
+    data_archive=$(ls data.tar.* 2>/dev/null | head -1)
+    [ -n "$data_archive" ] || err "Could not find data archive inside $deb_url"
+    tar -xf "$data_archive" --wildcards "$so_pattern" --strip-components=4 -C "$dest_dir" 2>/dev/null || \
+    tar -xf "$data_archive" --wildcards "$so_pattern" -C "$dest_dir" 2>/dev/null || \
+        err "Could not extract $so_pattern from $data_archive"
+
+    cd - >/dev/null
+    rm -rf "$tmpdir"
+}
+
 # ── bundle helper ─────────────────────────────────────────────────────────────
 bundle() {
-    local soname="$1"         # e.g. libicuuc.so.70
-    local realname="$2"       # e.g. libicuuc.so.70.1 (actual file, may equal soname)
+    local soname="$1"       # e.g. libicuuc.so.70
+    local realname="$2"     # e.g. libicuuc.so.70.1
+    local deb_url="$3"      # fallback: URL to Ubuntu 22.04 .deb
+    local so_glob="$4"      # glob to extract from that .deb
 
     if [ -e "$TOOLCHAIN_LIB/$soname" ]; then
         ok "$soname already in toolchain/lib"
         return
     fi
 
-    # Search standard lib paths
-    local src
+    # Search standard lib paths on host
+    local src=""
     for dir in /lib/x86_64-linux-gnu /lib /usr/lib/x86_64-linux-gnu /usr/lib; do
         if [ -f "$dir/$realname" ]; then
             src="$dir/$realname"; break
-        elif [ -f "$dir/$soname" ]; then
+        elif [ -L "$dir/$soname" ] && [ -f "$(readlink -f "$dir/$soname")" ]; then
             src="$(readlink -f "$dir/$soname")"; break
         fi
     done
 
-    if [ -z "$src" ]; then
-        echo "[WARN]  $soname not found on this system — skipping (may cause issues on other hosts)"
+    if [ -n "$src" ]; then
+        cp "$src" "$TOOLCHAIN_LIB/$realname"
+        ln -sf "$realname" "$TOOLCHAIN_LIB/$soname"
+        ok "bundled $soname from $src"
         return
     fi
 
-    cp "$src" "$TOOLCHAIN_LIB/$realname"
-    ln -sf "$realname" "$TOOLCHAIN_LIB/$soname"
-    ok "bundled $soname from $src"
+    # Not on host — download from Ubuntu archive
+    if [ -n "$deb_url" ]; then
+        warn "$soname not found on this system — fetching from Ubuntu 22.04 archive"
+        fetch_from_deb "$deb_url" "$so_glob" "$TOOLCHAIN_LIB"
+        # find what was extracted and create the soname symlink
+        local extracted
+        extracted=$(ls "$TOOLCHAIN_LIB/$realname" 2>/dev/null || ls "$TOOLCHAIN_LIB/"${soname%%.*}* 2>/dev/null | head -1)
+        if [ -n "$extracted" ]; then
+            ln -sf "$(basename "$extracted")" "$TOOLCHAIN_LIB/$soname" 2>/dev/null || true
+            ok "bundled $soname from Ubuntu 22.04 archive"
+        else
+            warn "Could not extract $soname — compilation may fail on some inputs"
+        fi
+    else
+        warn "$soname not found and no fallback URL provided"
+    fi
 }
 
-bundle "libicuuc.so.70"   "libicuuc.so.70.1"
-bundle "libicudata.so.70" "libicudata.so.70.1"
-bundle "liblzma.so.5"     "liblzma.so.5.2.5"
+# Ubuntu 22.04 (jammy) package URLs for version-pinned libs
+ICU70_DEB="$UBUNTU_ARCHIVE/i/icu/libicu70_70.1-2_amd64.deb"
+LZMA_DEB="$UBUNTU_ARCHIVE/x/xz-utils/liblzma5_5.2.5-2ubuntu1_amd64.deb"
 
-# ── execute permission check ──────────────────────────────────────────────────
-for bin in \
-    "$TOOLCHAIN/bin/clang" \
-    "$TOOLCHAIN/bin/mlir-translate" \
-    "$TOOLCHAIN/bin/mlir-opt" \
-    "$TOOLCHAIN/bin/opt" \
-    "$TOOLCHAIN/mingw/bin/x86_64-w64-mingw32-gcc"
-do
-    if [ -f "$bin" ] && [ ! -x "$bin" ]; then
-        chmod +x "$bin"
-        info "fixed permissions: $(basename $bin)"
-    fi
-done
+bundle "libicuuc.so.70"   "libicuuc.so.70.1"   "$ICU70_DEB"  "*/libicuuc.so.70*"
+bundle "libicudata.so.70" "libicudata.so.70.1" "$ICU70_DEB"  "*/libicudata.so.70*"
+bundle "liblzma.so.5"     "liblzma.so.5.2.5"  "$LZMA_DEB"   "*/liblzma.so.5*"
+
+# ── execute permissions ───────────────────────────────────────────────────────
 chmod -R +x "$TOOLCHAIN/bin/" "$TOOLCHAIN/mingw/bin/" 2>/dev/null || true
+info "execute permissions set"
 
 # ── smoke test ────────────────────────────────────────────────────────────────
-export LD_LIBRARY_PATH="$TOOLCHAIN_LIB:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$TOOLCHAIN_LIB${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-"$TOOLCHAIN/bin/clang" --version > /dev/null 2>&1 \
-    && ok "clang — OK" || err "clang failed to execute. Your glibc may be too old."
+"$TOOLCHAIN/bin/clang" --version >/dev/null 2>&1 \
+    && ok "clang — OK" \
+    || err "clang failed. Your glibc ($GLIBC_VER) may be too old (need 2.35+)."
 
-"$TOOLCHAIN/bin/mlir-translate" --version > /dev/null 2>&1 \
-    && ok "mlir-translate — OK" || err "mlir-translate failed. Check toolchain/lib for missing .so files."
+"$TOOLCHAIN/bin/mlir-translate" --version >/dev/null 2>&1 \
+    && ok "mlir-translate — OK" \
+    || err "mlir-translate failed. Run: ldd $TOOLCHAIN/bin/mlir-translate"
 
-"$TOOLCHAIN/mingw/bin/x86_64-w64-mingw32-gcc" --version > /dev/null 2>&1 \
-    && ok "mingw gcc — OK" || err "mingw gcc failed."
+"$TOOLCHAIN/mingw/bin/x86_64-w64-mingw32-gcc" --version >/dev/null 2>&1 \
+    && ok "mingw gcc — OK" \
+    || err "mingw gcc failed."
 
 echo ""
-echo "Toolchain is ready. Minimum system: glibc 2.35+ (Ubuntu 22.04+)."
+echo "Toolchain is ready."
+echo "Minimum system: glibc 2.35+ (Ubuntu 22.04+, Fedora 37+, Debian 12+)."
