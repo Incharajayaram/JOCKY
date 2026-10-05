@@ -2,8 +2,10 @@
 #include "../include/jocky_anti_analysis.h"
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
 #include <sys/mman.h>
+#endif
 #include <stdio.h>
 #include <time.h>
 #include <stdint.h>

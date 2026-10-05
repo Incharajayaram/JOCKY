@@ -22,10 +22,12 @@
  * - UNWIND_CODE: Atomic unwinding operations (push, alloca, etc.)
  */
 
+/* On Windows, winnt.h already defines RUNTIME_FUNCTION, UNWIND_INFO, UNWIND_CODE */
+#ifndef _WIN32
 typedef struct {
     uint32_t BeginAddress;
     uint32_t EndAddress;
-    uint32_t UnwindData;  /* RVA to UNWIND_INFO or chained info */
+    uint32_t UnwindData;
 } RUNTIME_FUNCTION;
 
 typedef struct {
@@ -35,7 +37,6 @@ typedef struct {
     uint8_t CountOfCodes;
     uint8_t FrameRegister;
     uint8_t FrameOffset;
-    /* Followed by UNWIND_CODE array and optional EXCEPTION_HANDLER */
 } UNWIND_INFO;
 
 typedef struct {
@@ -43,6 +44,7 @@ typedef struct {
     uint8_t OpCode;
     uint8_t OpInfo;
 } UNWIND_CODE;
+#endif /* !_WIN32 */
 
 /* BYOUD function API */
 
