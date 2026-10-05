@@ -13,6 +13,7 @@ from typing import Optional
 from obfuscation import MLIR_PASSES, LLVM_PASSES
 from datetime import datetime as dt
 from metrics import get_metric
+from report import extract_used_apis, get_enabled_passes, generate_behavior_summary
 
 
 class JobStatus(str, Enum):
@@ -33,6 +34,12 @@ class CompileJob:
     output_name: Optional[str] = None
     ai_enabled: bool = False
     driver_ranking: Optional[list] = None
+    runtime_apis_used: list = field(default_factory=list)
+    obfuscation_config: dict = field(default_factory=dict)
+    behavior_summary: str = ""
+    dogbolt_id: Optional[str] = None
+    decompilation: Optional[str] = None
+    decompilation_status: str = "pending"
 
 
 jobs: dict[str, CompileJob] = {}
@@ -137,6 +144,12 @@ async def run_compilation(
         source_dir.mkdir(parents=True, exist_ok=True)
         source_path = source_dir / "source.jky"
         source_path.write_text(source)
+
+        # Scan source for runtime APIs and store report data before compilation begins
+        job.runtime_apis_used = extract_used_apis(source)
+        job.obfuscation_config = obfuscation
+        enabled_passes = get_enabled_passes(obfuscation)
+        job.behavior_summary = generate_behavior_summary(job.platform, job.runtime_apis_used, enabled_passes)
 
         job.progress = 10
         job.logs.append(f"[PIPELINE] Platform: {job.platform}")

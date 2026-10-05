@@ -1,8 +1,9 @@
-import { ChevronDown, ChevronUp, Terminal, Download, X, Copy, CheckCircle, Circle, Layers, AlignLeft } from 'lucide-react';
+import { ChevronDown, ChevronUp, Terminal, Download, X, Copy, CheckCircle, Circle, Layers, AlignLeft, FileText } from 'lucide-react';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import type { LogEntry } from '../types';
 import LogFilter from './LogFilter';
+import ReportPanel from './ReportPanel';
 
 const styles: Record<string, CSSProperties> = {
   container: {
@@ -117,6 +118,24 @@ function viewToggleStyle(active: boolean): CSSProperties {
   };
 }
 
+function reportBtnStyle(hovered: boolean): CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '6px 14px',
+    borderRadius: 0,
+    border: '1px solid #60a5fa',
+    background: hovered ? 'rgba(96, 165, 250, 0.15)' : 'transparent',
+    color: '#60a5fa',
+    fontSize: 11,
+    fontFamily: "'JetBrains Mono', monospace",
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    clipPath: 'polygon(6% 0%, 100% 0%, 94% 100%, 0% 100%)',
+  };
+}
+
 function downloadBtnStyle(hovered: boolean): CSSProperties {
   return {
     display: 'flex',
@@ -146,7 +165,9 @@ export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOu
   const [expanded, setExpanded] = useState(true);
   const [simplified, setSimplified] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
+  const [showReport, setShowReport] = useState(false);
   const [dlHovered, setDlHovered] = useState(false);
+  const [reportHovered, setReportHovered] = useState(false);
   const [copyHovered, setCopyHovered] = useState(false);
   const [clearHovered, setClearHovered] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -236,15 +257,26 @@ export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOu
           )}
 
           {buildDone && jobId && (
-            <button
-              style={downloadBtnStyle(dlHovered)}
-              onClick={() => window.open(`/api/download/${jobId}`, '_blank')}
-              onMouseEnter={() => setDlHovered(true)}
-              onMouseLeave={() => setDlHovered(false)}
-            >
-              <Download size={11} />
-              Download Binary
-            </button>
+            <>
+              <button
+                style={reportBtnStyle(reportHovered)}
+                onClick={() => setShowReport(true)}
+                onMouseEnter={() => setReportHovered(true)}
+                onMouseLeave={() => setReportHovered(false)}
+              >
+                <FileText size={11} />
+                View Report
+              </button>
+              <button
+                style={downloadBtnStyle(dlHovered)}
+                onClick={() => window.open(`/api/download/${jobId}`, '_blank')}
+                onMouseEnter={() => setDlHovered(true)}
+                onMouseLeave={() => setDlHovered(false)}
+              >
+                <Download size={11} />
+                Download Binary
+              </button>
+            </>
           )}
 
           {logs.length > 0 && (
@@ -338,6 +370,10 @@ export default function BuildOutput({ logs, jobId, buildDone, onClear }: BuildOu
           ))
         )}
       </div>
+
+      {showReport && jobId && (
+        <ReportPanel jobId={jobId} onClose={() => setShowReport(false)} />
+      )}
     </div>
   );
 }
