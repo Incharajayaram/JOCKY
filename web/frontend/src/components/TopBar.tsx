@@ -1,4 +1,4 @@
-import { HelpCircle, Settings } from 'lucide-react';
+import { HelpCircle, Settings, GitBranch } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useState } from 'react';
 import CompileButton from './CompileButton';
@@ -55,9 +55,10 @@ const styles: Record<string, CSSProperties> = {
 interface TopBarProps {
   onCompile: () => void;
   compiling: boolean;
+  onDecompile: () => void;
 }
 
-export default function TopBar({ onCompile, compiling }: TopBarProps) {
+export default function TopBar({ onCompile, compiling, onDecompile }: TopBarProps) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -69,6 +70,24 @@ export default function TopBar({ onCompile, compiling }: TopBarProps) {
           <span style={styles.version}>v1.0</span>
         </div>
         <div style={styles.rightSection}>
+          <button
+            style={{
+              ...styles.iconButton,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 11,
+              fontFamily: "'JetBrains Mono', monospace",
+              border: '1px solid var(--border)',
+              padding: '6px 12px',
+              color: 'var(--text-secondary)',
+            }}
+            onClick={onDecompile}
+            title="Decompiler Explorer"
+          >
+            <GitBranch size={13} />
+            Decompile
+          </button>
           <button
             style={styles.iconButton}
             onClick={() => setHelpOpen(true)}

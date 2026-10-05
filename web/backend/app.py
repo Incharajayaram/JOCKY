@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 from compiler import create_job, get_job, run_compilation, JobStatus
 from report import run_dogbolt_analysis, get_enabled_passes
+from dogbolt import router as dogbolt_router
 from runtime_apis import RUNTIME_APIS
 from obfuscation import MLIR_PASSES, LLVM_PASSES
 from demo_scripts import WINDOWS_DEMO, LINUX_DEMO
@@ -39,6 +40,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.include_router(dogbolt_router)
 
 
 @app.on_event("startup")
