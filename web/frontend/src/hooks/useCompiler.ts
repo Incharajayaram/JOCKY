@@ -15,6 +15,7 @@ export function useCompiler() {
   const [buildDone, setBuildDone] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const wsRetryRef = useRef<number>(0);
+  const buildDoneRef = useRef(false);
 
   const addLog = useCallback((text: string, level?: LogEntry['level']) => {
     setLogs((prev) => [...prev, {
@@ -37,6 +38,7 @@ export function useCompiler() {
   ) => {
     setCompiling(true);
     setBuildDone(false);
+    buildDoneRef.current = false;
     setLogs([]);
 
     const mlirMap: Record<string, boolean> = {};
@@ -97,7 +99,12 @@ export function useCompiler() {
 
         ws.onmessage = (event) => {
           const msg = event.data;
-          addLog(msg);
+          if (msg === '__BUILD_DONE__' || msg.includes('[DONE]')) {
+            buildDoneRef.current = true;
+            setBuildDone(true);
+          } else {
+            addLog(msg);
+          }
         };
 
         ws.onerror = () => {
@@ -105,18 +112,17 @@ export function useCompiler() {
         };
 
         ws.onclose = () => {
-          if (wsRetryRef.current < 3 && !buildDone) {
+          if (buildDoneRef.current) {
+            setCompiling(false);
+            addLog('[OK] Build process finished', 'success');
+          } else if (wsRetryRef.current < 3) {
             const delay = Math.min(1000 * Math.pow(2, wsRetryRef.current), 5000);
             wsRetryRef.current += 1;
             addLog(`[INFO] Reconnecting in ${delay}ms (attempt ${wsRetryRef.current}/3)...`, 'info');
             setTimeout(connectWebSocket, delay);
-          } else if (!buildDone) {
+          } else {
             addLog('[ERROR] WebSocket disconnected, switching to polling', 'error');
             pollStatus(id);
-          } else {
-            setCompiling(false);
-            setBuildDone(true);
-            addLog('[OK] Build process finished', 'success');
           }
         };
       };
@@ -138,6 +144,7 @@ export function useCompiler() {
         data.logs.forEach((line: string) => addLog(line));
       }
       if (data.status === 'done') {
+        buildDoneRef.current = true;
         setBuildDone(true);
         setCompiling(false);
         addLog('[OK] Build complete', 'success');
