@@ -338,10 +338,38 @@ int32_t crypto_generate_key(void) { return -1; }
 int32_t crypto_aes256_encrypt(void* key, void* plaintext, void* ciphertext) { return -1; }
 int32_t crypto_aes256_decrypt(void* key, void* ciphertext, void* plaintext) { return -1; }
 
-/* AI/Telemetry */
-int32_t ai_init(void) { return -1; }
-int32_t ai_score_threat(void) { return -1; }
-int32_t ai_collect_telemetry(void) { return -1; }
+/* AI/Telemetry — wired to mutation_engine.c */
+#include "../ai/jocky_ai.h"
+
+static int g_ai_utils_initialized = 0;
+
+static void ensure_ai_initialized(void) {
+    if (g_ai_utils_initialized) return;
+    if (!jocky_ai_load_model_file(JOCKY_AI_MODEL_PATH)) {
+        /* No model file: heuristic fallback in jocky_ai_score_threat still works */
+    }
+    g_ai_utils_initialized = 1;
+}
+
+int32_t ai_init(void) {
+    ensure_ai_initialized();
+    return 0;
+}
+
+double ai_score_threat(void) {
+    ensure_ai_initialized();
+    JOCKY_AI_TELEMETRY tel;
+    jocky_ai_collect_telemetry(&tel);
+    return (double)jocky_ai_score_threat(&tel);
+}
+
+void* ai_collect_telemetry(void) {
+    ensure_ai_initialized();
+    JOCKY_AI_TELEMETRY* tel = (JOCKY_AI_TELEMETRY*)malloc(sizeof(JOCKY_AI_TELEMETRY));
+    if (!tel) return NULL;
+    jocky_ai_collect_telemetry(tel);
+    return tel;
+}
 
 /* Provenance/Telemetry */
 int32_t provenance_record(void) { return -1; }
