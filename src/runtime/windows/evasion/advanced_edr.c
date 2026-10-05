@@ -9,6 +9,10 @@
 #define STATUS_SUCCESS 0x00000000L
 #endif
 
+#ifndef ProcessMitigationPolicy
+#define ProcessMitigationPolicy ((PROCESSINFOCLASS)52)
+#endif
+
 #pragma comment(lib, "psapi.lib")
 
 typedef NTSTATUS (WINAPI *pNtSetInformationProcess)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG);
