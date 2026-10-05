@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 from compiler import create_job, get_job, run_compilation, JobStatus
+from report import get_enabled_passes
 from runtime_apis import RUNTIME_APIS
 from obfuscation import MLIR_PASSES, LLVM_PASSES
 from demo_scripts import WINDOWS_DEMO, LINUX_DEMO
@@ -377,6 +378,30 @@ async def get_job_metrics(job_id: str):
         mlir_passes_enabled=metric.mlir_passes_enabled,
         llvm_passes_enabled=metric.llvm_passes_enabled,
     )
+
+
+@app.get("/api/jobs/{job_id}/report")
+async def get_job_report(job_id: str):
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    enabled_passes = get_enabled_passes(job.obfuscation_config)
+
+    return {
+        "job_id": job_id,
+        "platform": job.platform,
+        "status": job.status.value,
+        "binary_name": job.output_name,
+        "binary_size": (
+            Path(job.output_path).stat().st_size
+            if job.output_path and Path(job.output_path).exists()
+            else None
+        ),
+        "runtime_apis": job.runtime_apis_used,
+        "obfuscation_passes": enabled_passes,
+        "behavior_summary": job.behavior_summary,
+    }
 
 
 @app.get("/api/jobs/{job_id}/artifact", response_model=ArtifactResponse)
