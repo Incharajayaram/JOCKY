@@ -1,28 +1,41 @@
 FROM python:3.11-slim
 
-WORKDIR /app
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONPATH=/workspace/jocky/src
+ENV TOOLCHAIN_PATH=/workspace/jocky/toolchain
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# System deps for compilation pipeline:
+#   build-essential + gcc  — compile Linux runtime objects
+#   mingw-w64              — cross-compile Windows PE (fallback when bundled MinGW absent)
+#   libssl-dev + libcurl4  — link -lssl -lcrypto -lcurl in Linux ELF builds
+#   zlib1g-dev             — link -lz
+#   curl                   — health-check
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     gcc \
     curl \
+    mingw-w64 \
+    libssl-dev \
+    libcurl4-openssl-dev \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY web/backend/requirements.txt /app/
+WORKDIR /workspace/jocky
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python deps first so this layer is cached independently of source changes
+COPY web/backend/requirements.txt web/backend/requirements.txt
+RUN pip install --no-cache-dir -r web/backend/requirements.txt
 
-# Copy backend code
-COPY web/backend/ /app/
+# Copy the full project (toolchain excluded via .dockerignore) and install jocky package
+COPY . .
+RUN pip install --no-cache-dir .
 
-# Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:8000/api/config || exit 1
 
-# Run FastAPI server
+# Run from web/backend so that relative imports (from compiler import ...) resolve correctly.
+# project_root resolves to /workspace/jocky (3 levels up from web/backend/compiler.py).
+WORKDIR /workspace/jocky/web/backend
 CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
