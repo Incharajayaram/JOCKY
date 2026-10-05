@@ -1,6 +1,6 @@
-#include "../include/jocky_byoud.h"
 #include <windows.h>
 #include <winnt.h>
+#include "../include/jocky_byoud.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

@@ -9,12 +9,6 @@
 #define MAX_PATH 260
 #endif
 
-void *jocky_compress_data(void *data, int32_t size) {
-    if (!data || size <= 0) return NULL;
-    void *compressed = malloc(size);
-    if (compressed) memcpy(compressed, data, size);
-    return compressed;
-}
 
 int32_t jocky_lsass_dump(void) {
 #ifdef _WIN32

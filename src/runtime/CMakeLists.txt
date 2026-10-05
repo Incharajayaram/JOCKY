@@ -100,7 +100,6 @@ set(RUNTIME_SOURCES
     windows/security/token_manipulation.c
     windows/execution/process_injection.c
     windows/evasion/blindside.c
-    windows/evasion/process_spoofing.c
     windows/threading/threadpool_windows.c
     windows/audit/audit.c
     windows/exfil/enhanced_exfiltration.c
@@ -175,6 +174,7 @@ set(RUNTIME_SOURCES
     forensics/plugins/parsers/arp_parser.c
     forensics/plugins/parsers/memory_parser.c
     forensics/plugins/parsers/elf_parser.c
+    forensics/plugins/parsers/pe_parser.c
 
     # Forensic plugins - output
     forensics/plugins/output/json_output.c
@@ -334,7 +334,6 @@ if(UNIX OR NOT WIN32)
         windows/security/token_manipulation.c
         windows/execution/process_injection.c
         windows/evasion/blindside.c
-        windows/evasion/process_spoofing.c
         windows/threading/threadpool_windows.c
         windows/exfil/enhanced_exfiltration.c
         windows/kernel/patchguard_peekaboo.c

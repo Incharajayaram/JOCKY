@@ -9,12 +9,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <time.h>
+#ifndef _WIN32
 #include <dirent.h>
 #include <unistd.h>
-#include <sys/stat.h>
 #include <sys/types.h>
-#include <time.h>
 #include <pwd.h>
+#endif
 
 /* ============================================================================
  * Helper Functions
@@ -34,6 +36,7 @@ static char* get_file_hash(const char* path) {
     return hash;
 }
 
+#ifndef _WIN32
 static void collect_files_recursive(const char* dirpath, forensic_artifact_list_t* list,
                                      time_t since, int max_depth, int current_depth) {
     if (current_depth > max_depth) return;
@@ -135,6 +138,7 @@ static void collect_files_recursive(const char* dirpath, forensic_artifact_list_
     }
     closedir(dir);
 }
+#endif
 
 /* ============================================================================
  * File Collector Implementation
@@ -174,10 +178,11 @@ static forensic_artifact_list_t* file_collector_collect(const char* target, void
         NULL
     };
     
+#ifndef _WIN32
     for (int i = 0; paths[i]; i++) {
         collect_files_recursive(paths[i], list, since, 3, 0);
     }
-    
+
     struct passwd* pw;
     while ((pw = getpwent()) != NULL) {
         char autostart[512];
@@ -185,8 +190,8 @@ static forensic_artifact_list_t* file_collector_collect(const char* target, void
         collect_files_recursive(autostart, list, since, 2, 0);
     }
     endpwent();
-    
     printf("[file_collector] Collected %zu files\n", list->count);
+#endif
     return list;
 }
 

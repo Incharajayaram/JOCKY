@@ -10,11 +10,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <time.h>
+#ifndef _WIN32
 #include <dirent.h>
 #include <unistd.h>
-#include <sys/stat.h>
 #include <pwd.h>
-#include <time.h>
+#endif
 
 /* ============================================================================
  * Registry Collector Implementation (Linux - config-based)
@@ -55,6 +57,7 @@ static forensic_artifact_t* create_registry_artifact(const char* key_path,
     return artifact;
 }
 
+#ifndef _WIN32
 static void collect_systemd_services(forensic_artifact_list_t* list) {
     const char* dirs[] = {
         "/etc/systemd/system",
@@ -224,6 +227,7 @@ static void collect_init_scripts(forensic_artifact_list_t* list) {
         closedir(dir);
     }
 }
+#endif
 
 static forensic_artifact_list_t* registry_collector_collect(const char* target, void* config) {
     (void)target;
@@ -232,11 +236,12 @@ static forensic_artifact_list_t* registry_collector_collect(const char* target, 
     forensic_artifact_list_t* list = forensic_artifact_list_create(128);
     if (!list) return NULL;
     
+#ifndef _WIN32
     collect_systemd_services(list);
     collect_cron_jobs(list);
     collect_shell_configs(list);
     collect_init_scripts(list);
-    
+
     if (access("/etc/rc.local", F_OK) == 0) {
         forensic_artifact_t* artifact = create_registry_artifact(
             "/etc", "rc.local", "/etc/rc.local", "rc_local"
@@ -245,8 +250,9 @@ static forensic_artifact_list_t* registry_collector_collect(const char* target, 
             forensic_artifact_list_add(list, artifact);
         }
     }
-    
+
     printf("[registry_collector] Collected %zu registry/config artifacts\n", list->count);
+#endif
     return list;
 }
 

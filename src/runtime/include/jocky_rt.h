@@ -290,7 +290,7 @@ bool jocky_disable_etw_ti(jocky_byovd_t* ctx);
  * and strip dangerous access rights (PROCESS_VM_READ, PROCESS_ALL_ACCESS).
  * This removes them independently of the Ps*Notify callback arrays targeted
  * by jocky_disable_edr_callbacks(). */
-bool jocky_disable_ob_callbacks(jocky_byovd_t* ctx);
+bool jocky_byovd_disable_ob_callbacks(jocky_byovd_t* ctx);
 
 /* Zero EPROCESS.Protection for the given PID, removing PPL/PP shielding.
  * After this call, the process can be opened with any desired access. */

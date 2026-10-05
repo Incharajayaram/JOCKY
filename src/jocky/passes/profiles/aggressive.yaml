@@ -4,6 +4,9 @@ passes:
   - string_encrypt
   - constant_obfuscate
   - symbol_obfuscate
+  - crypto_hash
+  - scf_obfuscate
+  - import_obfuscate
   - bogus_control_flow
   - flatten_cfg
   - instruction_substitution

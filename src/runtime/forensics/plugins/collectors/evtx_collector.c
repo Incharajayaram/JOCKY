@@ -11,10 +11,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <dirent.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#endif
 
 /* ============================================================================
  * Helper Functions
@@ -42,6 +44,7 @@ static char* read_file_to_string(const char* path, size_t* out_len) {
     return buf;
 }
 
+#ifndef _WIN32
 static void collect_evtx_files(const char* dir_path, forensic_artifact_list_t* list) {
     DIR* dir = opendir(dir_path);
     if (!dir) return;
@@ -113,6 +116,7 @@ static void collect_evtx_files(const char* dir_path, forensic_artifact_list_t* l
 /* ============================================================================
  * EVTX Collector Implementation
  * ============================================================================ */
+#endif /* !_WIN32 - end of collect_evtx_files */
 
 static int evtx_collector_init(void* config) {
     (void)config;
@@ -120,6 +124,7 @@ static int evtx_collector_init(void* config) {
     return 0;
 }
 
+#ifndef _WIN32
 static forensic_artifact_list_t* evtx_collector_collect(const char* target, void* config) {
     (void)target;
     (void)config;
@@ -153,6 +158,7 @@ static forensic_artifact_list_t* evtx_collector_collect(const char* target, void
     printf("[evtx_collector] Collected %zu EVTX log files\n", list->count);
     return list;
 }
+#endif
 
 static void evtx_collector_cleanup(void) {
     printf("[evtx_collector] Cleanup\n");
@@ -173,7 +179,9 @@ forensic_data_source_plugin_t evtx_collector_plugin = {
     .version = "1.0.0",
     .description = "Collects Windows Event Log (.evtx) files from standard locations",
     .init = evtx_collector_init,
+#ifndef _WIN32
     .collect = evtx_collector_collect,
+#endif
     .cleanup = evtx_collector_cleanup,
     .required_capabilities = evtx_capabilities,
     .capability_count = sizeof(evtx_capabilities) / sizeof(evtx_capabilities[0])

@@ -10,9 +10,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
 #include <time.h>
 
 /* ============================================================================
@@ -25,6 +27,7 @@ static int mft_parser_init(void* config) {
     return 0;
 }
 
+#ifndef _WIN32
 static void scan_directory(const char* path, forensic_parsed_artifact_t* artifact, int depth) {
     if (depth > 3) return;
     
@@ -78,6 +81,7 @@ static void scan_directory(const char* path, forensic_parsed_artifact_t* artifac
     }
     closedir(dir);
 }
+#endif
 
 static forensic_parsed_artifact_t* parse_mft(const forensic_bytes_t* data, void* config) {
     (void)data;
@@ -90,10 +94,12 @@ static forensic_parsed_artifact_t* parse_mft(const forensic_bytes_t* data, void*
         "/tmp", "/var/tmp", "/home", "/root", "/etc", "/var/log", NULL
     };
     
+#ifndef _WIN32
     for (int i = 0; paths[i]; i++) {
         scan_directory(paths[i], artifact, 0);
     }
-    
+#endif
+
     time_t now = time(NULL);
     char timestamp[64];
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));

@@ -10,15 +10,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#ifndef _WIN32
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <time.h>
+#endif
 
 /* ============================================================================
  * Helper Functions
  * ============================================================================ */
 
+#ifndef _WIN32
 static char* read_file_to_string(const char* path, size_t* out_len) {
     FILE* f = fopen(path, "r");
     if (!f) return NULL;
@@ -94,6 +97,8 @@ static char* get_process_name(pid_t pid) {
     return name;
 }
 
+#endif /* !_WIN32 */
+
 /* ============================================================================
  * Process Collector Implementation
  * ============================================================================ */
@@ -111,27 +116,28 @@ static forensic_artifact_list_t* process_collector_collect(const char* target, v
     forensic_artifact_list_t* list = forensic_artifact_list_create(128);
     if (!list) return NULL;
     
+#ifndef _WIN32
     DIR* dir = opendir("/proc");
     if (!dir) {
         forensic_artifact_list_destroy(list);
         return NULL;
     }
-    
+
     struct dirent* entry;
     while ((entry = readdir(dir)) != NULL) {
         if (entry->d_type != DT_DIR) continue;
-        
+
         char* endptr;
         long pid = strtol(entry->d_name, &endptr, 10);
         if (*endptr != '\0' || pid <= 0) continue;
-        
+
         char* cmdline = get_process_cmdline(pid);
         char* exe = get_process_exe(pid);
         char* name = get_process_name(pid);
         pid_t ppid = get_ppid(pid);
-        
+
         if (!cmdline && !exe && !name) continue;
-        
+
         forensic_metadata_t meta = forensic_metadata_create(16);
         forensic_metadata_add(&meta, "pid", entry->d_name);
         if (ppid > 0) {
@@ -141,32 +147,33 @@ static forensic_artifact_list_t* process_collector_collect(const char* target, v
         }
         if (exe) forensic_metadata_add(&meta, "exe", exe);
         if (name) forensic_metadata_add(&meta, "name", name);
-        
+
         forensic_artifact_t artifact = {0};
         artifact.plugin_name = strdup("process_collector");
         artifact.artifact_type = strdup("process");
-        
+
         time_t now = time(NULL);
         char timestamp[64];
         strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
         artifact.timestamp = strdup(timestamp);
-        
+
         if (cmdline) {
             artifact.raw = forensic_bytes_create(cmdline, strlen(cmdline));
         } else {
             artifact.raw = forensic_bytes_create("", 0);
         }
         artifact.metadata = meta;
-        
+
         forensic_artifact_list_add(list, &artifact);
-        
+
         free(cmdline);
         free(exe);
         free(name);
     }
-    
+
     closedir(dir);
     printf("[process_collector] Collected %zu processes\n", list->count);
+#endif
     return list;
 }
 

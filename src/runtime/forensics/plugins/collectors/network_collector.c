@@ -9,10 +9,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#ifndef _WIN32
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <unistd.h>
-#include <time.h>
+#endif
 
 /* ============================================================================
  * Network Collector Implementation
@@ -62,29 +64,30 @@ static forensic_artifact_t* create_network_artifact(const char* proto,
     return artifact;
 }
 
+#ifndef _WIN32
 static void parse_proc_net(const char* path, const char* proto,
                             forensic_artifact_list_t* list) {
     FILE* f = fopen(path, "r");
     if (!f) return;
-    
+
     char line[512];
     fgets(line, sizeof(line), f);
-    
+
     while (fgets(line, sizeof(line), f)) {
         unsigned int local_addr, rem_addr;
         unsigned int local_port, rem_port;
         unsigned int state;
         int uid;
         unsigned int inode;
-        
+
         if (sscanf(line, "%*d: %08X:%04X %08X:%04X %02X %*08X:%*08X %*02X:%*08X %*08X %d %*d %u",
                    &local_addr, &local_port, &rem_addr, &rem_port,
                    &state, &uid, &inode) < 5) continue;
-        
+
         struct in_addr local, remote;
         local.s_addr = local_addr;
         remote.s_addr = rem_addr;
-        
+
         const char* state_str = "UNKNOWN";
         if (strcmp(proto, "TCP") == 0) {
             switch (state) {
@@ -103,14 +106,14 @@ static void parse_proc_net(const char* path, const char* proto,
         } else {
             state_str = (state == 7) ? "LISTEN" : "UNKNOWN";
         }
-        
+
         forensic_artifact_t* artifact = create_network_artifact(
             proto,
             inet_ntoa(local), ntohs((uint16_t)local_port),
             inet_ntoa(remote), ntohs((uint16_t)rem_port),
             state_str
         );
-        
+
         if (artifact) {
             forensic_artifact_list_add(list, artifact);
             free(artifact->timestamp);
@@ -125,14 +128,14 @@ static void parse_proc_net(const char* path, const char* proto,
 static void collect_dns_cache(forensic_artifact_list_t* list) {
     FILE* f = popen("resolvectl statistics 2>/dev/null || cat /etc/resolv.conf 2>/dev/null", "r");
     if (!f) return;
-    
+
     char line[512];
     while (fgets(line, sizeof(line), f)) {
         if (strstr(line, "nameserver") || strstr(line, "search")) {
             forensic_metadata_t meta = forensic_metadata_create(8);
             forensic_metadata_add(&meta, "type", "dns_config");
             forensic_metadata_add(&meta, "content", line);
-            
+
             forensic_artifact_t artifact = {0};
             artifact.plugin_name = strdup("network_collector");
             artifact.artifact_type = strdup("dns_cache");
@@ -147,6 +150,7 @@ static void collect_dns_cache(forensic_artifact_list_t* list) {
     }
     pclose(f);
 }
+#endif
 
 static forensic_artifact_list_t* network_collector_collect(const char* target, void* config) {
     (void)target;
@@ -155,12 +159,13 @@ static forensic_artifact_list_t* network_collector_collect(const char* target, v
     forensic_artifact_list_t* list = forensic_artifact_list_create(128);
     if (!list) return NULL;
     
+#ifndef _WIN32
     parse_proc_net("/proc/net/tcp", "TCP", list);
     parse_proc_net("/proc/net/udp", "UDP", list);
     parse_proc_net("/proc/net/tcp6", "TCP6", list);
     parse_proc_net("/proc/net/udp6", "UDP6", list);
     collect_dns_cache(list);
-    
+
     FILE* f = fopen("/proc/net/arp", "r");
     if (f) {
         char line[512];
@@ -173,10 +178,10 @@ static forensic_artifact_list_t* network_collector_collect(const char* target, v
                 forensic_metadata_add(&meta, "ip", ip);
                 forensic_metadata_add(&meta, "mac", hw);
                 forensic_metadata_add(&meta, "interface", dev);
-                
-forensic_artifact_t artifact = {0};
-            artifact.plugin_name = strdup("network_collector");
-            artifact.artifact_type = strdup("arp_entry");
+
+                forensic_artifact_t artifact = {0};
+                artifact.plugin_name = strdup("network_collector");
+                artifact.artifact_type = strdup("arp_entry");
                 time_t now = time(NULL);
                 char timestamp[64];
                 strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
@@ -188,8 +193,8 @@ forensic_artifact_t artifact = {0};
         }
         fclose(f);
     }
-    
     printf("[network_collector] Collected %zu network artifacts\n", list->count);
+#endif
     return list;
 }
 

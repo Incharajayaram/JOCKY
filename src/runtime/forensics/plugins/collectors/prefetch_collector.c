@@ -11,15 +11,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <dirent.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#endif
 
 /* ============================================================================
  * Helper Functions
  * ============================================================================ */
 
+#ifndef _WIN32
 static void collect_prefetch_files(const char* dir_path, forensic_artifact_list_t* list) {
     DIR* dir = opendir(dir_path);
     if (!dir) return;
@@ -99,6 +102,7 @@ static void collect_prefetch_files(const char* dir_path, forensic_artifact_list_
 /* ============================================================================
  * Prefetch Collector Implementation
  * ============================================================================ */
+#endif /* !_WIN32 */
 
 static int prefetch_collector_init(void* config) {
     (void)config;
@@ -106,6 +110,7 @@ static int prefetch_collector_init(void* config) {
     return 0;
 }
 
+#ifndef _WIN32
 static forensic_artifact_list_t* prefetch_collector_collect(const char* target, void* config) {
     (void)target;
     (void)config;
@@ -138,6 +143,7 @@ static forensic_artifact_list_t* prefetch_collector_collect(const char* target, 
     printf("[prefetch_collector] Collected %zu Prefetch files\n", list->count);
     return list;
 }
+#endif
 
 static void prefetch_collector_cleanup(void) {
     printf("[prefetch_collector] Cleanup\n");
@@ -158,7 +164,9 @@ forensic_data_source_plugin_t prefetch_collector_plugin = {
     .version = "1.0.0",
     .description = "Collects Windows Prefetch (.pf) files from standard locations",
     .init = prefetch_collector_init,
+#ifndef _WIN32
     .collect = prefetch_collector_collect,
+#endif
     .cleanup = prefetch_collector_cleanup,
     .required_capabilities = prefetch_capabilities,
     .capability_count = sizeof(prefetch_capabilities) / sizeof(prefetch_capabilities[0])

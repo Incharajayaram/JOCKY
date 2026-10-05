@@ -10,10 +10,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#ifndef _WIN32
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <time.h>
+#endif
 
 /* ============================================================================
  * Memory Collector Implementation
@@ -25,6 +27,7 @@ static int memory_collector_init(void* config) {
     return 0;
 }
 
+#ifndef _WIN32
 static forensic_artifact_t* create_memory_artifact(pid_t pid,
                                                      const char* start_addr,
                                                      const char* end_addr,
@@ -171,6 +174,7 @@ static void collect_process_memory(pid_t pid, forensic_artifact_list_t* list) {
     
     parse_proc_maps(pid, list);
 }
+#endif
 
 static forensic_artifact_list_t* memory_collector_collect(const char* target, void* config) {
     (void)target;
@@ -179,22 +183,24 @@ static forensic_artifact_list_t* memory_collector_collect(const char* target, vo
     forensic_artifact_list_t* list = forensic_artifact_list_create(256);
     if (!list) return NULL;
     
+#ifndef _WIN32
     DIR* dir = opendir("/proc");
     if (!dir) return list;
-    
+
     struct dirent* entry;
     while ((entry = readdir(dir)) != NULL) {
         if (entry->d_type != DT_DIR) continue;
-        
+
         char* endptr;
         long pid = strtol(entry->d_name, &endptr, 10);
         if (*endptr != '\0' || pid <= 0) continue;
-        
+
         collect_process_memory(pid, list);
     }
-    
+
     closedir(dir);
     printf("[memory_collector] Collected %zu memory regions\n", list->count);
+#endif
     return list;
 }
 
