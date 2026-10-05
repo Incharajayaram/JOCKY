@@ -2,10 +2,25 @@ import { useCallback, useRef, useState } from 'react';
 import type { CompileRequest, LogEntry, ObfuscationState } from '../types';
 
 function parseLogLevel(text: string): LogEntry['level'] {
-  if (text.startsWith('[ERROR]') || text.startsWith('error:')) return 'error';
+  const t = text.toLowerCase();
+  if (
+    text.startsWith('[ERROR]') || text.startsWith('error:') ||
+    text.includes('Build failed') || text.includes('ParseError') ||
+    text.startsWith('Traceback') || t.includes('exception') ||
+    text.startsWith('  File "')
+  ) return 'error';
   if (text.startsWith('[WARN]') || text.startsWith('warning:')) return 'warn';
-  if (text.startsWith('[OK]') || text.includes('success') || text.includes('complete')) return 'success';
+  if (
+    text.startsWith('[OK]') || text.includes('[PIPELINE] Build succeeded') ||
+    t.includes('success') || t.includes('complete')
+  ) return 'success';
   return 'info';
+}
+
+interface StatusMessage {
+  status?: string;
+  progress?: number;
+  logs?: string[];
 }
 
 export function useCompiler() {
@@ -15,6 +30,8 @@ export function useCompiler() {
   const [buildDone, setBuildDone] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const wsRetryRef = useRef<number>(0);
+  const buildDoneRef = useRef(false);
+  const seenLogCountRef = useRef(0);
 
   const addLog = useCallback((text: string, level?: LogEntry['level']) => {
     setLogs((prev) => [...prev, {
@@ -24,10 +41,40 @@ export function useCompiler() {
     }]);
   }, []);
 
+  const addNewLines = useCallback((lines: string[]) => {
+    const newLines = lines.slice(seenLogCountRef.current);
+    if (newLines.length === 0) return;
+    seenLogCountRef.current = lines.length;
+    setLogs((prev) => [
+      ...prev,
+      ...newLines.map((text) => ({
+        text,
+        level: parseLogLevel(text),
+        timestamp: Date.now(),
+      })),
+    ]);
+  }, []);
+
+  const handleStatusMessage = useCallback((data: StatusMessage) => {
+    if (data.logs) {
+      addNewLines(data.logs);
+    }
+    if (data.status === 'done') {
+      buildDoneRef.current = true;
+      setBuildDone(true);
+      setCompiling(false);
+    } else if (data.status === 'failed' || data.status === 'error') {
+      buildDoneRef.current = true;
+      setBuildDone(true);
+      setCompiling(false);
+    }
+  }, [addNewLines]);
+
   const clearLogs = useCallback(() => {
     setLogs([]);
     setJobId(null);
     setBuildDone(false);
+    seenLogCountRef.current = 0;
   }, []);
 
   const compile = useCallback(async (
@@ -37,16 +84,14 @@ export function useCompiler() {
   ) => {
     setCompiling(true);
     setBuildDone(false);
+    buildDoneRef.current = false;
+    seenLogCountRef.current = 0;
     setLogs([]);
 
     const mlirMap: Record<string, boolean> = {};
     const llvmMap: Record<string, boolean> = {};
-    obfuscation.mlir.forEach((p) => {
-      mlirMap[p.id] = p.enabled;
-    });
-    obfuscation.llvm.forEach((p) => {
-      llvmMap[p.id] = p.enabled;
-    });
+    obfuscation.mlir.forEach((p) => { mlirMap[p.id] = p.enabled; });
+    obfuscation.llvm.forEach((p) => { llvmMap[p.id] = p.enabled; });
 
     const request: CompileRequest = {
       source,
@@ -96,8 +141,19 @@ export function useCompiler() {
         };
 
         ws.onmessage = (event) => {
-          const msg = event.data;
-          addLog(msg);
+          const msg: string = event.data;
+          try {
+            const parsed: StatusMessage = JSON.parse(msg);
+            handleStatusMessage(parsed);
+          } catch {
+            // Plain text log line
+            if (msg === '__BUILD_DONE__' || msg.includes('[DONE]')) {
+              buildDoneRef.current = true;
+              setBuildDone(true);
+            } else {
+              addLog(msg);
+            }
+          }
         };
 
         ws.onerror = () => {
@@ -105,18 +161,16 @@ export function useCompiler() {
         };
 
         ws.onclose = () => {
-          if (wsRetryRef.current < 3 && !buildDone) {
+          if (buildDoneRef.current) {
+            setCompiling(false);
+          } else if (wsRetryRef.current < 3) {
             const delay = Math.min(1000 * Math.pow(2, wsRetryRef.current), 5000);
             wsRetryRef.current += 1;
             addLog(`[INFO] Reconnecting in ${delay}ms (attempt ${wsRetryRef.current}/3)...`, 'info');
             setTimeout(connectWebSocket, delay);
-          } else if (!buildDone) {
-            addLog('[ERROR] WebSocket disconnected, switching to polling', 'error');
-            pollStatus(id);
           } else {
-            setCompiling(false);
-            setBuildDone(true);
-            addLog('[OK] Build process finished', 'success');
+            addLog('[WARN] Switching to polling...', 'warn');
+            pollStatus(id);
           }
         };
       };
@@ -127,21 +181,23 @@ export function useCompiler() {
       addLog('[INFO] Ensure the backend is running: cd web/backend && python main.py', 'info');
       setCompiling(false);
     }
-  }, [addLog]);
+  }, [addLog, addNewLines, handleStatusMessage]);
 
   async function pollStatus(id: string) {
     try {
       const res = await fetch(`/api/status/${id}`);
       if (!res.ok) return;
-      const data = await res.json();
+      const data: StatusMessage = await res.json();
       if (data.logs) {
-        data.logs.forEach((line: string) => addLog(line));
+        addNewLines(data.logs);
       }
       if (data.status === 'done') {
+        buildDoneRef.current = true;
         setBuildDone(true);
         setCompiling(false);
         addLog('[OK] Build complete', 'success');
-      } else if (data.status === 'error') {
+      } else if (data.status === 'error' || data.status === 'failed') {
+        buildDoneRef.current = true;
         setCompiling(false);
         addLog('[ERROR] Build failed', 'error');
       } else {
