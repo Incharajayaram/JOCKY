@@ -219,6 +219,12 @@ def run(cmd, label, cwd=None, env=None):
     log("exec", f"{label}: {' '.join(str(c) for c in cmd)}")
     if env is None:
         env = os.environ.copy()
+    # Append bundled libs as fallback: RPATH on LLVM binaries takes priority for their own
+    # deps; this catches version-pinned libs (libicuuc.so.70, libicudata.so.70) missing on
+    # newer distros, and provides libstdc++/libgcc_s for MinGW tools which have no RPATH.
+    toolchain_lib = str(TOOLCHAIN / "lib")
+    existing = env.get("LD_LIBRARY_PATH", "")
+    env["LD_LIBRARY_PATH"] = f"{existing}:{toolchain_lib}" if existing else toolchain_lib
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, env=env)
     if result.stdout.strip():
         for line in result.stdout.strip().split("\n"):
