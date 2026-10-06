@@ -22,23 +22,26 @@
    LKM (Linux Kernel Module) — index-based handle wrappers
    ============================================================================ */
 
-static JOCKY_LKM g_lkm_modules[32];
+static char g_lkm_names[32][256];
 static int g_lkm_count = 0;
 
 int32_t lkm_load(const char* path) {
     if (!path || g_lkm_count >= 32) return -1;
-    if (jocky_lkm_load(path, &g_lkm_modules[g_lkm_count]) != 0) return -1;
+    const char* name = strrchr(path, '/');
+    name = name ? name + 1 : path;
+    if (jocky_lkm_load(path, name) < 0) return -1;
+    snprintf(g_lkm_names[g_lkm_count], 256, "%s", name);
     return g_lkm_count++;
 }
 
 int32_t lkm_unload(int32_t handle) {
     if (handle < 0 || handle >= g_lkm_count) return -1;
-    return jocky_lkm_unload(&g_lkm_modules[handle]);
+    return jocky_lkm_unload(g_lkm_names[handle]);
 }
 
 int32_t lkm_hook_syscall(int32_t handle, int32_t syscall_num) {
-    if (handle < 0 || handle >= g_lkm_count) return -1;
-    return jocky_lkm_hook_syscall(&g_lkm_modules[handle], syscall_num, NULL);
+    (void)handle;
+    return jocky_lkm_hook_syscall(syscall_num, NULL);
 }
 
 int32_t lkm_unhook_syscall(int32_t syscall_num) {
@@ -55,39 +58,31 @@ int64_t lkm_get_syscall_table(void) {
    eBPF — index-based handle wrappers
    ============================================================================ */
 
-static JOCKY_EBPF_PROGRAM g_ebpf_programs[32];
-static int g_ebpf_count = 0;
-
 int32_t ebpf_load(const char* name, const int8_t* bytecode) {
-    if (!name || g_ebpf_count >= 32) return -1;
-    uint32_t size = bytecode ? 64 : 0;
-    if (jocky_ebpf_load(name, (const uint8_t*)bytecode, size, &g_ebpf_programs[g_ebpf_count]) != 0) return -1;
-    return g_ebpf_count++;
+    (void)name;
+    if (!bytecode) return -1;
+    return jocky_ebpf_load(bytecode, 64, 0);
 }
 
 int32_t ebpf_attach(int32_t handle, const char* attach_point) {
-    if (handle < 0 || handle >= g_ebpf_count) return -1;
-    return jocky_ebpf_attach(&g_ebpf_programs[handle], attach_point);
+    (void)attach_point;
+    return jocky_ebpf_attach(handle, 0, -1);
 }
 
 int32_t ebpf_detach(int32_t handle) {
-    if (handle < 0 || handle >= g_ebpf_count) return -1;
-    return jocky_ebpf_detach(&g_ebpf_programs[handle]);
+    return jocky_ebpf_detach(handle);
 }
 
 int32_t ebpf_map_update(int32_t handle, const int8_t* key, const int8_t* value) {
-    if (handle < 0 || handle >= g_ebpf_count) return -1;
-    return jocky_ebpf_map_update(&g_ebpf_programs[handle], key, value);
+    return jocky_ebpf_map_update(handle, key, value);
 }
 
 int32_t ebpf_map_lookup(int32_t handle, const int8_t* key) {
-    if (handle < 0 || handle >= g_ebpf_count) return -1;
-    return jocky_ebpf_map_lookup(&g_ebpf_programs[handle], key, NULL);
+    return jocky_ebpf_map_lookup(handle, key, NULL);
 }
 
 int32_t ebpf_unload(int32_t handle) {
-    if (handle < 0 || handle >= g_ebpf_count) return -1;
-    return jocky_ebpf_unload(&g_ebpf_programs[handle]);
+    return jocky_ebpf_unload(handle);
 }
 
 /* ============================================================================
@@ -311,17 +306,6 @@ int32_t fence2pwn_detect_kfence(void) {
 
 int32_t fence2pwn_exploit(void) {
     return jocky_fence2pwn_exploit_uaf(NULL, NULL, 0);
-}
-
-/* ============================================================================
-   jocky_ebpf_run — Linux eBPF program execution
-   ============================================================================ */
-
-int64_t jocky_ebpf_run(int32_t prog_fd, void* ctx, int32_t ctx_size) {
-    (void)prog_fd;
-    (void)ctx;
-    (void)ctx_size;
-    return -1;
 }
 
 /* ============================================================================

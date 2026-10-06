@@ -9,6 +9,8 @@
 #include <linux/bpf.h>
 #endif
 
+#include "../../include/jocky_ebpf.h"
+
 #define MAX_EBPF_PROGS 16
 
 static struct {
@@ -98,4 +100,44 @@ int32_t jocky_ebpf_unload(int32_t prog_fd)
 
     memset(&prog_table[prog_fd], 0, sizeof(prog_table[prog_fd]));
     return 1;
+}
+
+int32_t jocky_ebpf_detach(int32_t prog_fd)
+{
+    if (prog_fd < 0 || prog_fd >= MAX_EBPF_PROGS || !prog_table[prog_fd].used) return -1;
+    prog_table[prog_fd].attached = 0;
+    return 1;
+}
+
+int32_t jocky_ebpf_map_update(int32_t prog_fd, const void* key, const void* value)
+{
+    if (prog_fd < 0 || prog_fd >= MAX_EBPF_PROGS || !prog_table[prog_fd].used) return -1;
+    if (prog_table[prog_fd].map_fd < 0) return -1;
+#ifdef __linux__
+    union bpf_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.map_fd = (__u32)prog_table[prog_fd].map_fd;
+    attr.key = (__u64)(uintptr_t)key;
+    attr.value = (__u64)(uintptr_t)value;
+    attr.flags = 0;
+    return (int32_t)syscall(SYS_bpf, BPF_MAP_UPDATE_ELEM, &attr, sizeof(attr));
+#else
+    return -1;
+#endif
+}
+
+int32_t jocky_ebpf_map_lookup(int32_t prog_fd, const void* key, void* out_value)
+{
+    if (prog_fd < 0 || prog_fd >= MAX_EBPF_PROGS || !prog_table[prog_fd].used) return -1;
+    if (prog_table[prog_fd].map_fd < 0) return -1;
+#ifdef __linux__
+    union bpf_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.map_fd = (__u32)prog_table[prog_fd].map_fd;
+    attr.key = (__u64)(uintptr_t)key;
+    attr.value = (__u64)(uintptr_t)out_value;
+    return (int32_t)syscall(SYS_bpf, BPF_MAP_LOOKUP_ELEM, &attr, sizeof(attr));
+#else
+    return -1;
+#endif
 }
