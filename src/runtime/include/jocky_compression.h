@@ -4,6 +4,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* FFI-facing compress/decompress used by JOCKY scripts */
+#include <stdint.h>
+int8_t*  jocky_compress_data(int8_t* data, uint64_t size);
+int32_t  jocky_compress_get_size(void);
+int8_t*  jocky_decompress_data(int8_t* data, uint64_t size);
+
 /* Compression levels */
 #define JOCKY_COMPRESS_FAST      1
 #define JOCKY_COMPRESS_BALANCED  6

