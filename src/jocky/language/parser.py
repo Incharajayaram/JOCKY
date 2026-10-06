@@ -741,7 +741,10 @@ class Parser:
                 node = IndexExpr(node, idx)
             elif self.match(TokenType.DOT):
                 self.advance()
-                field_name = self.expect(TokenType.IDENT).value
+                if self.match(TokenType.NUMBER):
+                    field_name = str(int(self.advance().value))
+                else:
+                    field_name = self.expect(TokenType.IDENT).value
                 node = FieldAccessExpr(node, field_name)
             else:
                 break
