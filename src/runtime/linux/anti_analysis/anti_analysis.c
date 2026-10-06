@@ -191,10 +191,6 @@ int jocky_check_environment_modified(void) {
         return 1;
     }
 
-    if (getenv("LD_LIBRARY_PATH") != NULL) {
-        return 1;
-    }
-
     if (getenv("DYLD_INSERT_LIBRARIES") != NULL) {
         return 1;
     }
