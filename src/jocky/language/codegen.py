@@ -920,6 +920,8 @@ class CodeGen:
             return JType(t.name, is_pointer=False, is_array=False)
         elif isinstance(expr, FieldAccessExpr):
             obj_type = self.infer_type(expr.object)
+            if expr.field.isdigit():
+                return JType("i8", is_pointer=True)
             if obj_type.name not in self.structs:
                 raise CodeGenError(f"Cannot access field on non-struct: {obj_type}")
             struct_def = self.structs[obj_type.name]
@@ -1026,6 +1028,15 @@ class CodeGen:
         elif isinstance(expr, FieldAccessExpr):
             # Load struct value and extract field via GEP
             obj, obj_type = self.emit_expr(expr.object)
+            if expr.field.isdigit():
+                idx = int(expr.field)
+                cast = self.next_reg()
+                self.emit(f"  {cast} = bitcast i8* {obj} to i8**")
+                gep = self.next_reg()
+                self.emit(f"  {gep} = getelementptr i8*, i8** {cast}, i64 {idx}")
+                r = self.next_reg()
+                self.emit(f"  {r} = load i8*, i8** {gep}")
+                return (r, JType("i8", is_pointer=True))
             if obj_type.name not in self.structs:
                 raise CodeGenError(f"Cannot access field on non-struct: {obj_type}")
             struct_def = self.structs[obj_type.name]

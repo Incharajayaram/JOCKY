@@ -473,6 +473,8 @@ class TypeChecker:
             raise TypeError(f"Cannot index type {bt}")
         elif isinstance(expr, FieldAccessExpr):
             obj_type = self.typeof(expr.object)
+            if expr.field.isdigit():
+                return JType("i8", is_pointer=True)
             if obj_type.name not in self.structs:
                 raise TypeError(f"Cannot access field on non-struct type: {obj_type}")
             struct_def = self.structs[obj_type.name]
