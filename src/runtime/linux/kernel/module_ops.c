@@ -34,9 +34,31 @@ int jocky_module_resolve_symbol(const char* mod, const char* sym) {
     return -1;
 }
 
-int jocky_lkm_get_symbol(const char* name) {
-    /* Get LKM (Loadable Kernel Module) symbol address */
-    return jocky_module_resolve_symbol(NULL, name);
+int8_t* jocky_lkm_get_symbol(const char* module_name, const char* symbol)
+{
+    if (!symbol) return NULL;
+
+    FILE* fp = fopen("/proc/kallsyms", "r");
+    if (!fp) return NULL;
+
+    static char addr_buf[32];
+    unsigned long addr = 0;
+    char line[256], sym_name[128], mod[128];
+    char type;
+
+    while (fgets(line, sizeof(line), fp)) {
+        int n = sscanf(line, "%lx %c %127s %127s", &addr, &type, sym_name, mod);
+        if (n >= 3 && strcmp(sym_name, symbol) == 0) {
+            if (!module_name || n < 4 || strcmp(mod, module_name) == 0) {
+                fclose(fp);
+                snprintf(addr_buf, sizeof(addr_buf), "%lx", addr);
+                return (int8_t*)addr_buf;
+            }
+        }
+    }
+
+    fclose(fp);
+    return NULL;
 }
 
 int jocky_module_stomp(const char* mod) {

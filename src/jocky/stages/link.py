@@ -46,7 +46,7 @@ class LinkStage(Stage):
                 str(tc.clang()), "--target=x86_64-pc-windows-gnu",
                 f"-L{mingw_lib}", str(obj_path), str(runtime_lib),
                 "-lkernel32", "-luser32", "-ladvapi32", "-lws2_32", "-lwinhttp", "-lwininet", "-ldnsapi",
-                "-lssl", "-lcrypto", "-lz",
+                "-lpsapi", "-lwevtapi", "-lssl", "-lcrypto", "-lz",
                 "-o", str(output)
             ]
             run_cmd(link_cmd, "Linking Windows PE executable (clang)")
@@ -141,10 +141,12 @@ class LinkStage(Stage):
         if not runtime_dir.exists():
             raise RuntimeError(f"Runtime directory not found: {runtime_dir}")
 
-        cmake_build_dir = out_dir / "cmake_build"
+        if target_os == "windows":
+            return self._build_runtime_windows(tc, out_dir, runtime_dir)
+
+        cmake_build_dir = out_dir / "cmake_build_linux"
         cmake_build_dir.mkdir(parents=True, exist_ok=True)
 
-        # Run CMake to configure the build
         cmake_cmd = [
             "cmake",
             "-S", str(runtime_dir),
@@ -154,18 +156,62 @@ class LinkStage(Stage):
 
         try:
             run_cmd(cmake_cmd, "Configure JOCKY runtime with CMake")
-        except Exception as e:
-            # If cmake fails, try using cpack or fallback to manual compilation
+        except Exception:
             pass
 
-        # Build the runtime library
         build_cmd = ["cmake", "--build", str(cmake_build_dir), "-j4"]
         run_cmd(build_cmd, f"Build JOCKY runtime library ({target_os})")
 
-        # Return path to the static library
         runtime_lib = cmake_build_dir / "libjocky_rt.a"
         if not runtime_lib.exists():
             raise RuntimeError(f"Runtime library not found after build: {runtime_lib}")
 
         return runtime_lib
+
+    def _build_runtime_windows(self, tc, out_dir: Path, runtime_dir: Path) -> Path:
+        """Compile JOCKY runtime for Windows using clang cross-compiler."""
+        import os
+        obj_dir = out_dir / "cmake_build_windows"
+        obj_dir.mkdir(parents=True, exist_ok=True)
+
+        sources = self._parse_cmake_sources(runtime_dir)
+        sources = self._filter_sources_for_platform(sources, runtime_dir, "windows")
+
+        mingw_inc = "/usr/x86_64-w64-mingw32/include"
+        include_dirs = [
+            str(runtime_dir / "include"),
+            str(runtime_dir),
+            mingw_inc,
+        ]
+        include_flags = [f"-I{d}" for d in include_dirs]
+
+        clang = str(tc.clang())
+        obj_files = []
+        for src in sources:
+            rel = src.relative_to(runtime_dir)
+            obj_name = str(rel).replace("/", "_").replace("\\", "_") + ".o"
+            obj_path = obj_dir / obj_name
+            compile_cmd = [
+                clang,
+                "--target=x86_64-pc-windows-gnu",
+                "-O1", "-c",
+                "-D_WIN32", "-DWIN32",
+                "-D_WIN32_WINNT=0x0600",
+                "-Wno-implicit-function-declaration",
+                "-Wno-incompatible-pointer-types",
+            ] + include_flags + [str(src), "-o", str(obj_path)]
+            try:
+                run_cmd(compile_cmd, f"Compile {rel}")
+                obj_files.append(str(obj_path))
+            except Exception:
+                pass
+
+        if not obj_files:
+            raise RuntimeError("No Windows runtime object files compiled")
+
+        lib_path = obj_dir / "libjocky_rt.a"
+        ar = shutil.which("llvm-ar") or shutil.which("ar") or "ar"
+        run_cmd([ar, "rcs", str(lib_path)] + obj_files, "Archive Windows runtime")
+
+        return lib_path
 

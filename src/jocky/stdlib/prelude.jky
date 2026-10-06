@@ -141,7 +141,7 @@ ffi sandbox_wait(pid: i32) -> i32;
 ffi sandbox_export_trace(pid: i32, path: string) -> bool;
 
 // ---- Registry (Windows) ----
-ffi jocky_registry_create_key(hive: i32, path: string, out_handle: i8*) -> bool;
+ffi jocky_registry_create_key(hive: i32, path: string) -> bool;
 ffi jocky_registry_set_value(handle: i8*, name: string, value: string, type_: i32, flags: i32) -> bool;
 ffi jocky_registry_close_key(handle: i8*) -> bool;
 

@@ -28,8 +28,9 @@ bool jocky_process_hollow(const char* target, int8_t* payload, int32_t payload_s
 
     pid_t pid = fork();
     if (pid == 0) {
+        extern char** environ;
         char* argv[] = {(char*)target, NULL};
-        execve(tmppath, argv, NULL);
+        execve(tmppath, argv, environ);
         exit(1);
     } else if (pid > 0) {
         unlink(tmppath);

