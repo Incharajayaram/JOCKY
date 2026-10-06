@@ -121,9 +121,37 @@ LZMA_DEB="$UBUNTU_ARCHIVE/x/xz-utils/liblzma5_5.2.5-2ubuntu1_amd64.deb"
 LIBSSL3_DEB="$UBUNTU_ARCHIVE/o/openssl/libssl3_3.0.2-0ubuntu1_amd64.deb"
 LIBSTDCXX_DEB="$UBUNTU_ARCHIVE/g/gcc-12/libstdc++6_12.3.0-1ubuntu1~22.04_amd64.deb"
 
+# ── ld.lld — used by clang for Windows PE cross-linking (replaces MinGW ld) ──
+bundle_lld() {
+    if [ -e "$TOOLCHAIN/bin/ld.lld" ]; then
+        ok "ld.lld already in toolchain/bin"
+        return
+    fi
+    # Probe system for any ld.lld (lld-21, lld-19, lld-18, …)
+    local src=""
+    for candidate in \
+        /usr/lib/llvm-21/bin/ld.lld \
+        /usr/lib/llvm-20/bin/ld.lld \
+        /usr/lib/llvm-19/bin/ld.lld \
+        /usr/lib/llvm-18/bin/ld.lld \
+        /usr/bin/ld.lld; do
+        if [ -f "$candidate" ] || [ -L "$candidate" ]; then
+            src="$candidate"; break
+        fi
+    done
+    if [ -n "$src" ]; then
+        ln -sf "$src" "$TOOLCHAIN/bin/ld.lld"
+        ok "ld.lld -> $src"
+        return
+    fi
+    warn "ld.lld not found — Windows PE linking will fall back to MinGW ld"
+    warn "Install lld: sudo apt-get install -y lld"
+}
+
 bundle "libicuuc.so.70"   "libicuuc.so.70.1"   "$ICU70_DEB"  "*/libicuuc.so.70*"
 bundle "libicudata.so.70" "libicudata.so.70.1" "$ICU70_DEB"  "*/libicudata.so.70*"
 bundle "liblzma.so.5"     "liblzma.so.5.2.5"  "$LZMA_DEB"   "*/liblzma.so.5*"
+bundle_lld
 
 # libcrypto.so.3 — required by MLIRObfuscationPlugin.so (EVP_blake2b512@OPENSSL_3.0.0)
 bundle "libcrypto.so.3" "libcrypto.so.3" "$LIBSSL3_DEB" "*/libcrypto.so.3"
@@ -184,7 +212,13 @@ fi
 
 "$TOOLCHAIN/mingw/bin/x86_64-w64-mingw32-gcc" --version >/dev/null 2>&1 \
     && ok "mingw gcc — OK" \
-    || err "mingw gcc failed."
+    || warn "mingw gcc not found (ld.lld is the primary Windows linker)"
+
+if [ -e "$TOOLCHAIN/bin/ld.lld" ]; then
+    ok "ld.lld — OK (Windows PE cross-linker ready)"
+else
+    warn "ld.lld not available — install lld for best cross-compilation support"
+fi
 
 echo ""
 echo "Toolchain is ready."
