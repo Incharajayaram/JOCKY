@@ -475,85 +475,42 @@ def stage_compile_runtime(build_dir, platform="windows"):
 
         return objs
 
-    log("RUNTIME", "Compiling JOCKY runtime for Windows")
-    # Prefer bundled MinGW (self-contained), fall back to system, then clang
-    mingw_gcc = None
-
-    bundled_mingw = TOOLCHAIN / "mingw" / "bin" / "x86_64-w64-mingw32-gcc"
-    if bundled_mingw.exists():
-        mingw_gcc = str(bundled_mingw)
-        log("RUNTIME", "Using bundled MinGW")
-    else:
-        try:
-            subprocess.run(["x86_64-w64-mingw32-gcc", "--version"], capture_output=True, check=True)
-            mingw_gcc = "x86_64-w64-mingw32-gcc"
-            log("RUNTIME", "Using system MinGW")
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            log("RUNTIME", "MinGW not found, using clang for Windows PE target")
-            mingw_gcc = "clang"
-
-    if mingw_gcc == "clang":
-        cflags = ["-O2", "-c", "--target=x86_64-pc-windows-gnu", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE",
-                  "-I", str(include_dir),
-                  "-I", str(RUNTIME_DIR),
-                  "-I", str(RUNTIME_DIR / "windows")]
-    else:
-        cflags = ["-O2", "-c", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE",
-                  "-I", str(include_dir),
-                  "-I", str(RUNTIME_DIR),
-                  "-I", str(RUNTIME_DIR / "windows")]
-
-    sources_win = sources
+    log("RUNTIME", "Compiling JOCKY runtime for Windows (clang cross-compile)")
+    toolchain_clang = TOOLCHAIN / "bin" / "clang"
+    compiler = str(toolchain_clang) if toolchain_clang.exists() else "clang"
 
     mingw_sysroot = TOOLCHAIN / "mingw" / "x86_64-w64-mingw32"
+    mingw_include = mingw_sysroot / "include"
+    mingw_lib = mingw_sysroot / "lib"
+
     cflags_win = [
-        "-O2", "-c", "-D_WIN32", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE", "-DCURL_STATICLIB",
+        "--target=x86_64-w64-windows-gnu",
+        "-O2", "-c",
+        "-D_WIN32", "-D_WIN32_WINNT=0x0600", "-DUNICODE", "-D_UNICODE", "-DCURL_STATICLIB",
+        # Runtime uses narrow string literals with Win32 APIs; silence mismatches that
+        # clang promotes to errors but MinGW GCC historically treated as warnings only
+        "-Wno-incompatible-pointer-types",
+        "-Wno-implicit-function-declaration",
         "-I", str(include_dir),
         "-I", str(RUNTIME_DIR),
         "-I", str(RUNTIME_DIR / "windows"),
-    ] + (["-I", str(mingw_sysroot / "include")] if (mingw_sysroot / "include").exists() else [])
+    ]
+    if mingw_include.exists():
+        cflags_win += ["-isystem", str(mingw_include)]
 
-    # Set up environment for bundled MinGW only if using it
     compile_env = os.environ.copy()
-    extra_flags = []
-    use_bundled = mingw_gcc.startswith(str(TOOLCHAIN / "mingw"))
+    toolchain_lib = TOOLCHAIN / "lib"
+    if toolchain_lib.exists():
+        existing = compile_env.get("LD_LIBRARY_PATH", "")
+        compile_env["LD_LIBRARY_PATH"] = str(toolchain_lib) + (":" + existing if existing else "")
 
-    if use_bundled:
-        bundled_mingw_bin = TOOLCHAIN / "mingw" / "bin"
-        bundled_mingw_lib = TOOLCHAIN / "mingw" / "lib"
-        # Prioritize bundled toolchain bin directory in PATH
-        if "PATH" in compile_env:
-            compile_env["PATH"] = str(bundled_mingw_bin) + ":" + compile_env["PATH"]
-        else:
-            compile_env["PATH"] = str(bundled_mingw_bin)
-        # Add bundled MinGW lib to library search paths
-        ld_path = str(bundled_mingw_lib)
-        if "LD_LIBRARY_PATH" in compile_env:
-            compile_env["LD_LIBRARY_PATH"] = ld_path + ":" + compile_env["LD_LIBRARY_PATH"]
-        else:
-            compile_env["LD_LIBRARY_PATH"] = ld_path
-        # Bypass GCC internal header wrappers that use #include_next with absolute paths.
-        # -nostdinc disables built-in search; explicit -isystem restores GCC's own headers
-        # first, then the MinGW sysroot headers, so #include_next works correctly.
-        mingw_gcc_include = str(TOOLCHAIN / "mingw" / "lib" / "10-win32" / "include")
-        mingw_include = str(TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "include")
-        mingw_lib = str(TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "lib")
-        extra_flags = [
-            "-nostdinc",
-            "-isystem", mingw_gcc_include,
-            "-isystem", mingw_include,
-            "-L", mingw_lib,
-        ]
-
-    for src in sources_win:
+    for src in sources:
         if not src.exists():
             log("RUNTIME", f"  skip (not found): {src.name}")
             continue
         obj = build_dir / f"rt_{src.parent.name}_{src.stem}.o"
         try:
-            run([mingw_gcc] + extra_flags + cflags_win + [
-                 "-I", str(src.parent),
-                 str(src), "-o", str(obj)],
+            run([compiler] + cflags_win + ["-I", str(src.parent), str(src), "-o", str(obj)],
                 f"Compile {src.name}",
                 env=compile_env)
             objs.append(obj)
@@ -595,81 +552,42 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
         return exe_path
 
     log("LINK", "Linking Windows PE executable")
-    # Prefer bundled MinGW (self-contained), fall back to system, then clang
+    toolchain_clang = TOOLCHAIN / "bin" / "clang"
+    linker = str(toolchain_clang) if toolchain_clang.exists() else "clang"
+
     link_env = os.environ.copy()
-    use_bundled = False
+    toolchain_lib = TOOLCHAIN / "lib"
+    if toolchain_lib.exists():
+        existing = link_env.get("LD_LIBRARY_PATH", "")
+        link_env["LD_LIBRARY_PATH"] = str(toolchain_lib) + (":" + existing if existing else "")
 
-    bundled_mingw = TOOLCHAIN / "mingw" / "bin" / "x86_64-w64-mingw32-gcc"
-    if bundled_mingw.exists():
-        linker = str(bundled_mingw)
-        use_bundled = True
-        log("LINK", "Using bundled MinGW")
+    # Prefer ld.lld from toolchain/bin (set up by setup_toolchain.sh), then system
+    lld_path = TOOLCHAIN / "bin" / "ld.lld"
+    if lld_path.exists():
+        fuse_ld = [f"-fuse-ld={lld_path}"]
+        log("LINK", f"Using LLD: {lld_path}")
     else:
-        try:
-            subprocess.run(["x86_64-w64-mingw32-gcc", "--version"], capture_output=True, check=True)
-            linker = "x86_64-w64-mingw32-gcc"
-            log("LINK", "Using system MinGW")
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            linker = "clang"
-            log("LINK", "Using clang for Windows PE target")
-
-    # Set up environment for bundled MinGW
-    linker_flags = []
-    if use_bundled:
-        bundled_mingw_bin = TOOLCHAIN / "mingw" / "bin"
-        bundled_mingw_lib = TOOLCHAIN / "mingw" / "lib"
-        if bundled_mingw_lib.exists():
-            # Prioritize bundled toolchain bin directory in PATH
-            if "PATH" in link_env:
-                link_env["PATH"] = str(bundled_mingw_bin) + ":" + link_env["PATH"]
-            else:
-                link_env["PATH"] = str(bundled_mingw_bin)
-            ld_path = str(bundled_mingw_lib)
-            if "LD_LIBRARY_PATH" in link_env:
-                link_env["LD_LIBRARY_PATH"] = ld_path + ":" + link_env["LD_LIBRARY_PATH"]
-            else:
-                link_env["LD_LIBRARY_PATH"] = ld_path
-            # Explicitly set LD to use bundled linker
-            link_env["LD"] = str(bundled_mingw_bin / "x86_64-w64-mingw32-ld")
-            # Tell gcc where to find cc1 and other internal tools, plus include/lib paths
-            mingw_lib = str(TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "lib")
-            linker_flags = [
-                "-L", mingw_lib,
-                "-fno-use-linker-plugin",
-            ]
+        fuse_ld = []
+        log("LINK", "ld.lld not found, using default linker (run setup_toolchain.sh)")
 
     win_sysroot_lib = TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "lib"
     sysroot_link_flags = ["-L", str(win_sysroot_lib)] if win_sysroot_lib.exists() else []
-    # Link order: curl -> ssl -> crypto -> z -> pthread
-    # Each library must precede the libraries it depends on so GNU ld resolves
-    # undefined references in left-to-right archive scanning order.
-    # libcurl was built with pthread support, so winpthread must be linked.
     third_party_libs = ["-lcurl", "-lssl", "-lcrypto", "-lz", "-lpthread"] if win_sysroot_lib.exists() else []
     win_system_libs = ["-lntdll", "-lwinhttp", "-lwininet", "-ldnsapi", "-lwevtapi",
                        "-ladvapi32", "-lkernel32", "-lws2_32", "-lpsapi",
                        "-lcrypt32", "-lgdi32", "-lwldap32"]
 
     all_objs = [str(obj_path)] + [str(o) for o in runtime_objs]
-    if linker == "clang":
-        cmd = [
-            linker,
-            "--target=x86_64-pc-windows-gnu",
-            *sysroot_link_flags,
-            *all_objs,
-            *third_party_libs,
-            *win_system_libs,
-            "-o", str(exe_path),
-        ]
-    else:
-        cmd = [
-            linker,
-            *linker_flags,
-            *sysroot_link_flags,
-            *all_objs,
-            *third_party_libs,
-            *win_system_libs,
-            "-o", str(exe_path),
-        ]
+    cmd = [
+        linker,
+        "--target=x86_64-w64-windows-gnu",
+        *fuse_ld,
+        *sysroot_link_flags,
+        *all_objs,
+        *third_party_libs,
+        *win_system_libs,
+        "-o", str(exe_path),
+    ]
     run(cmd, "Link PE executable", env=link_env)
     log("LINK", f"Output: {exe_path} ({exe_path.stat().st_size} bytes)")
 
