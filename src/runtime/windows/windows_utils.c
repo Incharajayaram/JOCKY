@@ -286,7 +286,67 @@ int32_t fs_write_file(const char* path, void* data, int32_t size) {
 #endif
 }
 
-int32_t fs_list_files(const char* path) { return -1; }
+char* fs_list_files(const char* path, int recursive) {
+#ifdef _WIN32
+    if (!path) return NULL;
+
+    WIN32_FIND_DATAA ffd;
+    char search_path[MAX_PATH];
+    snprintf(search_path, MAX_PATH, "%s\\*", path);
+
+    HANDLE hFind = FindFirstFileA(search_path, &ffd);
+    if (hFind == INVALID_HANDLE_VALUE) return NULL;
+
+    size_t cap = 8192;
+    char* result = (char*)malloc(cap);
+    if (!result) { FindClose(hFind); return NULL; }
+    result[0] = '\0';
+    size_t result_len = 0;
+
+    do {
+        if (strcmp(ffd.cFileName, ".") == 0 || strcmp(ffd.cFileName, "..") == 0)
+            continue;
+
+        char full_path[MAX_PATH];
+        snprintf(full_path, MAX_PATH, "%s\\%s", path, ffd.cFileName);
+        size_t entry_len = strlen(full_path);
+
+        while (result_len + entry_len + 2 >= cap) {
+            cap *= 2;
+            char* new_result = (char*)realloc(result, cap);
+            if (!new_result) { free(result); FindClose(hFind); return NULL; }
+            result = new_result;
+        }
+
+        memcpy(result + result_len, full_path, entry_len);
+        result_len += entry_len;
+        result[result_len++] = '\n';
+        result[result_len] = '\0';
+
+        if (recursive && (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            char* sub = fs_list_files(full_path, recursive);
+            if (sub) {
+                size_t sub_len = strlen(sub);
+                while (result_len + sub_len + 1 >= cap) {
+                    cap *= 2;
+                    char* new_result = (char*)realloc(result, cap);
+                    if (!new_result) { free(sub); free(result); FindClose(hFind); return NULL; }
+                    result = new_result;
+                }
+                memcpy(result + result_len, sub, sub_len);
+                result_len += sub_len;
+                result[result_len] = '\0';
+                free(sub);
+            }
+        }
+    } while (FindNextFileA(hFind, &ffd));
+
+    FindClose(hFind);
+    return result;
+#else
+    return NULL;
+#endif
+}
 
 /* Audit */
 int32_t audit_init(int32_t buffer_size) { return -1; }

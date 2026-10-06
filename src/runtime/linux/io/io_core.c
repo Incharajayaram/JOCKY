@@ -78,25 +78,52 @@ int fs_write_file(const char* path, void* data, int size) {
     return (n == size) ? 0 : -1;
 }
 
-void* fs_list_files(const char* path, int recursive) {
-    if (!path) return NULL;
-
+static char* fs_list_files_impl(const char* path, int recursive,
+                                 char* buf, size_t* len, size_t* cap) {
     DIR* dir = opendir(path);
-    if (!dir) return NULL;
-
-    char** files = malloc(sizeof(char*) * 256);
-    int count = 0;
+    if (!dir) return buf;
 
     struct dirent* entry;
-    while ((entry = readdir(dir)) && count < 255) {
+    while ((entry = readdir(dir))) {
         if (entry->d_name[0] == '.') continue;
-        files[count++] = strdup(entry->d_name);
+
+        char full_path[4096];
+        snprintf(full_path, sizeof(full_path), "%s/%s", path, entry->d_name);
+        size_t entry_len = strlen(full_path);
+
+        while (*len + entry_len + 2 >= *cap) {
+            *cap *= 2;
+            char* new_buf = (char*)realloc(buf, *cap);
+            if (!new_buf) { closedir(dir); return buf; }
+            buf = new_buf;
+        }
+
+        memcpy(buf + *len, full_path, entry_len);
+        *len += entry_len;
+        buf[(*len)++] = '\n';
+        buf[*len] = '\0';
+
+        if (recursive) {
+            struct stat st;
+            if (stat(full_path, &st) == 0 && S_ISDIR(st.st_mode))
+                buf = fs_list_files_impl(full_path, recursive, buf, len, cap);
+        }
     }
 
     closedir(dir);
-    files[count] = NULL;
+    return buf;
+}
 
-    return files;
+char* fs_list_files(const char* path, int recursive) {
+    if (!path) return NULL;
+
+    size_t cap = 8192;
+    size_t len = 0;
+    char* buf = (char*)malloc(cap);
+    if (!buf) return NULL;
+    buf[0] = '\0';
+
+    return fs_list_files_impl(path, recursive, buf, &len, &cap);
 }
 
 int fs_file_size(const char* path) {

