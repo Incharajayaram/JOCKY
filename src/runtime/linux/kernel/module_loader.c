@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <dirent.h>
 #include <sys/prctl.h>
 #include <sys/ptrace.h>
 #include <sys/types.h>
@@ -59,7 +60,23 @@ int32_t jocky_linux_cleanup_lastlog(void) {
 
 int32_t jocky_wipe_temp_files(const char* path1, const char* path2) {
     if (!path1) return 0;
-    return 1;
+
+    int removed = 0;
+    const char* paths[2] = {path1, path2};
+    for (int pi = 0; pi < 2; pi++) {
+        if (!paths[pi]) continue;
+        DIR* d = opendir(paths[pi]);
+        if (!d) continue;
+        struct dirent* ent;
+        while ((ent = readdir(d)) != NULL) {
+            if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) continue;
+            char full[1024];
+            snprintf(full, sizeof(full), "%s/%s", paths[pi], ent->d_name);
+            removed += (unlink(full) == 0) ? 1 : 0;
+        }
+        closedir(d);
+    }
+    return removed > 0 ? 1 : 0;
 }
 
 

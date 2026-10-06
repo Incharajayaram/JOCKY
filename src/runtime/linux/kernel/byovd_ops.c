@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -29,8 +30,10 @@ int8_t* jocky_byovd_new(void) {
     return (int8_t*)g_byovd;
 }
 
-int jocky_byovd_load(const char* driver) {
-    if (!g_byovd || !driver) return -1;
+bool jocky_byovd_load(const char* driver_path, const char* service_name, int8_t* ctx) {
+    byovd_context_t* bctx = ctx ? (byovd_context_t*)ctx : g_byovd;
+    if (!bctx || !driver_path) return false;
+    const char* driver = driver_path;
 
     /* Try to load vulnerable driver */
     char cmd[512];
@@ -54,27 +57,25 @@ int jocky_byovd_load(const char* driver) {
         }
     }
 
-    strncpy(g_byovd->driver_name, driver, sizeof(g_byovd->driver_name) - 1);
-    g_byovd->handle = 1;  /* Mark as loaded */
+    strncpy(bctx->driver_name, driver, sizeof(bctx->driver_name) - 1);
+    bctx->handle = 1;
 
-    return 1;
+    return true;
 }
 
-int jocky_byovd_unload(int handle) {
-    if (!g_byovd || handle != g_byovd->handle) return -1;
+void jocky_byovd_unload(int8_t* ctx) {
+    byovd_context_t* bctx = ctx ? (byovd_context_t*)ctx : g_byovd;
+    if (!bctx) return;
 
-    if (g_byovd->fd >= 0) {
-        close(g_byovd->fd);
-        g_byovd->fd = -1;
+    if (bctx->fd >= 0) {
+        close(bctx->fd);
+        bctx->fd = -1;
     }
 
-    /* Attempt to unload the driver */
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "modprobe -r %s 2>/dev/null || rmmod %s 2>/dev/null",
-             g_byovd->driver_name, g_byovd->driver_name);
+             bctx->driver_name, bctx->driver_name);
     system(cmd);
-
-    return 0;
 }
 
 void jocky_byovd_destroy(int8_t* ctx) {

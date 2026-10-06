@@ -1,146 +1,101 @@
-#include "../../include/jocky_ebpf.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #ifdef __linux__
 #include <sys/syscall.h>
 #include <linux/bpf.h>
 #endif
 
-int jocky_ebpf_load(
-    const char* name,
-    const uint8_t* bytecode,
-    uint32_t bytecode_size,
-    JOCKY_EBPF_PROGRAM* out_program)
-{
-    if (!name || !bytecode || bytecode_size == 0 || !out_program) {
-        return -1;
+#define MAX_EBPF_PROGS 16
+
+static struct {
+    int program_fd;
+    int map_fd;
+    int attached;
+    int used;
+} prog_table[MAX_EBPF_PROGS];
+
+static int alloc_prog_slot(void) {
+    for (int i = 0; i < MAX_EBPF_PROGS; i++) {
+        if (!prog_table[i].used) return i;
     }
+    return -1;
+}
+
+int32_t jocky_ebpf_load(const int8_t* prog, int32_t prog_size, int32_t prog_type)
+{
+    if (!prog || prog_size <= 0) return -1;
+
+    int slot = alloc_prog_slot();
+    if (slot < 0) return -1;
+
+    memset(&prog_table[slot], 0, sizeof(prog_table[slot]));
+    prog_table[slot].used = 1;
+    prog_table[slot].program_fd = -1;
+    prog_table[slot].map_fd = -1;
 
 #ifdef __linux__
-    /* Would use bpf() syscall to load eBPF program */
-    /* struct bpf_load_program_attr attr = {...}; */
-    /* bpf(BPF_PROG_LOAD, &attr, sizeof(attr)); */
+    union bpf_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.prog_type = (__u32)prog_type;
+    attr.insns = (__u64)(uintptr_t)prog;
+    attr.insn_cnt = (__u32)(prog_size / 8);
+    attr.license = (__u64)(uintptr_t)"GPL";
+    int fd = (int)syscall(SYS_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+    prog_table[slot].program_fd = fd;
+#endif
 
-    memset(out_program, 0, sizeof(*out_program));
-    strncpy(out_program->name, name, sizeof(out_program->name) - 1);
-    out_program->program_fd = -1;
-    out_program->map_fd = -1;
+    return slot;
+}
 
-    /* For testing, create dummy FDs */
-    out_program->program_fd = 3;  /* Fake FD */
-    out_program->map_fd = 4;      /* Fake FD */
+int32_t jocky_ebpf_attach(int32_t prog_fd, int32_t attach_type, int32_t target_fd)
+{
+    if (prog_fd < 0 || prog_fd >= MAX_EBPF_PROGS || !prog_table[prog_fd].used) return -1;
 
-    return 0;
+#ifdef __linux__
+    union bpf_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.attach_type = (__u32)attach_type;
+    attr.target_fd = target_fd;
+    attr.attach_bpf_fd = prog_table[prog_fd].program_fd;
+    int ret = (int)syscall(SYS_bpf, BPF_PROG_ATTACH, &attr, sizeof(attr));
+    if (ret == 0) {
+        prog_table[prog_fd].attached = 1;
+        return 1;
+    }
+    return -1;
 #else
     return -1;
 #endif
 }
 
-int jocky_ebpf_attach(
-    JOCKY_EBPF_PROGRAM* program,
-    const char* attach_point)
+int64_t jocky_ebpf_run(int32_t prog_fd, int8_t* ctx, int32_t ctx_size)
 {
-    if (!program || !attach_point) {
-        return -1;
-    }
-
-#ifdef __linux__
-    /* Would attach to tracepoint, kprobe, etc */
-    strncpy(program->attached_point, attach_point, sizeof(program->attached_point) - 1);
-    program->attached = 1;
+    if (prog_fd < 0 || prog_fd >= MAX_EBPF_PROGS || !prog_table[prog_fd].used) return -1;
+    (void)ctx;
+    (void)ctx_size;
     return 0;
-#else
-    return -1;
-#endif
 }
 
-int jocky_ebpf_detach(JOCKY_EBPF_PROGRAM* program)
+int32_t jocky_ebpf_unload(int32_t prog_fd)
 {
-    if (!program || !program->attached) {
-        return -1;
-    }
+    if (prog_fd < 0 || prog_fd >= MAX_EBPF_PROGS || !prog_table[prog_fd].used) return -1;
 
 #ifdef __linux__
-    program->attached = 0;
-    return 0;
-#else
-    return -1;
+    if (prog_table[prog_fd].attached) {
+        prog_table[prog_fd].attached = 0;
+    }
+    if (prog_table[prog_fd].program_fd >= 0) {
+        close(prog_table[prog_fd].program_fd);
+    }
+    if (prog_table[prog_fd].map_fd >= 0) {
+        close(prog_table[prog_fd].map_fd);
+    }
 #endif
-}
 
-int jocky_ebpf_map_update(
-    JOCKY_EBPF_PROGRAM* program,
-    const void* key,
-    const void* value)
-{
-    if (!program || !key || !value) {
-        return -1;
-    }
-
-#ifdef __linux__
-    /* Would call bpf(BPF_MAP_UPDATE_ELEM, ...) */
-    return 0;
-#else
-    return -1;
-#endif
-}
-
-int jocky_ebpf_map_lookup(
-    JOCKY_EBPF_PROGRAM* program,
-    const void* key,
-    void* out_value)
-{
-    if (!program || !key || !out_value) {
-        return -1;
-    }
-
-#ifdef __linux__
-    /* Would call bpf(BPF_MAP_LOOKUP_ELEM, ...) */
-    memset(out_value, 0, 8);
-    return 0;
-#else
-    return -1;
-#endif
-}
-
-int jocky_ebpf_query(JOCKY_EBPF_PROGRAM* program)
-{
-    if (!program) {
-        return -1;
-    }
-
-#ifdef __linux__
-    /* Would query program info */
-    return program->program_fd >= 0 ? 0 : -1;
-#else
-    return -1;
-#endif
-}
-
-int jocky_ebpf_unload(JOCKY_EBPF_PROGRAM* program)
-{
-    if (!program) {
-        return -1;
-    }
-
-#ifdef __linux__
-    if (program->attached) {
-        jocky_ebpf_detach(program);
-    }
-
-    if (program->program_fd >= 0) {
-        close(program->program_fd);
-    }
-    if (program->map_fd >= 0) {
-        close(program->map_fd);
-    }
-
-    memset(program, 0, sizeof(*program));
-    return 0;
-#else
-    return -1;
-#endif
+    memset(&prog_table[prog_fd], 0, sizeof(prog_table[prog_fd]));
+    return 1;
 }

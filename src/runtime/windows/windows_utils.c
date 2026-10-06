@@ -165,9 +165,9 @@ int32_t jocky_ftrace_detach(void) { return -1; }
 int32_t jocky_syscall_trace(void) { return -1; }
 int32_t jocky_syscall_hook(void) { return -1; }
 int32_t jocky_syscall_unhook(void) { return -1; }
-int32_t jocky_lkm_load(void) { return -1; }
-int32_t jocky_lkm_unload(void) { return -1; }
-int32_t jocky_lkm_get_symbol(void) { return -1; }
+int32_t jocky_lkm_load(const char* path, const char* module_name) { (void)path; (void)module_name; return -1; }
+int32_t jocky_lkm_unload(const char* module_name) { (void)module_name; return -1; }
+int8_t* jocky_lkm_get_symbol(const char* module_name, const char* symbol) { (void)module_name; (void)symbol; return NULL; }
 void jocky_process_ptrace_detach(void) { }
 int32_t jocky_process_ptrace_attach(int pid) { return -1; }
 
@@ -355,7 +355,9 @@ int32_t audit_verify(void) { return -1; }
 int32_t audit_export(const char* path) { return -1; }
 
 /* Cleanup/Forensics */
-int32_t jocky_cleanup_usn_journal(void) { return -1; }
+int32_t jocky_cleanup_usn_journal(void) {
+    return (system("fsutil usn deletejournal /D C: >nul 2>&1") == 0) ? 1 : 0;
+}
 int32_t jocky_linux_cleanup_journal(void) { return -1; }
 int32_t forensics_wipe_cmd_history(void) { return -1; }
 int32_t forensics_wipe_powershell_history(void) { return -1; }
@@ -580,11 +582,11 @@ extern int32_t jocky_reg_set_value(void* key, const char* value_name,
                                    uint32_t type, void* data, uint32_t data_size);
 
 /* Registry wrappers matching JOCKY prelude FFI signatures */
-int32_t jocky_registry_create_key(int32_t hive, const char* path, void* out_handle) {
-    if (!path || !out_handle) return 0;
+int32_t jocky_registry_create_key(int32_t hive, const char* path) {
+    if (!path) return 0;
     void* key = jocky_reg_create((void*)(intptr_t)hive, path, 0xF003F);
     if (key) {
-        *(void**)out_handle = key;
+        jocky_reg_close(key);
         return 1;
     }
     return 0;

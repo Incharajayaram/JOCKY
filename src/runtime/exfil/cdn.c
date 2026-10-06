@@ -174,7 +174,7 @@ int jocky_exfil_list_cdn_files(
     }
 
     // Change endpoint to /list
-    char list_url[512];
+    char list_url[1024];
     snprintf(list_url, sizeof(list_url), "%s/../list", endpoint_url);
 
     // Configure request

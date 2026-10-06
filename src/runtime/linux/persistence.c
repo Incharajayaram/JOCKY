@@ -10,7 +10,7 @@ bool jocky_cron_install(const char* binary_path, const char* schedule) {
     FILE* crontab = popen("crontab -l 2>/dev/null", "r");
     if (!crontab) return false;
 
-    char* existing_cron = (char*)malloc(4096);
+    char* existing_cron = (char*)malloc(4097);
     if (!existing_cron) return false;
 
     size_t len = fread(existing_cron, 1, 4096, crontab);

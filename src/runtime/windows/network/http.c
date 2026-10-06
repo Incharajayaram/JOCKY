@@ -30,13 +30,17 @@ int64_t jocky_http_get(const char* url, int8_t* out_buf, int64_t max_size) {
     if (buffer) {
         while (InternetReadFile(hInternetFile, buffer, bufferSize, &dwBytesRead)) {
             if (dwBytesRead == 0) break;
-            if (total_read + dwBytesRead <= (uint64_t)max_size) {
-                memcpy(out_buf + total_read, buffer, dwBytesRead);
-            }
-            total_read += dwBytesRead;
+            int64_t space = max_size - 1 - total_read;
+            if (space <= 0) break;
+            int64_t copy = (dwBytesRead < (DWORD)space) ? (int64_t)dwBytesRead : space;
+            memcpy(out_buf + total_read, buffer, (size_t)copy);
+            total_read += copy;
         }
         free(buffer);
     }
+
+    if (total_read >= 0 && total_read < max_size)
+        out_buf[total_read] = '\0';
 
     InternetCloseHandle(hInternetFile);
     InternetCloseHandle(hInternetSession);

