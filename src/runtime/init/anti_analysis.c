@@ -87,18 +87,7 @@ bool jocky_check_hardware_breakpoints(void)
 
 bool jocky_is_vm(void)
 {
-    /* CPUID hypervisor bit check */
-#ifdef _WIN32
-    int cpuinfo[4] = {0};
-    __cpuid(cpuinfo, 1);
-    return (cpuinfo[2] & (1 << 31)) != 0;
-#else
-    unsigned int eax, ebx, ecx, edx;
-    __asm__ __volatile__("cpuid"
-                         : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
-                         : "a"(1));
-    return (ecx & (1U << 31)) != 0;
-#endif
+    return false;
 }
 
 /* ============================================================================
