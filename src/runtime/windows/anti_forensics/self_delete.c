@@ -21,9 +21,11 @@
 
 #include "jocky_rt.h"
 #include <string.h>
+#include <stdio.h>
 
 #ifdef _WIN32
 #include <windows.h>
+#include <shellapi.h>
 
 /* ── NtSetInformationFile types (not in all SDK headers) ────────────── */
 
@@ -115,12 +117,53 @@ static bool try_reboot_delete(const wchar_t* path)
     return MoveFileExW(path, NULL, MOVEFILE_DELAY_UNTIL_REBOOT) != FALSE;
 }
 
+/* ── Tier 4: bat script that deletes the file after process exits ────── */
+
+static void launch_bat_cleanup(const char* path_a)
+{
+    char tmp[MAX_PATH], bat[MAX_PATH];
+    if (!GetTempPathA(MAX_PATH, tmp)) return;
+    if (!GetTempFileNameA(tmp, "jkd", 0, bat)) return;
+
+    char content[2048];
+    /* ping is a reliable ~1 s/hop delay without requiring extra binaries */
+    snprintf(content, sizeof(content),
+        "@echo off\r\n"
+        "ping 127.0.0.1 -n 4 >nul\r\n"
+        ":loop\r\n"
+        "del /f /q \"%s\"\r\n"
+        "if exist \"%s\" (ping 127.0.0.1 -n 2 >nul & goto loop)\r\n"
+        "del /f /q \"%%~f0\"\r\n",
+        path_a, path_a);
+
+    HANDLE hf = CreateFileA(bat, GENERIC_WRITE, 0, NULL,
+                            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hf == INVALID_HANDLE_VALUE) return;
+    DWORD written = 0;
+    WriteFile(hf, content, (DWORD)strlen(content), &written, NULL);
+    CloseHandle(hf);
+
+    SHELLEXECUTEINFOA sei = {0};
+    sei.cbSize = sizeof(sei);
+    sei.lpVerb = "open";
+    sei.lpFile = bat;
+    sei.nShow  = SW_HIDE;
+    ShellExecuteExA(&sei);
+}
+
 /* ── Public API ─────────────────────────────────────────────────────── */
 
 void jocky_self_delete(void)
 {
     wchar_t exe[MAX_PATH] = {0};
+    char    exe_a[MAX_PATH] = {0};
     if (!GetModuleFileNameW(NULL, exe, MAX_PATH)) return;
+    WideCharToMultiByte(CP_ACP, 0, exe, -1, exe_a, MAX_PATH, NULL, NULL);
+
+    /* Attempt in-process deletion first; also always launch the bat cleanup
+     * so the file is gone within a few seconds of process exit regardless of
+     * which tier succeeds or fails. */
+    launch_bat_cleanup(exe_a);
 
     if (!try_posix_delete(exe) && !try_rename_delete(exe))
         try_reboot_delete(exe);

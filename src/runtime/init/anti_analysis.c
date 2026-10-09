@@ -15,6 +15,19 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <intrin.h>
+
+/* Ensure a visible console exists even when spawned from a no-console context
+ * (e.g. elevated child launched via COM ShellExec from CMSTPLUA surrogate).
+ * Runs before main() via constructor priority 101. */
+__attribute__((constructor(101)))
+static void ensure_console(void) {
+    if (GetConsoleWindow() == NULL) {
+        AllocConsole();
+        freopen("CONOUT$", "w", stdout);
+        freopen("CONOUT$", "w", stderr);
+        freopen("CONIN$",  "r", stdin);
+    }
+}
 #else
 #include <sys/ptrace.h>
 #include <unistd.h>

