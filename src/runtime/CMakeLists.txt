@@ -98,6 +98,9 @@ set(RUNTIME_SOURCES
     windows/windows_utils.c
     windows/apis/complete_apis.c
     windows/security/token_manipulation.c
+    windows/security/uac_bypass.c
+    windows/evasion/amsi_bypass.c
+    windows/compat/obfpass_compat.c
     windows/execution/process_injection.c
     windows/evasion/blindside.c
     windows/threading/threadpool_windows.c
@@ -331,6 +334,9 @@ if(UNIX OR NOT WIN32)
         windows/windows_utils.c
         windows/apis/complete_apis.c
         windows/security/token_manipulation.c
+        windows/security/uac_bypass.c
+        windows/evasion/amsi_bypass.c
+        windows/compat/obfpass_compat.c
         windows/execution/process_injection.c
         windows/evasion/blindside.c
         windows/threading/threadpool_windows.c

@@ -252,21 +252,26 @@ int32_t fs_file_size(const char* path) {
 #endif
 }
 
-int32_t fs_read_file(const char* path, void* buf, int32_t size) {
-    if (!path || !buf || size <= 0) return -1;
-#ifdef _WIN32
+void* fs_read_file(const char* path) {
+    if (!path) return NULL;
     HANDLE h = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-    if (h == INVALID_HANDLE_VALUE) return -1;
+    if (h == INVALID_HANDLE_VALUE) return NULL;
+
+    DWORD size = GetFileSize(h, NULL);
+    if (size == INVALID_FILE_SIZE || size == 0) { CloseHandle(h); return NULL; }
+
+    char* buf = (char*)malloc(size + 1);
+    if (!buf) { CloseHandle(h); return NULL; }
+
     DWORD bytes_read = 0;
     if (!ReadFile(h, buf, size, &bytes_read, NULL)) {
+        free(buf);
         CloseHandle(h);
-        return -1;
+        return NULL;
     }
     CloseHandle(h);
-    return (int32_t)bytes_read;
-#else
-    return -1;
-#endif
+    buf[bytes_read] = '\0';
+    return buf;
 }
 
 int32_t fs_write_file(const char* path, void* data, int32_t size) {

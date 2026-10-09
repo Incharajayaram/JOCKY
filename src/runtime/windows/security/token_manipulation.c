@@ -285,6 +285,22 @@ int jocky_is_system_user(void) {
     return is_system;
 }
 
+int jocky_is_admin(void) {
+    BOOL is_admin = FALSE;
+    PSID admin_sid = NULL;
+    SID_IDENTIFIER_AUTHORITY nt_authority = SECURITY_NT_AUTHORITY;
+
+    if (!AllocateAndInitializeSid(&nt_authority, 2,
+            SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS,
+            0, 0, 0, 0, 0, 0, &admin_sid)) {
+        return 0;
+    }
+
+    CheckTokenMembership(NULL, admin_sid, &is_admin);
+    FreeSid(admin_sid);
+    return is_admin ? 1 : 0;
+}
+
 int jocky_restore_original_token(void) {
     if (!g_original_token) {
         RevertToSelf();

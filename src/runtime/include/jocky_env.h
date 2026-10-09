@@ -34,6 +34,9 @@ long jocky_getuid(void);
  */
 long jocky_getgid(void);
 
+/* Returns 1 if effective UID is 0 (root), 0 otherwise. */
+int jocky_is_root(void);
+
 /**
  * Get username from UID.
  * buffer must be at least 256 bytes.

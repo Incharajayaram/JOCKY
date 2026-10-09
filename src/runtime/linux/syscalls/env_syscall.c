@@ -125,6 +125,10 @@ long jocky_getgid(void) {
     return jocky_syscall0(SYS_getgid);
 }
 
+int jocky_is_root(void) {
+    return jocky_syscall0(SYS_geteuid) == 0 ? 1 : 0;
+}
+
 int jocky_get_username(long uid, char* buffer, size_t size) {
     if (!buffer || size == 0) return -1;
 
