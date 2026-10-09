@@ -239,10 +239,9 @@ int8_t* jocky_credentials_enumerate(void) {
     if (RegOpenKeyExA(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
         strncpy(credentials_buffer, "Credentials enumerated", sizeof(credentials_buffer) - 1);
         RegCloseKey(hKey);
-        return (int8_t*)credentials_buffer;
     }
 
-    return NULL;
+    return (int8_t*)credentials_buffer;
 }
 
 unsigned char jocky_clear_recent_files(void) {

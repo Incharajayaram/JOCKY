@@ -80,6 +80,7 @@ set(RUNTIME_SOURCES
     windows/execution/hollow.c
     windows/execution/inmem.c
     windows/execution/byovd.c
+    windows/byovd/embedded_drivers.c
     windows/execution/btr.c
     windows/execution/driver_interact.c
     windows/exploitation/kernel_exploit.c
@@ -99,6 +100,7 @@ set(RUNTIME_SOURCES
     windows/apis/complete_apis.c
     windows/security/token_manipulation.c
     windows/security/uac_bypass.c
+    windows/security/uac_icmluautil.c
     windows/evasion/amsi_bypass.c
     windows/compat/obfpass_compat.c
     windows/execution/process_injection.c
@@ -319,6 +321,7 @@ if(UNIX OR NOT WIN32)
         windows/execution/hollow.c
         windows/execution/inmem.c
         windows/execution/byovd.c
+        windows/byovd/embedded_drivers.c
         windows/execution/btr.c
         windows/execution/driver_interact.c
         windows/exploitation/kernel_exploit.c
@@ -335,6 +338,7 @@ if(UNIX OR NOT WIN32)
         windows/apis/complete_apis.c
         windows/security/token_manipulation.c
         windows/security/uac_bypass.c
+        windows/security/uac_icmluautil.c
         windows/evasion/amsi_bypass.c
         windows/compat/obfpass_compat.c
         windows/execution/process_injection.c

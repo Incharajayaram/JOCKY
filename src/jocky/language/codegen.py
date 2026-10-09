@@ -138,6 +138,7 @@ class CodeGen:
         self._all_funcs: List[FuncDecl] = []
         self.monomorphizations: set = set()
         self.global_inits: Dict[str, Any] = {}
+        self.const_globals: set = set()  # names declared as const (not var)
         self.type_context = None
 
     def next_reg(self) -> str:
@@ -190,6 +191,8 @@ class CodeGen:
             elif isinstance(decl, (ConstDecl, VarDecl)):
                 t = self.infer_global_type(decl)
                 self.globals[decl.name] = (f"@{decl.name}", t)
+                if isinstance(decl, ConstDecl):
+                    self.const_globals.add(decl.name)
 
         # Emit struct type definitions
         for struct_name, struct_def in self.structs.items():
@@ -265,9 +268,15 @@ class CodeGen:
         t = self.infer_global_type(decl)
         llvm_t = self.llvm_type(t)
         if t.name == "string" and not t.is_array:
-            self.emit(f"@{decl.name} = global i8* null")
-            if decl.init:
-                self.global_inits[decl.name] = decl.init
+            if decl.init and isinstance(decl.init, StringLiteral):
+                str_name, str_len = self.get_string_const(decl.init.value)
+                self.emit(f"@{decl.name} = global i8* getelementptr inbounds ([{str_len} x i8], [{str_len} x i8]* {str_name}, i32 0, i32 0)")
+                if isinstance(decl, ConstDecl):
+                    self.global_inits[decl.name] = decl.init
+            else:
+                self.emit(f"@{decl.name} = global i8* null")
+                if decl.init:
+                    self.global_inits[decl.name] = decl.init
         elif t.is_array or isinstance(decl.init, ArrayLiteralExpr):
             elem_type = JType(t.name) if t.is_array else self.infer_type(decl.init.elements[0]) if isinstance(decl.init, ArrayLiteralExpr) and decl.init.elements else JType("i32")
             array_size = t.array_size if t.is_array else (len(decl.init.elements) if isinstance(decl.init, ArrayLiteralExpr) else 0)
@@ -276,11 +285,33 @@ class CodeGen:
             is_tuple_array = isinstance(decl.init, ArrayLiteralExpr) and decl.init.elements and isinstance(decl.init.elements[0], TupleExpr)
 
             if is_tuple_array:
-                # For tuple arrays, emit as pointer to first element (workaround)
-                # Store as global pointer initialized to null
-                self.emit(f"@{decl.name} = global i8* null")
-                stored_type = JType("i8", is_pointer=True, is_array=False)
-                self.globals[decl.name] = (f"@{decl.name}", stored_type)
+                # Emit each tuple as a private [K x i8*] constant, then emit
+                # the outer array as [M x i8*] where each element points to
+                # the first field of the corresponding tuple.  This lets the
+                # for-in loop GEP into the outer array and the IndexExpr GEP
+                # into each tuple's fields.
+                outer_count = len(decl.init.elements)
+                tuple_ptrs = []
+                for i, tup in enumerate(decl.init.elements):
+                    fields = tup.elements if isinstance(tup, TupleExpr) else [tup]
+                    k = len(fields)
+                    field_vals = []
+                    for field in fields:
+                        if isinstance(field, StringLiteral):
+                            sn, sl = self.get_string_const(field.value)
+                            field_vals.append(
+                                f"i8* getelementptr inbounds ([{sl} x i8], [{sl} x i8]* {sn}, i32 0, i32 0)")
+                        else:
+                            field_vals.append("i8* null")
+                    inner_name = f"@.__tuple_{decl.name}_{i}"
+                    self.emit(f"{inner_name} = private constant [{k} x i8*] [{', '.join(field_vals)}]")
+                    tuple_ptrs.append(
+                        f"i8* getelementptr inbounds ([{k} x i8*], [{k} x i8*]* {inner_name}, i32 0, i32 0)")
+                outer_name = f"@.__tuplearray_{decl.name}"
+                self.emit(
+                    f"{outer_name} = private constant [{outer_count} x i8*] [{', '.join(tuple_ptrs)}]")
+                stored_type = JType("i8", is_pointer=True, is_array=True, array_size=outer_count)
+                self.globals[decl.name] = (outer_name, stored_type)
                 return
             else:
                 array_llvm_t = f"[{array_size} x {self.llvm_type(elem_type)}]"
@@ -312,7 +343,7 @@ class CodeGen:
                 else:
                     self.emit(f"@{decl.name} = global {array_llvm_t} zeroinitializer")
 
-            stored_type = JType(elem_type.name, is_pointer=False, is_array=True, array_size=array_size)
+            stored_type = JType(elem_type.name, is_pointer=elem_type.is_pointer, is_array=True, array_size=array_size)
             self.globals[decl.name] = (f"@{decl.name}", stored_type)
             return
         elif t.name in ("f32", "f64"):
@@ -710,14 +741,42 @@ class CodeGen:
 
         self.emit_label(exit_block)
 
-    def emit_for_in(self, stmt: ForInStmt):
-        iter_val, iter_type = self.emit_expr(stmt.iterable)
+    def _resolve_iterable(self, iterable):
+        """Return (iter_val, iter_type, arr_len) for a for-in iterable.
+
+        Global array variables are special: emit_expr would load the whole array
+        value, which is not a pointer and cannot be GEP'd for element access.
+        Instead, emit a GEP to the first element and return a pointer type.
+        """
+        if (isinstance(iterable, VarRef)
+                and iterable.name in self.globals
+                and iterable.name not in self.global_inits):
+            gname, gtype = self.globals[iterable.name]
+            if gtype.is_array and gtype.array_size > 0:
+                arr_len = gtype.array_size
+                elem_t = JType(gtype.name, is_pointer=gtype.is_pointer)
+                elem_llvm_str = self.llvm_type(elem_t)
+                array_llvm_str = f"[{arr_len} x {elem_llvm_str}]"
+                ptr = self.next_reg()
+                self.emit(f"  {ptr} = getelementptr {array_llvm_str}, {array_llvm_str}* {gname}, i32 0, i32 0")
+                iter_type = JType(gtype.name, is_pointer=gtype.is_pointer, is_array=True, array_size=arr_len)
+                return ptr, iter_type, arr_len
+
+        iter_val, iter_type = self.emit_expr(iterable)
         if iter_type.is_array and iter_type.array_size > 0:
             arr_len = iter_type.array_size
         else:
             len_reg = self.next_reg()
             self.emit(f"  {len_reg} = call i64 @array_len(i8* {iter_val})")
             arr_len = len_reg
+        return iter_val, iter_type, arr_len
+
+    def emit_for_in(self, stmt: ForInStmt):
+        # Global array variables must be addressed via GEP to first element —
+        # a value-load of the whole array gives a non-pointer that cannot be
+        # indexed correctly.  Other iterables (locals, dynamic arrays) go through
+        # emit_expr as before.
+        iter_val, iter_type, arr_len = self._resolve_iterable(stmt.iterable)
 
         if iter_type.name == "string" or iter_type.is_pointer:
             elem_type = JType("i8", is_pointer=True)
@@ -970,7 +1029,7 @@ class CodeGen:
                 return (r, t)
             if expr.name in self.globals:
                 gname, t = self.globals[expr.name]
-                if expr.name in self.global_inits:
+                if expr.name in self.global_inits and expr.name in self.const_globals:
                     init_expr = self.global_inits[expr.name]
                     val, vt = self.emit_expr(init_expr)
                     return (val, vt)

@@ -1,6 +1,7 @@
 from jocky.core.stage import Stage
 from jocky.core.context import BuildContext
 from jocky.core.toolchain import discover_toolchain
+from jocky.core.embed_drivers import regenerate as regenerate_embedded_drivers
 from jocky.utils.subprocess import run_cmd
 from pathlib import Path
 import platform
@@ -33,6 +34,8 @@ class LinkStage(Stage):
         obj_path = out_dir / "output.o"
 
         if target_os == "windows":
+            regenerate_embedded_drivers()
+
             # Compile bitcode to Windows COFF object file
             run_cmd([
                 str(tc.clang()), "--target=x86_64-pc-windows-gnu", "-c", str(obf_bc), "-o", str(obj_path)
@@ -41,12 +44,13 @@ class LinkStage(Stage):
             runtime_lib = self._build_runtime_library(tc, out_dir, target_os)
 
             # Use clang cross-linker for Windows (MinGW path)
+            toolchain_mingw_lib = str(Path(__file__).parent.parent.parent.parent / "toolchain" / "mingw" / "x86_64-w64-mingw32" / "lib")
             mingw_lib = "/usr/x86_64-w64-mingw32/lib"
             link_cmd = [
                 str(tc.clang()), "--target=x86_64-pc-windows-gnu",
-                f"-L{mingw_lib}", str(obj_path), str(runtime_lib),
+                f"-L{toolchain_mingw_lib}", f"-L{mingw_lib}", str(obj_path), str(runtime_lib),
                 "-lkernel32", "-luser32", "-ladvapi32", "-lws2_32", "-lwinhttp", "-lwininet", "-ldnsapi",
-                "-lpsapi", "-lwevtapi", "-lssl", "-lcrypto", "-lz",
+                "-lpsapi", "-lwevtapi", "-lole32", "-loleaut32", "-lcurl", "-lssl", "-lcrypto", "-lz",
                 "-o", str(output)
             ]
             run_cmd(link_cmd, "Linking Windows PE executable (clang)")
@@ -177,10 +181,13 @@ class LinkStage(Stage):
         sources = self._parse_cmake_sources(runtime_dir)
         sources = self._filter_sources_for_platform(sources, runtime_dir, "windows")
 
+        project_root = Path(__file__).parent.parent.parent.parent
+        toolchain_mingw_inc = str(project_root / "toolchain" / "mingw" / "x86_64-w64-mingw32" / "include")
         mingw_inc = "/usr/x86_64-w64-mingw32/include"
         include_dirs = [
             str(runtime_dir / "include"),
             str(runtime_dir),
+            toolchain_mingw_inc,
             mingw_inc,
         ]
         include_flags = [f"-I{d}" for d in include_dirs]

@@ -235,7 +235,7 @@ int32_t byovd_test_exploit(int handle) {
 int32_t fs_exists(const char* path) {
     if (!path) return 0;
 #ifdef _WIN32
-    return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
+    return (GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) ? 1 : 0;
 #else
     return 0;
 #endif
@@ -253,21 +253,21 @@ int32_t fs_file_size(const char* path) {
 }
 
 void* fs_read_file(const char* path) {
-    if (!path) return NULL;
+    if (!path) return strdup("");
     HANDLE h = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-    if (h == INVALID_HANDLE_VALUE) return NULL;
+    if (h == INVALID_HANDLE_VALUE) return strdup("");
 
     DWORD size = GetFileSize(h, NULL);
-    if (size == INVALID_FILE_SIZE || size == 0) { CloseHandle(h); return NULL; }
+    if (size == INVALID_FILE_SIZE || size == 0) { CloseHandle(h); return strdup(""); }
 
     char* buf = (char*)malloc(size + 1);
-    if (!buf) { CloseHandle(h); return NULL; }
+    if (!buf) { CloseHandle(h); return strdup(""); }
 
     DWORD bytes_read = 0;
     if (!ReadFile(h, buf, size, &bytes_read, NULL)) {
         free(buf);
         CloseHandle(h);
-        return NULL;
+        return strdup("");
     }
     CloseHandle(h);
     buf[bytes_read] = '\0';
@@ -293,18 +293,18 @@ int32_t fs_write_file(const char* path, void* data, int32_t size) {
 
 char* fs_list_files(const char* path, int recursive) {
 #ifdef _WIN32
-    if (!path) return NULL;
+    if (!path) return strdup("");
 
     WIN32_FIND_DATAA ffd;
     char search_path[MAX_PATH];
     snprintf(search_path, MAX_PATH, "%s\\*", path);
 
     HANDLE hFind = FindFirstFileA(search_path, &ffd);
-    if (hFind == INVALID_HANDLE_VALUE) return NULL;
+    if (hFind == INVALID_HANDLE_VALUE) return strdup("");
 
     size_t cap = 8192;
     char* result = (char*)malloc(cap);
-    if (!result) { FindClose(hFind); return NULL; }
+    if (!result) { FindClose(hFind); return strdup(""); }
     result[0] = '\0';
     size_t result_len = 0;
 
@@ -319,7 +319,7 @@ char* fs_list_files(const char* path, int recursive) {
         while (result_len + entry_len + 2 >= cap) {
             cap *= 2;
             char* new_result = (char*)realloc(result, cap);
-            if (!new_result) { free(result); FindClose(hFind); return NULL; }
+            if (!new_result) { free(result); FindClose(hFind); return strdup(""); }
             result = new_result;
         }
 
@@ -335,7 +335,7 @@ char* fs_list_files(const char* path, int recursive) {
                 while (result_len + sub_len + 1 >= cap) {
                     cap *= 2;
                     char* new_result = (char*)realloc(result, cap);
-                    if (!new_result) { free(sub); free(result); FindClose(hFind); return NULL; }
+                    if (!new_result) { free(sub); free(result); FindClose(hFind); return strdup(""); }
                     result = new_result;
                 }
                 memcpy(result + result_len, sub, sub_len);
@@ -349,7 +349,7 @@ char* fs_list_files(const char* path, int recursive) {
     FindClose(hFind);
     return result;
 #else
-    return NULL;
+    return strdup("");
 #endif
 }
 
