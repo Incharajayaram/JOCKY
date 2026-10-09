@@ -1,0 +1,12 @@
+name: evasive
+description: Heavy LLVM IR obfuscation safe for Windows cross-compile; no MLIR runtime stubs
+passes:
+  - bogus_control_flow
+  - flatten_cfg
+  - instruction_substitution
+  - linear_mba
+  - opaque_predicates
+  - indirect_call
+  - strip_signature
+  - pdata_strip
+optimization_level: 2
