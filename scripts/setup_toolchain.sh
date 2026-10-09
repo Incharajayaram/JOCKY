@@ -189,6 +189,114 @@ bundle_libstdcxx() {
 }
 bundle_libstdcxx
 
+# ── MinGW C headers (device-agnostic fix) ────────────────────────────────────
+# The toolchain ships with x86_64-w64-mingw32/include/ full of symlinks that
+# point to ../../share/mingw-w64/include/.  That share/ directory was itself a
+# symlink to an absolute path on the original developer's machine, which breaks
+# on every other host.  We fix it here in three steps:
+#   1. Replace the absolute symlink with a relative one.
+#   2. Populate toolchain/share/mingw-w64/ from the system install or a .deb.
+fix_mingw_headers() {
+    local share_dir="$TOOLCHAIN/share/mingw-w64"
+    local share_link="$TOOLCHAIN/mingw/share/mingw-w64"
+
+    # Step 1 — make the share link relative if it's currently an absolute path
+    if [ -L "$share_link" ] && [[ "$(readlink "$share_link")" = /* ]]; then
+        rm "$share_link"
+        ln -sf "../../share/mingw-w64" "$share_link"
+        info "Fixed MinGW share symlink: absolute → relative"
+    fi
+
+    # Step 2 — already have real headers under the resolved path
+    if [ -f "$share_dir/include/stdio.h" ]; then
+        ok "MinGW C headers already present"
+        return
+    fi
+
+    # Step 3a — use system-installed mingw-w64 headers (mingw-w64-x86-64-dev)
+    if [ -f "/usr/x86_64-w64-mingw32/include/stdio.h" ]; then
+        mkdir -p "$TOOLCHAIN/share"
+        ln -sfn "/usr/x86_64-w64-mingw32" "$share_dir"
+        ok "MinGW headers linked from system /usr/x86_64-w64-mingw32"
+        return
+    fi
+
+    # Step 3b — download mingw-w64-x86-64-dev from Ubuntu archive and extract
+    warn "MinGW C headers missing — downloading from Ubuntu archive"
+    local deb_url="http://archive.ubuntu.com/ubuntu/pool/universe/m/mingw-w64/mingw-w64-x86-64-dev_11.0.1-3build1_all.deb"
+    local tmpdir
+    tmpdir=$(mktemp -d)
+
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$deb_url" -o "$tmpdir/pkg.deb"
+    else
+        wget -q "$deb_url" -O "$tmpdir/pkg.deb"
+    fi
+
+    cd "$tmpdir"
+    ar x pkg.deb
+    local data_archive
+    data_archive=$(ls data.tar.* 2>/dev/null | head -1)
+    if [ -z "$data_archive" ]; then
+        warn "MinGW header download failed — Windows header compilation will fail"
+        rm -rf "$tmpdir"; cd - >/dev/null; return
+    fi
+
+    mkdir -p "$share_dir"
+    # Package layout: ./usr/x86_64-w64-mingw32/include/...
+    # Strip 3 components (. usr x86_64-w64-mingw32) → include/... under share_dir
+    tar -xf "$data_archive" \
+        --wildcards "*/x86_64-w64-mingw32/include/*" \
+        --strip-components=3 \
+        -C "$share_dir" 2>/dev/null
+
+    cd - >/dev/null
+    rm -rf "$tmpdir"
+
+    if [ -f "$share_dir/include/stdio.h" ]; then
+        ok "MinGW C headers extracted from Ubuntu package"
+    else
+        warn "MinGW header extraction may have failed — check $share_dir/include/"
+    fi
+}
+fix_mingw_headers
+
+# ── MinGW GCC runtime symlinks (device-agnostic fix) ─────────────────────────
+# toolchain/mingw/lib/gcc/x86_64-w64-mingw32/10-win32/ contains symlinks that
+# point to absolute paths on the original developer's machine.  The real files
+# live in toolchain/mingw/lib/10-win32/ — we rewire any broken link there to a
+# relative path.  Also fixes bin/gcc, bin/g++, bin/ld, bin/ar.
+fix_mingw_gcc_libs() {
+    local win32_real="$TOOLCHAIN/mingw/lib/10-win32"
+    local gcc_win32="$TOOLCHAIN/mingw/lib/gcc/x86_64-w64-mingw32/10-win32"
+
+    if [ -d "$win32_real" ] && [ -d "$gcc_win32" ]; then
+        local fixed=0
+        while IFS= read -r link; do
+            local name
+            name=$(basename "$link")
+            if [ -e "$win32_real/$name" ]; then
+                rm "$link"
+                ln -sf "../../../10-win32/$name" "$link"
+                fixed=$((fixed + 1))
+            fi
+        done < <(find "$gcc_win32" -maxdepth 1 -type l ! -exec test -e {} \; -print 2>/dev/null)
+        [ "$fixed" -gt 0 ] && ok "Fixed $fixed broken GCC runtime lib symlinks" || ok "GCC runtime lib symlinks OK"
+    fi
+
+    # Fix bin/gcc, bin/g++, bin/ld, bin/ar → same-dir versioned binaries
+    local mingw_bin="$TOOLCHAIN/mingw/bin"
+    for short in gcc g++ ld ar; do
+        local link="$mingw_bin/$short"
+        local versioned="$mingw_bin/x86_64-w64-mingw32-$short"
+        if [ -L "$link" ] && [ ! -e "$link" ] && [ -f "$versioned" ]; then
+            rm "$link"
+            ln -sf "x86_64-w64-mingw32-$short" "$link"
+        fi
+    done
+}
+fix_mingw_gcc_libs
+
 # ── execute permissions ───────────────────────────────────────────────────────
 chmod -R +x "$TOOLCHAIN/bin/" "$TOOLCHAIN/mingw/bin/" 2>/dev/null || true
 info "execute permissions set"
@@ -219,6 +327,10 @@ if [ -e "$TOOLCHAIN/bin/ld.lld" ]; then
 else
     warn "ld.lld not available — install lld for best cross-compilation support"
 fi
+
+[ -f "$TOOLCHAIN/mingw/x86_64-w64-mingw32/include/stdio.h" ] \
+    && ok "MinGW C headers — OK" \
+    || warn "MinGW C headers not resolving — run setup_toolchain.sh again or install mingw-w64-x86-64-dev"
 
 echo ""
 echo "Toolchain is ready."
