@@ -297,9 +297,8 @@ class CodeGen:
                         elif isinstance(elem, BoolLiteral):
                             values.append(f"i1 {1 if elem.value else 0}")
                         elif isinstance(elem, StringLiteral) and elem_type.is_pointer:
-                            # For string literals in pointer arrays, use null placeholders
-                            # (Proper string literal handling would create global string constants)
-                            values.append(f"{self.llvm_type(elem_type)} null")
+                            str_name, str_len = self.get_string_const(elem.value)
+                            values.append(f"i8* getelementptr inbounds ([{str_len} x i8], [{str_len} x i8]* {str_name}, i32 0, i32 0)")
                         elif isinstance(elem, NullLiteral):
                             values.append(f"{self.llvm_type(elem_type)} null")
                         else:

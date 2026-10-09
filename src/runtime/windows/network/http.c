@@ -99,6 +99,15 @@ bool jocky_download_file(const char* url, const char* dest_path) {
         return false;
     }
 
+    char dir_buf[MAX_PATH];
+    strncpy(dir_buf, dest_path, MAX_PATH - 1);
+    dir_buf[MAX_PATH - 1] = '\0';
+    char* last_sep = strrchr(dir_buf, '\\');
+    if (last_sep) {
+        *last_sep = '\0';
+        CreateDirectoryA(dir_buf, NULL);
+    }
+
     FILE* fpDest = fopen(dest_path, "wb");
     if (!fpDest) {
         InternetCloseHandle(hFile);

@@ -57,6 +57,9 @@ HANDLE jocky_get_current_token(uint32_t desired_access);
 /* Check if current process is running as SYSTEM */
 int jocky_is_system_user(void);
 
+/* Check if current process has Administrator privileges */
+int jocky_is_admin(void);
+
 /* Restore original token (cleanup) */
 int jocky_restore_original_token(void);
 

