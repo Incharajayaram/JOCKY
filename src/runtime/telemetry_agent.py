@@ -205,9 +205,10 @@ class TelemetryAgent:
 
     def send_batch(self, events: List[Dict[str, Any]]) -> bool:
         """
-        Send a batch of events to C2 backend with retry logic.
+        Send events to C2 backend with retry logic.
+        Sends each event individually to match backend API format.
 
-        Returns True if successful, False if all retries exhausted.
+        Returns True if all events sent successfully, False if any failed.
         """
         if not events:
             return True
@@ -218,45 +219,38 @@ class TelemetryAgent:
                 self.logger.info(f"Event (local): {json.dumps(event)}")
             return True
 
-        payload = {"events": events, "timestamp": datetime.utcnow().isoformat() + "Z"}
-
-        for attempt in range(self.max_retries):
-            try:
-                response = requests.post(
-                    self.c2_url,
-                    json=payload,
-                    timeout=5,
-                    verify=False,  # Allow self-signed certs
-                )
-                if response.status_code in (200, 201, 202):
-                    self.logger.info(
-                        f"Sent {len(events)} events to C2 (status={response.status_code})"
+        # Send each event individually
+        all_success = True
+        for event in events:
+            for attempt in range(self.max_retries):
+                try:
+                    response = requests.post(
+                        self.c2_url,
+                        json=event,  # Send event directly, not wrapped
+                        timeout=5,
+                        verify=False,  # Allow self-signed certs
                     )
-                    return True
-                else:
-                    self.logger.warning(
-                        f"C2 returned status {response.status_code}: {response.text[:100]}"
-                    )
+                    if response.status_code in (200, 201, 202):
+                        self.logger.info(
+                            f"Sent event: {event.get('event_type')} (status={response.status_code})"
+                        )
+                        break  # Move to next event
+                    else:
+                        self.logger.warning(
+                            f"Event send failed (status={response.status_code}): {response.text[:200]}"
+                        )
+                except Exception as e:
+                    self.logger.warning(f"Attempt {attempt + 1}/{self.max_retries}: {e}")
                     if attempt < self.max_retries - 1:
-                        wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
-                        self.logger.info(f"Retrying in {wait_time}s...")
-                        time.sleep(wait_time)
-            except requests.exceptions.ConnectionError as e:
-                self.logger.warning(f"C2 connection failed (attempt {attempt + 1}/{self.max_retries}): {e}")
-                if attempt < self.max_retries - 1:
-                    wait_time = 2 ** attempt
-                    time.sleep(wait_time)
-            except requests.exceptions.Timeout:
-                self.logger.warning(f"C2 request timeout (attempt {attempt + 1}/{self.max_retries})")
-                if attempt < self.max_retries - 1:
-                    wait_time = 2 ** attempt
-                    time.sleep(wait_time)
-            except Exception as e:
-                self.logger.error(f"Unexpected error sending to C2: {e}")
-                return False
+                        time.sleep(2 ** attempt)  # Exponential backoff
+                        continue
+                    all_success = False
+                    break
+            else:
+                # All retries exhausted for this event
+                all_success = False
 
-        self.logger.error(f"Failed to send {len(events)} events after {self.max_retries} retries")
-        return False
+        return all_success
 
     def batch_and_send_worker(self) -> None:
         """
