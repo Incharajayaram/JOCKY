@@ -571,8 +571,23 @@ def stage_link(obj_path, runtime_objs, build_dir, output_name, platform="windows
         log("LINK", "ld.lld not found, using default linker (run setup_toolchain.sh)")
 
     win_sysroot_lib = TOOLCHAIN / "mingw" / "x86_64-w64-mingw32" / "lib"
-    sysroot_link_flags = ["-L", str(win_sysroot_lib)] if win_sysroot_lib.exists() else []
-    third_party_libs = ["-lcurl", "-lssl", "-lcrypto", "-lz", "-lpthread"] if win_sysroot_lib.exists() else []
+    gcc_runtime_lib = TOOLCHAIN / "mingw" / "lib" / "gcc" / "x86_64-w64-mingw32" / "10-win32"
+    sysroot_link_flags = []
+    if win_sysroot_lib.exists():
+        sysroot_link_flags += ["-L", str(win_sysroot_lib)]
+    if gcc_runtime_lib.exists():
+        sysroot_link_flags += ["-L", str(gcc_runtime_lib)]
+    third_party_libs = []
+    if win_sysroot_lib.exists():
+        for lib, flag in [("libcurl.a", "-lcurl"), ("libssl.a", "-lssl"),
+                          ("libcrypto.a", "-lcrypto"), ("libz.a", "-lz")]:
+            if (win_sysroot_lib / lib).exists():
+                third_party_libs.append(flag)
+        # Link winpthread statically so libwinpthread-1.dll is not required on the target
+        if (win_sysroot_lib / "libwinpthread.a").exists():
+            third_party_libs += ["-Wl,-Bstatic", "-lpthread", "-Wl,-Bdynamic"]
+        elif (win_sysroot_lib / "libpthread.a").exists():
+            third_party_libs += ["-Wl,-Bstatic", "-lpthread", "-Wl,-Bdynamic"]
     win_system_libs = ["-lntdll", "-lwinhttp", "-lwininet", "-ldnsapi", "-lwevtapi",
                        "-ladvapi32", "-lkernel32", "-lws2_32", "-lpsapi",
                        "-lcrypt32", "-lgdi32", "-lwldap32"]
