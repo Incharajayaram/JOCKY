@@ -531,6 +531,14 @@
                         <div class="metric-label">Exfil Channels</div>
                         <div class="metric-value" id="metricsExfil">0/5</div>
                     </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Forensic Artifacts</div>
+                        <div class="metric-value" id="metricsForensic">0</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Anti-Forensics</div>
+                        <div class="metric-value" id="metricsAntiForensic">0/18</div>
+                    </div>
                 </div>
             </div>
 
@@ -547,6 +555,36 @@
                     </div>
                     <div class="phase-info">
                         <span id="currentPhase">Waiting for execution...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Driver Load Attempts -->
+            <div class="panel">
+                <div class="panel-header">BYOVD Driver Load Attempts</div>
+                <div id="driverAttempts" style="max-height: 300px; overflow-y: auto;">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; padding: 1rem; text-align: center;">
+                        No driver attempts yet
+                    </div>
+                </div>
+            </div>
+
+            <!-- Exfil Channel Status -->
+            <div class="panel">
+                <div class="panel-header">Exfil Channel Status</div>
+                <div id="exfilChannels" style="max-height: 300px; overflow-y: auto;">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; padding: 1rem; text-align: center;">
+                        No exfil attempts yet
+                    </div>
+                </div>
+            </div>
+
+            <!-- Forensic Analysis Results -->
+            <div class="panel">
+                <div class="panel-header">Forensic Analysis Results</div>
+                <div id="forensicResults" style="max-height: 300px; overflow-y: auto;">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; padding: 1rem; text-align: center;">
+                        No forensic data yet
                     </div>
                 </div>
             </div>
@@ -601,6 +639,8 @@
                     dataCollected: 0,
                     exfilChannels: 0,
                     exfilTotal: 5,
+                    forensicArtifacts: 0,
+                    antiForensicCount: 0,
                 };
 
                 this.initializeUI();
@@ -699,6 +739,9 @@
                     message,
                     timestamp,
                     metrics: dataMetrics,
+                    driver_attempt,
+                    exfil_attempt,
+                    forensic_result,
                 } = data;
 
                 // Add event to feed
@@ -712,6 +755,21 @@
                 // Update metrics
                 if (dataMetrics) {
                     this.updateMetrics(dataMetrics);
+                }
+
+                // Handle driver attempt
+                if (driver_attempt) {
+                    this.addDriverAttempt(driver_attempt);
+                }
+
+                // Handle exfil attempt
+                if (exfil_attempt) {
+                    this.addExfilAttempt(exfil_attempt);
+                }
+
+                // Handle forensic result
+                if (forensic_result) {
+                    this.addForensicResult(forensic_result);
                 }
             }
 
@@ -754,6 +812,97 @@
                 document.getElementById('phasePercentage').textContent = `${percentage}%`;
             }
 
+            addDriverAttempt(driverAttempt) {
+                this.metrics.driversAttempted++;
+                if (driverAttempt.status === 'success') {
+                    this.metrics.driversSuccess++;
+                }
+
+                const container = document.getElementById('driverAttempts');
+                if (container.innerHTML.includes('No driver attempts')) {
+                    container.innerHTML = '';
+                }
+
+                const entry = document.createElement('div');
+                entry.style.cssText = 'padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 4px; border-left: 3px solid; font-size: 0.85rem; font-family: monospace; background: rgba(0,0,0,0.3);';
+                entry.style.borderLeftColor = driverAttempt.status === 'success' ? 'var(--accent-green)' : 'var(--accent-red)';
+
+                const time = new Date(driverAttempt.timestamp || Date.now()).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                entry.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                        <span style="color: var(--accent-blue);">${driverAttempt.driver_name}</span>
+                        <span style="color: var(--text-secondary); font-size: 0.8rem;">[${driverAttempt.timestamp ? new Date(driverAttempt.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}]</span>
+                    </div>
+                    <div style="display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-secondary);">
+                        <span>Device: ${driverAttempt.device_path}</span>
+                        <span style="color: ${driverAttempt.status === 'success' ? 'var(--accent-green)' : 'var(--accent-red)'};">${driverAttempt.status.toUpperCase()}</span>
+                        ${driverAttempt.error_code ? `<span>Error: ${driverAttempt.error_code}</span>` : ''}
+                    </div>
+                `;
+                container.insertBefore(entry, container.firstChild);
+            }
+
+            addExfilAttempt(exfilAttempt) {
+                this.metrics.exfilChannels++;
+
+                const container = document.getElementById('exfilChannels');
+                if (container.innerHTML.includes('No exfil attempts')) {
+                    container.innerHTML = '';
+                }
+
+                const entry = document.createElement('div');
+                entry.style.cssText = 'padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 4px; border-left: 3px solid; font-size: 0.85rem; font-family: monospace; background: rgba(0,0,0,0.3);';
+                entry.style.borderLeftColor = exfilAttempt.status === 'success' ? 'var(--accent-green)' : 'var(--accent-red)';
+
+                entry.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                        <span style="color: var(--accent-blue);">${exfilAttempt.channel}</span>
+                        <span style="color: ${exfilAttempt.status === 'success' ? 'var(--accent-green)' : 'var(--accent-red)'};">${exfilAttempt.status.toUpperCase()}</span>
+                    </div>
+                    <div style="display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-secondary);">
+                        <span>Bytes: ${exfilAttempt.bytes_sent || 0}</span>
+                        ${exfilAttempt.error ? `<span style="color: var(--accent-red);">Error: ${exfilAttempt.error}</span>` : ''}
+                    </div>
+                `;
+                container.insertBefore(entry, container.firstChild);
+            }
+
+            addForensicResult(forensicResult) {
+                this.metrics.forensicArtifacts++;
+
+                const container = document.getElementById('forensicResults');
+                if (container.innerHTML.includes('No forensic data')) {
+                    container.innerHTML = '';
+                }
+
+                const entry = document.createElement('div');
+                entry.style.cssText = 'padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 4px; border-left: 3px solid var(--accent-blue); font-size: 0.85rem; font-family: monospace; background: rgba(0,0,0,0.3);';
+
+                const artifactNames = {
+                    'event_logs': 'Event Logs',
+                    'registry_hives': 'Registry Hives',
+                    'mft_analysis': 'MFT Analysis',
+                    'jump_lists': 'Jump Lists',
+                    'browser_artifacts': 'Browser Artifacts',
+                    'process_tree': 'Process Tree',
+                    'timeline': 'Forensic Timeline',
+                    'correlation': 'Correlation Analysis',
+                };
+
+                const name = artifactNames[forensicResult.artifact_type] || forensicResult.artifact_type;
+                entry.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                        <span style="color: var(--accent-blue);">${name}</span>
+                        <span style="color: var(--text-secondary); font-size: 0.8rem;">${forensicResult.timestamp ? new Date(forensicResult.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                    </div>
+                    <div style="display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-secondary);">
+                        <span>Records: ${forensicResult.record_count || 0}</span>
+                        <span>Size: ${this.formatBytes(forensicResult.size_bytes || 0)}</span>
+                    </div>
+                `;
+                container.insertBefore(entry, container.firstChild);
+            }
+
             updateMetrics(data) {
                 if (data.edr_techniques !== undefined) {
                     this.metrics.edrTechniques = data.edr_techniques;
@@ -785,6 +934,10 @@
                     this.formatBytes(this.metrics.dataCollected);
                 document.getElementById('metricsExfil').textContent =
                     `${this.metrics.exfilChannels}/${this.metrics.exfilTotal}`;
+                document.getElementById('metricsForensic').textContent =
+                    this.metrics.forensicArtifacts;
+                document.getElementById('metricsAntiForensic').textContent =
+                    `${this.metrics.antiForensicCount}/18`;
             }
 
             addEvent(phase, eventType, status, message, timestamp) {
@@ -917,6 +1070,61 @@
                 const i = Math.floor(Math.log(bytes) / Math.log(k));
                 return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
             }
+
+            async loadExfilData() {
+                try {
+                    const response = await fetch('/api/exfil/all');
+                    const data = await response.json();
+
+                    const container = document.getElementById('exfil-content');
+                    if (!container) return;
+
+                    if (!data.exfil_files || data.exfil_files.length === 0) {
+                        container.innerHTML = '<p style="color: var(--text-secondary); padding: 1rem; text-align: center;">No exfil data collected yet</p>';
+                        return;
+                    }
+
+                    let html = `<div style="padding: 1rem;">`;
+                    html += `<h3 style="margin-bottom: 1rem; color: var(--accent-green);">Exfiltrated Data (${data.total} files)</h3>`;
+
+                    for (const file of data.exfil_files) {
+                        if (file.error) {
+                            html += `<div style="margin: 10px 0; padding: 10px; background: #2a1a1a; border-left: 3px solid var(--accent-red); border-radius: 4px;">
+                                <strong>${file.filename}</strong> - Error: ${file.error}
+                            </div>`;
+                            continue;
+                        }
+
+                        html += `<div style="margin: 15px 0; padding: 15px; background: var(--bg-secondary); border-left: 3px solid var(--accent-green); border-radius: 4px; border: 1px solid var(--border-color);">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                                <strong style="color: var(--accent-green);">${this.escapeHtml(file.filename)}</strong>
+                                <span style="color: var(--text-secondary); font-size: 0.9em;">${this.formatBytes(file.size)} | ${file.mtime}</span>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px; font-size: 0.9em;">
+                                <div><span style="color: var(--text-secondary);">Lines:</span> <span style="color: var(--accent-green);">${file.summary.total_lines}</span></div>
+                                <div><span style="color: var(--text-secondary);">Passwords:</span> <span style="color: var(--accent-yellow);">${file.summary.password_lines}</span></div>
+                                <div><span style="color: var(--text-secondary);">Credentials:</span> <span style="color: var(--accent-yellow);">${file.summary.credential_lines}</span></div>
+                                <div><span style="color: var(--text-secondary);">Paths:</span> <span style="color: var(--accent-blue);">${file.summary.path_lines}</span></div>
+                            </div>
+                            <details style="margin: 10px 0;">
+                                <summary style="cursor: pointer; color: var(--accent-green); padding: 5px; font-weight: 600;">Show Full Content</summary>
+                                <pre style="background: var(--bg-primary); padding: 10px; overflow-x: auto; font-size: 0.8em; max-height: 400px; margin: 10px 0; border: 1px solid var(--border-color); border-radius: 4px;">${this.escapeHtml(file.plaintext)}</pre>
+                            </details>
+                        </div>`;
+                    }
+                    html += `</div>`;
+                    container.innerHTML = html;
+                } catch (err) {
+                    console.error('Error loading exfil data:', err);
+                    const container = document.getElementById('exfil-content');
+                    if (container) container.innerHTML = `<p style="color: var(--accent-red); padding: 1rem;">Error loading exfil data</p>`;
+                }
+            }
+
+            escapeHtml(text) {
+                const map = {'&': '&', '<': '<', '>': '>', '"': '"', "'": '&#039;'};
+                return text.replace(/[&<>"']/g, m => map[m]);
+            }
         }
 
         // Initialize dashboard
@@ -933,16 +1141,21 @@
                     dashboard = new TelemetryDashboard();
                 }
             });
+
+            // Load exfil data periodically
+            setInterval(() => dashboard.loadExfilData(), 5000);
+            dashboard.loadExfilData();
         });
     </script>
 
-    <div style="margin-top: 20px; border-top: 1px solid #333; padding-top: 20px;">
-        <button id="tab-exfil" style="padding: 10px 20px; margin: 10px 5px 0 0; background: #1a3a1a; border: 1px solid #00ff00; color: #00ff00; cursor: pointer; border-radius: 4px;">📦 Exfil Data</button>
-        <div id="exfil-content" style="margin-top: 20px; display: none;">
-            <p style="color: #888;">Loading exfil data...</p>
-        </div>
-    </div>
-    
+    <div class="panel full-width" style="margin-top: 2rem;">
+                <div class="panel-header">Exfiltrated Data (Decrypted)</div>
+                <div id="exfil-content" style="max-height: 500px; overflow-y: auto;">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; padding: 1rem; text-align: center;">
+                        No exfil data collected yet
+                    </div>
+                </div>
+            </div>
 </body>
 </html>
 
