@@ -3,14 +3,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+      secrets:
+        - gcs-key
     networks:
       - jocky-net
     volumes:
-      # Toolchain is 4.2 GB — bind-mount from host, read-only inside container
-      - ./toolchain:/workspace/jocky/toolchain:ro
-      # Persistent build artifacts (compiled binaries available for download)
       - jocky_build:/workspace/jocky/build
-      # Persistent SQLite database
       - jocky_db:/workspace/jocky/data
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -46,3 +44,8 @@ networks:
 volumes:
   jocky_build:
   jocky_db:
+
+secrets:
+  gcs-key:
+    file: ./gcs-key.json
+
