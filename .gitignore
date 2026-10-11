@@ -38,3 +38,6 @@ tools/ghidra_*_PUBLIC/
 tools/ghidra*.zip
 node_modules/
 build/
+# GCP service account keys
+gcs-key.json
+jocky-511319-f7777ab8dc11.json
