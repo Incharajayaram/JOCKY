@@ -24,9 +24,13 @@ ENV PATH="/usr/local/google-cloud-sdk/bin:${PATH}"
 
 WORKDIR /workspace/jocky
 
-# Download toolchain from GCS at build time — key passed as BuildKit secret, never stored in image
-RUN --mount=type=secret,id=gcs-key \
-    gcloud auth activate-service-account --key-file=/run/secrets/gcs-key && \
+# Download toolchain from GCS.
+# Locally: pass --secret id=gcs-key,src=./gcs-key.json
+# Cloud Build: secret omitted — runs under Cloud Build SA which has GCS access via ADC
+RUN --mount=type=secret,id=gcs-key,required=false \
+    if [ -f /run/secrets/gcs-key ]; then \
+        gcloud auth activate-service-account --key-file=/run/secrets/gcs-key; \
+    fi && \
     gcloud storage cp gs://jocky-toolchain/toolchain.zip /tmp/toolchain.zip && \
     unzip -q /tmp/toolchain.zip -d /workspace/jocky && \
     rm /tmp/toolchain.zip

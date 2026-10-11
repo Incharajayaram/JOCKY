@@ -1,0 +1,74 @@
+name: Deploy to Cloud Run
+
+on:
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: jocky-511319
+  REGION: asia-southeast1
+  REPO: asia-southeast1-docker.pkg.dev/jocky-511319/jocky
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build images via Cloud Build
+        run: |
+          gcloud builds submit \
+            --config cloudbuild.yaml \
+            --substitutions "_IMG_BACKEND=${{ env.REPO }}/backend:${{ github.sha }},_IMG_FRONTEND=${{ env.REPO }}/frontend:${{ github.sha }}" \
+            --quiet
+
+      - name: Deploy backend
+        run: |
+          gcloud run deploy jocky-backend \
+            --image ${{ env.REPO }}/backend:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --port 8000 \
+            --cpu 2 --memory 4Gi \
+            --concurrency 8 --timeout 600 \
+            --min-instances 0 --max-instances 1 \
+            --execution-environment gen2 \
+            --no-allow-unauthenticated \
+            --quiet
+
+      - name: Get backend URL
+        run: |
+          BACKEND_URL=$(gcloud run services describe jocky-backend \
+            --region ${{ env.REGION }} \
+            --format="value(status.url)")
+          echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+
+      - name: Deploy frontend
+        run: |
+          gcloud run deploy jocky-frontend \
+            --image ${{ env.REPO }}/frontend:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --port 80 \
+            --cpu 1 --memory 512Mi \
+            --concurrency 80 \
+            --min-instances 0 --max-instances 1 \
+            --execution-environment gen2 \
+            --set-env-vars BACKEND_URL=${{ env.BACKEND_URL }} \
+            --allow-unauthenticated \
+            --quiet
+
+      - name: Print frontend URL
+        run: |
+          gcloud run services describe jocky-frontend \
+            --region ${{ env.REGION }} \
+            --format="value(status.url)"
