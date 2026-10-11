@@ -1,0 +1,32 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-backend
+    env:
+      - DOCKER_BUILDKIT=1
+    args:
+      - build
+      - --platform=linux/amd64
+      - -f
+      - Dockerfile.backend
+      - -t
+      - $_IMG_BACKEND
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    id: build-frontend
+    args:
+      - build
+      - --platform=linux/amd64
+      - -f
+      - Dockerfile.frontend
+      - -t
+      - $_IMG_FRONTEND
+      - .
+
+images:
+  - $_IMG_BACKEND
+  - $_IMG_FRONTEND
+
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
