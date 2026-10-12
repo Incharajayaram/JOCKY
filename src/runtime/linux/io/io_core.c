@@ -142,6 +142,68 @@ int fs_exists(const char* path) {
     return (stat(path, &sb) == 0) ? 1 : 0;
 }
 
+char* fs_read_text_files_in_dir(const char* dir_path) {
+    if (!dir_path) return strdup("");
+
+    DIR* dir = opendir(dir_path);
+    if (!dir) return strdup("");
+
+    size_t cap = 16384;
+    char* result = (char*)malloc(cap);
+    if (!result) { closedir(dir); return strdup(""); }
+    result[0] = '\0';
+    size_t len = 0;
+
+    struct dirent* entry;
+    while ((entry = readdir(dir))) {
+        if (entry->d_name[0] == '.') continue;
+
+        char* dot = strrchr(entry->d_name, '.');
+        if (!dot) continue;
+        if (strcasecmp(dot, ".txt") != 0 && strcasecmp(dot, ".log") != 0 &&
+            strcasecmp(dot, ".csv") != 0 && strcasecmp(dot, ".json") != 0 &&
+            strcasecmp(dot, ".xml") != 0 && strcasecmp(dot, ".ini") != 0 &&
+            strcasecmp(dot, ".cfg") != 0 && strcasecmp(dot, ".conf") != 0 &&
+            strcasecmp(dot, ".sh") != 0 && strcasecmp(dot, ".bash") != 0 &&
+            strcasecmp(dot, ".ps1") != 0 && strcasecmp(dot, ".py") != 0 &&
+            strcasecmp(dot, ".md") != 0 && strcasecmp(dot, ".yml") != 0 &&
+            strcasecmp(dot, ".yaml") != 0 && strcasecmp(dot, ".env") != 0 &&
+            strcasecmp(dot, ".key") != 0 && strcasecmp(dot, ".pem") != 0 &&
+            strcasecmp(dot, ".crt") != 0 && strcasecmp(dot, ".config") != 0)
+            continue;
+
+        char full[4096];
+        snprintf(full, sizeof(full), "%s/%s", dir_path, entry->d_name);
+
+        struct stat sb;
+        if (stat(full, &sb) != 0 || !S_ISREG(sb.st_mode)) continue;
+        if (sb.st_size > 1048576) continue;
+
+        char* content = (char*)fs_read_file(full);
+        if (!content || content[0] == '\0') { free(content); continue; }
+
+        size_t clen = strlen(content);
+        size_t hdr_len = strlen(full) + 32;
+        size_t need = len + hdr_len + clen + 4;
+        while (need >= cap) {
+            cap *= 2;
+            char* nr = (char*)realloc(result, cap);
+            if (!nr) { free(content); free(result); closedir(dir); return strdup(""); }
+            result = nr;
+        }
+
+        len += snprintf(result + len, cap - len, "\n--- FILE: %s ---\n", full);
+        memcpy(result + len, content, clen);
+        len += clen;
+        result[len++] = '\n';
+        result[len] = '\0';
+        free(content);
+    }
+
+    closedir(dir);
+    return result;
+}
+
 /* Audit/logging */
 void provenance_record(const char* path, const char* owner, const char* data) {
     /* Stub - would log to auditd in production */

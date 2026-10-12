@@ -1,1223 +1,326 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>C2 Telemetry Dashboard</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --bg-primary: #0d0d0d;
-            --bg-secondary: #1a1a1a;
-            --bg-tertiary: #252525;
-            --text-primary: #e0e0e0;
-            --text-secondary: #a0a0a0;
-            --accent-green: #00ff00;
-            --accent-red: #ff3333;
-            --accent-yellow: #ffcc00;
-            --accent-blue: #00ccff;
-            --border-color: #333333;
-        }
-
-        body {
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Courier New', monospace;
-            line-height: 1.6;
-            overflow-x: hidden;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 1rem;
-        }
-
-        /* Header */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .header h1 {
-            font-size: 2rem;
-            font-weight: 600;
-            letter-spacing: -0.5px;
-        }
-
-        .header-controls {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .chain-input {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 0.5rem 0.75rem;
-            border-radius: 4px;
-            font-size: 0.9rem;
-        }
-
-        .chain-input::placeholder {
-            color: var(--text-secondary);
-        }
-
-        .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            background: var(--bg-secondary);
-            border-radius: 4px;
-            font-size: 0.85rem;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        .status-dot.connected {
-            background-color: var(--accent-green);
-        }
-
-        .status-dot.disconnected {
-            background-color: var(--accent-red);
-            animation: none;
-        }
-
-        .status-dot.reconnecting {
-            background-color: var(--accent-yellow);
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* Main grid */
-        .dashboard {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .panel {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 1.5rem;
-        }
-
-        .panel-header {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: var(--text-primary);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 0.75rem;
-        }
-
-        /* Metrics Panel */
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1rem;
-        }
-
-        .metric-item {
-            background: var(--bg-tertiary);
-            padding: 1rem;
-            border-radius: 4px;
-            border-left: 3px solid var(--accent-green);
-        }
-
-        .metric-label {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 0.5rem;
-        }
-
-        .metric-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            font-family: 'Courier New', monospace;
-            color: var(--accent-green);
-        }
-
-        /* Phase Progress Bar */
-        .phase-progress {
-            margin-bottom: 1.5rem;
-        }
-
-        .phase-label {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.5rem;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .phase-bar {
-            display: flex;
-            gap: 0.25rem;
-            margin-bottom: 0.75rem;
-        }
-
-        .phase-block {
-            flex: 1;
-            height: 20px;
-            background: var(--bg-tertiary);
-            border-radius: 2px;
-            transition: all 0.3s ease;
-            border: 1px solid var(--border-color);
-            cursor: pointer;
-            position: relative;
-        }
-
-        .phase-block.completed {
-            background: var(--accent-green);
-            border-color: var(--accent-green);
-        }
-
-        .phase-block.active {
-            background: var(--accent-yellow);
-            border-color: var(--accent-yellow);
-            box-shadow: 0 0 8px rgba(255, 204, 0, 0.3);
-        }
-
-        .phase-block.pending {
-            background: var(--bg-tertiary);
-        }
-
-        .phase-block:hover {
-            transform: scaleY(1.2);
-            z-index: 10;
-        }
-
-        .phase-info {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            padding-top: 0.5rem;
-        }
-
-        /* Live Feed */
-        .live-feed {
-            display: flex;
-            flex-direction: column;
-            height: 400px;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            background: var(--bg-tertiary);
-            overflow: hidden;
-        }
-
-        .feed-scroller {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
-            display: flex;
-            flex-direction: column-reverse;
-        }
-
-        .feed-entry {
-            padding: 0.75rem;
-            margin-bottom: 0.5rem;
-            border-left: 3px solid var(--border-color);
-            border-radius: 2px;
-            font-size: 0.85rem;
-            font-family: 'Courier New', monospace;
-            background: rgba(0, 0, 0, 0.3);
-            transition: all 0.2s ease;
-            animation: slideIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .feed-entry.success {
-            border-left-color: var(--accent-green);
-            color: var(--accent-green);
-        }
-
-        .feed-entry.failure {
-            border-left-color: var(--accent-red);
-            color: var(--accent-red);
-        }
-
-        .feed-entry.pending {
-            border-left-color: var(--accent-yellow);
-            color: var(--accent-yellow);
-        }
-
-        .feed-entry.info {
-            border-left-color: var(--accent-blue);
-            color: var(--accent-blue);
-        }
-
-        .feed-timestamp {
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-            margin-right: 0.5rem;
-        }
-
-        .feed-phase {
-            color: var(--accent-blue);
-            font-weight: 600;
-            margin-right: 0.5rem;
-        }
-
-        .feed-message {
-            flex: 1;
-        }
-
-        /* Timeline View */
-        .timeline-container {
-            overflow-x: auto;
-            padding: 1rem 0;
-        }
-
-        .timeline {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            min-width: 600px;
-        }
-
-        .timeline-row {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .timeline-label {
-            width: 100px;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .timeline-bar-container {
-            flex: 1;
-            height: 24px;
-            background: var(--bg-tertiary);
-            border-radius: 2px;
-            position: relative;
-            border: 1px solid var(--border-color);
-            overflow: hidden;
-        }
-
-        .timeline-bar {
-            height: 100%;
-            border-radius: 2px;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: rgba(0, 0, 0, 0.7);
-        }
-
-        .timeline-bar.success {
-            background: var(--accent-green);
-        }
-
-        .timeline-bar.failure {
-            background: var(--accent-red);
-        }
-
-        .timeline-bar.active {
-            background: var(--accent-yellow);
-            animation: shimmer 1.5s infinite;
-        }
-
-        .timeline-bar.pending {
-            background: linear-gradient(90deg, var(--accent-blue) 0%, transparent 100%);
-        }
-
-        @keyframes shimmer {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-
-        .timeline-duration {
-            width: 50px;
-            text-align: right;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-        }
-
-        /* Responsive */
-        @media (max-width: 1024px) {
-            .dashboard {
-                grid-template-columns: 1fr;
-            }
-
-            .metrics-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 0.5rem;
-            }
-
-            .header {
-                flex-direction: column;
-                gap: 1rem;
-                align-items: flex-start;
-            }
-
-            .header-controls {
-                width: 100%;
-                flex-direction: column;
-            }
-
-            .chain-input {
-                width: 100%;
-            }
-
-            .metrics-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .live-feed {
-                height: 300px;
-            }
-
-            .panel {
-                padding: 1rem;
-            }
-        }
-
-        /* Scrollbar styling */
-        .feed-scroller::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .feed-scroller::-webkit-scrollbar-track {
-            background: var(--bg-tertiary);
-        }
-
-        .feed-scroller::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 4px;
-        }
-
-        .feed-scroller::-webkit-scrollbar-thumb:hover {
-            background: var(--text-secondary);
-        }
-
-        .timeline-container::-webkit-scrollbar {
-            height: 8px;
-        }
-
-        .timeline-container::-webkit-scrollbar-track {
-            background: var(--bg-tertiary);
-        }
-
-        .timeline-container::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 4px;
-        }
-
-        .timeline-container::-webkit-scrollbar-thumb:hover {
-            background: var(--text-secondary);
-        }
-
-        /* Full-width panels */
-        .full-width {
-            grid-column: 1 / -1;
-        }
-
-        .error-banner {
-            background: rgba(255, 51, 51, 0.1);
-            border: 1px solid var(--accent-red);
-            border-radius: 4px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            color: var(--accent-red);
-            display: none;
-        }
-
-        .error-banner.show {
-            display: block;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JOCKY C2 Telemetry</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#ccc;font-family:'Courier New',monospace;font-size:14px}
+.wrap{max-width:1400px;margin:0 auto;padding:16px}
+header{display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid #222;margin-bottom:16px}
+header h1{font-size:1.4rem;color:#00ff41;font-weight:400}
+.conn{display:flex;align-items:center;gap:8px;font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;background:#ff3333}
+.dot.on{background:#00ff41;box-shadow:0 0 6px #00ff41}
+.top-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.tm{background:#141414;border:1px solid #1e1e1e;border-radius:4px;padding:12px;text-align:center}
+.tm .label{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:1px}
+.tm .val{font-size:1.6rem;color:#00ff41;margin-top:4px}
+.tm .val.warn{color:#ffcc00}
+.tm .val.bad{color:#ff3333}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.panel{background:#141414;border:1px solid #1e1e1e;border-radius:4px;padding:14px}
+.panel h2{font-size:12px;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;border-bottom:1px solid #1e1e1e;padding-bottom:6px}
+.plist{display:flex;flex-direction:column;gap:4px}
+.ph{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:3px;background:#0e0e0e;border-left:3px solid #333;font-size:13px}
+.ph.active{border-left-color:#ffcc00;background:#1a1800}
+.ph.done{border-left-color:#00ff41;background:#001a00}
+.ph .idx{color:#555;min-width:28px;font-size:12px}
+.ph .name{flex:1}
+.ph .count{color:#00ff41;font-size:12px;min-width:40px;text-align:right}
+.ph .st{font-size:10px;text-transform:uppercase;min-width:50px;text-align:right}
+.ph.active .st{color:#ffcc00}
+.ph.done .st{color:#00ff41}
+.ph .st{color:#555}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px}
+.detail-item{font-size:11px;padding:3px 8px;background:#0e0e0e;border-radius:2px;display:flex;justify-content:space-between}
+.detail-item .name{color:#888}
+.detail-item .status{color:#00ff41}
+.detail-item .status.fail{color:#ff3333}
+#log{height:220px;overflow-y:auto;font-size:12px;line-height:1.7}
+#log::-webkit-scrollbar{width:4px}
+#log::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+.entry{padding:2px 0;border-bottom:1px solid #111}
+.entry .ts{color:#555;margin-right:8px}
+.entry .ev{color:#00ff41}
+.entry .ph-tag{color:#ffcc00}
+.entry .detail{color:#888;margin-left:6px}
+.st-success{color:#00ff41}
+.st-active{color:#ffcc00}
+.st-failure{color:#ff3333}
+</style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div>
-                <h1>C2 Telemetry</h1>
-                <p style="color: var(--text-secondary); font-size: 0.9rem;">Real-time execution monitoring</p>
-            </div>
-            <div class="header-controls">
-                <input
-                    type="text"
-                    id="chainId"
-                    class="chain-input"
-                    placeholder="Chain ID (e.g., research_chain_v4)"
-                    value="research_chain_v4"
-                >
-                <div class="status-indicator">
-                    <div class="status-dot connected" id="statusDot"></div>
-                    <span id="statusText">Connecting...</span>
-                </div>
-            </div>
-        </div>
+<div class="wrap">
+  <header>
+    <h1>JOCKY C2 Telemetry</h1>
+    <div class="conn"><span class="dot" id="dot"></span><span id="connText">Disconnected</span></div>
+  </header>
 
-        <!-- Error Banner -->
-        <div class="error-banner" id="errorBanner"></div>
+  <div class="top-metrics">
+    <div class="tm"><div class="label">Current Phase</div><div class="val" id="mPhase">--</div></div>
+    <div class="tm"><div class="label">EDR Techniques</div><div class="val" id="mEdr">0/15</div></div>
+    <div class="tm"><div class="label">Data Items</div><div class="val" id="mData">0</div></div>
+    <div class="tm"><div class="label">Exfil Channels</div><div class="val" id="mExfil">0/5</div></div>
+    <div class="tm"><div class="label">BYOVD Drivers</div><div class="val" id="mDrivers">0/62</div></div>
+    <div class="tm"><div class="label">Cleanup</div><div class="val" id="mCleanup">0/18</div></div>
+    <div class="tm"><div class="label">Total Events</div><div class="val" id="mEvents">0</div></div>
+    <div class="tm"><div class="label">Forensics</div><div class="val" id="mForensic">0/11</div></div>
+  </div>
 
-        <!-- Dashboard -->
-        <div class="dashboard">
-            <!-- Metrics Panel -->
-            <div class="panel">
-                <div class="panel-header">Execution Metrics</div>
-                <div class="metrics-grid">
-                    <div class="metric-item">
-                        <div class="metric-label">EDR Techniques</div>
-                        <div class="metric-value" id="metricsEDR">0/15</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Drivers Attempted</div>
-                        <div class="metric-value" id="metricsDriversAttempted">0/62</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Drivers Successful</div>
-                        <div class="metric-value" id="metricsDriversSuccess">0/62</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Data Collected</div>
-                        <div class="metric-value" id="metricsDataCollected">0 B</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Execution Time</div>
-                        <div class="metric-value" id="metricsExecutionTime">00:00</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Exfil Channels</div>
-                        <div class="metric-value" id="metricsExfil">0/5</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Forensic Artifacts</div>
-                        <div class="metric-value" id="metricsForensic">0</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-label">Anti-Forensics</div>
-                        <div class="metric-value" id="metricsAntiForensic">0/18</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Phase Progress -->
-            <div class="panel">
-                <div class="panel-header">Phase Progress</div>
-                <div class="phase-progress">
-                    <div class="phase-label">
-                        <span>13 Phases</span>
-                        <span id="phasePercentage">0%</span>
-                    </div>
-                    <div class="phase-bar" id="phaseBar">
-                        <!-- Generated by JavaScript -->
-                    </div>
-                    <div class="phase-info">
-                        <span id="currentPhase">Waiting for execution...</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Driver Load Attempts -->
-            <div class="panel">
-                <div class="panel-header">BYOVD Driver Load Attempts</div>
-                <div id="driverAttempts" style="max-height: 300px; overflow-y: auto;">
-                    <div style="color: var(--text-secondary); font-size: 0.85rem; padding: 1rem; text-align: center;">
-                        No driver attempts yet
-                    </div>
-                </div>
-            </div>
-
-            <!-- Exfil Channel Status -->
-            <div class="panel">
-                <div class="panel-header">Exfil Channel Status</div>
-                <div id="exfilChannels" style="max-height: 300px; overflow-y: auto;">
-                    <div style="color: var(--text-secondary); font-size: 0.85rem; padding: 1rem; text-align: center;">
-                        No exfil attempts yet
-                    </div>
-                </div>
-            </div>
-
-            <!-- Forensic Analysis Results -->
-            <div class="panel">
-                <div class="panel-header">Forensic Analysis Results</div>
-                <div id="forensicResults" style="max-height: 300px; overflow-y: auto;">
-                    <div style="color: var(--text-secondary); font-size: 0.85rem; padding: 1rem; text-align: center;">
-                        No forensic data yet
-                    </div>
-                </div>
-            </div>
-
-            <!-- Live Feed -->
-            <div class="panel full-width">
-                <div class="panel-header">Live Event Stream</div>
-                <div class="live-feed">
-                    <div class="feed-scroller" id="feedScroller">
-                        <div class="feed-entry info">
-                            <span class="feed-timestamp">[00:00:00]</span>
-                            <span class="feed-phase">INIT</span>
-                            <span class="feed-message">Dashboard connected. Waiting for telemetry...</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Timeline View -->
-            <div class="panel full-width">
-                <div class="panel-header">Timeline (Gantt)</div>
-                <div class="timeline-container">
-                    <div class="timeline" id="timeline">
-                        <!-- Generated by JavaScript -->
-                    </div>
-                </div>
-            </div>
-        </div>
+  <div class="grid">
+    <div class="panel">
+      <h2>Phase Timeline</h2>
+      <div class="plist" id="plist"></div>
     </div>
-
-    <script>
-        class TelemetryDashboard {
-            constructor() {
-                this.ws = null;
-                this.reconnectAttempts = 0;
-                this.maxReconnectAttempts = 10;
-                this.reconnectDelay = 1000;
-                this.baseReconnectDelay = 1000;
-                this.startTime = Date.now();
-                this.phases = Array.from({length: 13}, (_, i) => ({
-                    id: i,
-                    name: this.getPhaseName(i),
-                    status: 'pending',
-                    startTime: null,
-                    endTime: null,
-                }));
-                this.events = [];
-                this.metrics = {
-                    edrTechniques: 0,
-                    driversAttempted: 0,
-                    driversSuccess: 0,
-                    dataCollected: 0,
-                    exfilChannels: 0,
-                    exfilTotal: 5,
-                    forensicArtifacts: 0,
-                    antiForensicCount: 0,
-                };
-
-                this.initializeUI();
-                this.connect();
-                this.startTimeUpdate();
-            }
-
-            getPhaseName(id) {
-                const names = [
-                    'EDR Evasion',
-                    'Persistence',
-                    'Privilege Escalation',
-                    'Lateral Movement',
-                    'Credential Dumping',
-                    'Defense Evasion',
-                    'BYOVD Loading',
-                    'BYOVD Exploitation',
-                    'Kernel Execution',
-                    'Memory Exfiltration',
-                    'Network Exfiltration',
-                    'Cleanup',
-                    'Completion',
-                ];
-                return names[id] || `Phase ${id}`;
-            }
-
-            initializeUI() {
-                // Initialize phase bar
-                const phaseBar = document.getElementById('phaseBar');
-                this.phases.forEach(phase => {
-                    const block = document.createElement('div');
-                    block.className = 'phase-block pending';
-                    block.title = phase.name;
-                    block.id = `phase-${phase.id}`;
-                    phaseBar.appendChild(block);
-                });
-
-                // Initialize timeline
-                this.updateTimeline();
-            }
-
-            connect() {
-                const chainId = document.getElementById('chainId').value || 'research_chain_v4';
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const url = `${protocol}//${window.location.host}/ws/telemetry/${chainId}`;
-
-                this.setStatus('connecting', 'Connecting...');
-
-                this.ws = new WebSocket(url);
-
-                this.ws.onopen = () => {
-                    this.reconnectAttempts = 0;
-                    this.reconnectDelay = this.baseReconnectDelay;
-                    this.setStatus('connected', 'Connected');
-                    this.addEvent('INIT', 'connection', 'success', 'WebSocket connected');
-                };
-
-                this.ws.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        this.handleTelemetry(data);
-                    } catch (e) {
-                        console.error('Failed to parse message:', e);
-                    }
-                };
-
-                this.ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    this.setStatus('disconnected', 'Error');
-                };
-
-                this.ws.onclose = () => {
-                    this.setStatus('disconnected', 'Disconnected');
-                    this.attemptReconnect();
-                };
-            }
-
-            attemptReconnect() {
-                if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                    this.reconnectAttempts++;
-                    this.setStatus('reconnecting', `Reconnecting (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-                    setTimeout(() => this.connect(), this.reconnectDelay);
-                    this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000);
-                } else {
-                    this.setStatus('disconnected', 'Connection failed - max retries exceeded');
-                    this.showError('Unable to connect to telemetry service. Check your connection and try refreshing.');
-                }
-            }
-
-            handleTelemetry(data) {
-                const {
-                    phase_id,
-                    phase_name,
-                    event_type,
-                    status,
-                    message,
-                    timestamp,
-                    metrics: dataMetrics,
-                    driver_attempt,
-                    exfil_attempt,
-                    forensic_result,
-                } = data;
-
-                // Add event to feed
-                this.addEvent(phase_name || `Phase ${phase_id}`, event_type, status, message, timestamp);
-
-                // Update phase
-                if (phase_id !== undefined) {
-                    this.updatePhase(phase_id, phase_name, status);
-                }
-
-                // Update metrics
-                if (dataMetrics) {
-                    this.updateMetrics(dataMetrics);
-                }
-
-                // Handle driver attempt
-                if (driver_attempt) {
-                    this.addDriverAttempt(driver_attempt);
-                }
-
-                // Handle exfil attempt
-                if (exfil_attempt) {
-                    this.addExfilAttempt(exfil_attempt);
-                }
-
-                // Handle forensic result
-                if (forensic_result) {
-                    this.addForensicResult(forensic_result);
-                }
-            }
-
-            updatePhase(id, name, status) {
-                if (id >= 0 && id < this.phases.length) {
-                    const phase = this.phases[id];
-                    const oldStatus = phase.status;
-                    phase.status = status || 'active';
-                    if (name) phase.name = name;
-
-                    if (!phase.startTime && status !== 'pending') {
-                        phase.startTime = Date.now();
-                    }
-                    if (status === 'success' || status === 'failure') {
-                        phase.endTime = Date.now();
-                    }
-
-                    // Update UI
-                    const block = document.getElementById(`phase-${id}`);
-                    if (block) {
-                        block.className = `phase-block ${status || 'active'}`;
-                        block.title = `${phase.name} (${status})`;
-                    }
-
-                    // Update phase info
-                    if (status === 'active' || oldStatus !== 'active') {
-                        document.getElementById('currentPhase').textContent =
-                            `${phase.name} - ${status.toUpperCase()}`;
-                    }
-
-                    this.updatePhasePercentage();
-                    this.updateTimeline();
-                }
-            }
-
-            updatePhasePercentage() {
-                const completed = this.phases.filter(p => p.status === 'success').length;
-                const total = this.phases.length;
-                const percentage = Math.round((completed / total) * 100);
-                document.getElementById('phasePercentage').textContent = `${percentage}%`;
-            }
-
-            addDriverAttempt(driverAttempt) {
-                this.metrics.driversAttempted++;
-                if (driverAttempt.status === 'success') {
-                    this.metrics.driversSuccess++;
-                }
-
-                const container = document.getElementById('driverAttempts');
-                if (container.innerHTML.includes('No driver attempts')) {
-                    container.innerHTML = '';
-                }
-
-                const entry = document.createElement('div');
-                entry.style.cssText = 'padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 4px; border-left: 3px solid; font-size: 0.85rem; font-family: monospace; background: rgba(0,0,0,0.3);';
-                entry.style.borderLeftColor = driverAttempt.status === 'success' ? 'var(--accent-green)' : 'var(--accent-red)';
-
-                const time = new Date(driverAttempt.timestamp || Date.now()).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                entry.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                        <span style="color: var(--accent-blue);">${driverAttempt.driver_name}</span>
-                        <span style="color: var(--text-secondary); font-size: 0.8rem;">[${driverAttempt.timestamp ? new Date(driverAttempt.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}]</span>
-                    </div>
-                    <div style="display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-secondary);">
-                        <span>Device: ${driverAttempt.device_path}</span>
-                        <span style="color: ${driverAttempt.status === 'success' ? 'var(--accent-green)' : 'var(--accent-red)'};">${driverAttempt.status.toUpperCase()}</span>
-                        ${driverAttempt.error_code ? `<span>Error: ${driverAttempt.error_code}</span>` : ''}
-                    </div>
-                `;
-                container.insertBefore(entry, container.firstChild);
-            }
-
-            addExfilAttempt(exfilAttempt) {
-                this.metrics.exfilChannels++;
-
-                const container = document.getElementById('exfilChannels');
-                if (container.innerHTML.includes('No exfil attempts')) {
-                    container.innerHTML = '';
-                }
-
-                const entry = document.createElement('div');
-                entry.style.cssText = 'padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 4px; border-left: 3px solid; font-size: 0.85rem; font-family: monospace; background: rgba(0,0,0,0.3);';
-                entry.style.borderLeftColor = exfilAttempt.status === 'success' ? 'var(--accent-green)' : 'var(--accent-red)';
-
-                entry.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                        <span style="color: var(--accent-blue);">${exfilAttempt.channel}</span>
-                        <span style="color: ${exfilAttempt.status === 'success' ? 'var(--accent-green)' : 'var(--accent-red)'};">${exfilAttempt.status.toUpperCase()}</span>
-                    </div>
-                    <div style="display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-secondary);">
-                        <span>Bytes: ${exfilAttempt.bytes_sent || 0}</span>
-                        ${exfilAttempt.error ? `<span style="color: var(--accent-red);">Error: ${exfilAttempt.error}</span>` : ''}
-                    </div>
-                `;
-                container.insertBefore(entry, container.firstChild);
-            }
-
-            addForensicResult(forensicResult) {
-                this.metrics.forensicArtifacts++;
-
-                const container = document.getElementById('forensicResults');
-                if (container.innerHTML.includes('No forensic data')) {
-                    container.innerHTML = '';
-                }
-
-                const entry = document.createElement('div');
-                entry.style.cssText = 'padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 4px; border-left: 3px solid var(--accent-blue); font-size: 0.85rem; font-family: monospace; background: rgba(0,0,0,0.3);';
-
-                const artifactNames = {
-                    'event_logs': 'Event Logs',
-                    'registry_hives': 'Registry Hives',
-                    'mft_analysis': 'MFT Analysis',
-                    'jump_lists': 'Jump Lists',
-                    'browser_artifacts': 'Browser Artifacts',
-                    'process_tree': 'Process Tree',
-                    'timeline': 'Forensic Timeline',
-                    'correlation': 'Correlation Analysis',
-                };
-
-                const name = artifactNames[forensicResult.artifact_type] || forensicResult.artifact_type;
-                entry.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                        <span style="color: var(--accent-blue);">${name}</span>
-                        <span style="color: var(--text-secondary); font-size: 0.8rem;">${forensicResult.timestamp ? new Date(forensicResult.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                    </div>
-                    <div style="display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-secondary);">
-                        <span>Records: ${forensicResult.record_count || 0}</span>
-                        <span>Size: ${this.formatBytes(forensicResult.size_bytes || 0)}</span>
-                    </div>
-                `;
-                container.insertBefore(entry, container.firstChild);
-            }
-
-            updateMetrics(data) {
-                if (data.edr_techniques !== undefined) {
-                    this.metrics.edrTechniques = data.edr_techniques;
-                }
-                if (data.drivers_attempted !== undefined) {
-                    this.metrics.driversAttempted = data.drivers_attempted;
-                }
-                if (data.drivers_success !== undefined) {
-                    this.metrics.driversSuccess = data.drivers_success;
-                }
-                if (data.data_collected !== undefined) {
-                    this.metrics.dataCollected = data.data_collected;
-                }
-                if (data.exfil_channels !== undefined) {
-                    this.metrics.exfilChannels = data.exfil_channels;
-                }
-
-                this.refreshMetricsDisplay();
-            }
-
-            refreshMetricsDisplay() {
-                document.getElementById('metricsEDR').textContent =
-                    `${this.metrics.edrTechniques}/15`;
-                document.getElementById('metricsDriversAttempted').textContent =
-                    `${this.metrics.driversAttempted}/62`;
-                document.getElementById('metricsDriversSuccess').textContent =
-                    `${this.metrics.driversSuccess}/62`;
-                document.getElementById('metricsDataCollected').textContent =
-                    this.formatBytes(this.metrics.dataCollected);
-                document.getElementById('metricsExfil').textContent =
-                    `${this.metrics.exfilChannels}/${this.metrics.exfilTotal}`;
-                document.getElementById('metricsForensic').textContent =
-                    this.metrics.forensicArtifacts;
-                document.getElementById('metricsAntiForensic').textContent =
-                    `${this.metrics.antiForensicCount}/18`;
-            }
-
-            addEvent(phase, eventType, status, message, timestamp) {
-                const now = new Date();
-                const time = (timestamp ? new Date(timestamp) : now).toLocaleTimeString('en-US', {
-                    hour12: false,
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                });
-
-                const feed = document.getElementById('feedScroller');
-                const entry = document.createElement('div');
-                entry.className = `feed-entry ${status || 'info'}`;
-
-                entry.innerHTML = `
-                    <span class="feed-timestamp">[${time}]</span>
-                    <span class="feed-phase">${phase}</span>
-                    <span class="feed-message">${eventType} - ${message}</span>
-                `;
-
-                feed.appendChild(entry);
-
-                // Keep only last 100 entries
-                while (feed.children.length > 100) {
-                    feed.removeChild(feed.firstChild);
-                }
-
-                // Auto-scroll to bottom if not manually scrolled
-                const isAtBottom = feed.scrollTop <= 10;
-                if (isAtBottom) {
-                    setTimeout(() => {
-                        feed.scrollTop = 0;
-                    }, 0);
-                }
-
-                this.events.push({time, phase, eventType, status, message});
-            }
-
-            updateTimeline() {
-                const timeline = document.getElementById('timeline');
-                timeline.innerHTML = '';
-
-                const startTime = this.startTime;
-                const now = Date.now();
-                const totalTime = now - startTime;
-
-                this.phases.forEach(phase => {
-                    const row = document.createElement('div');
-                    row.className = 'timeline-row';
-
-                    const label = document.createElement('div');
-                    label.className = 'timeline-label';
-                    label.textContent = `Phase ${phase.id}`;
-
-                    const barContainer = document.createElement('div');
-                    barContainer.className = 'timeline-bar-container';
-
-                    if (phase.startTime) {
-                        const bar = document.createElement('div');
-                        bar.className = `timeline-bar ${phase.status}`;
-
-                        const phaseStart = phase.startTime - startTime;
-                        const phaseEnd = phase.endTime ? phase.endTime - startTime : now - startTime;
-                        const phaseDuration = phaseEnd - phaseStart;
-
-                        const leftPercent = (phaseStart / totalTime) * 100;
-                        const widthPercent = (phaseDuration / totalTime) * 100;
-
-                        bar.style.marginLeft = `${leftPercent}%`;
-                        bar.style.width = `${Math.max(widthPercent, 2)}%`;
-
-                        const duration = Math.round(phaseDuration / 1000);
-                        bar.textContent = `${duration}s`;
-
-                        barContainer.appendChild(bar);
-                    }
-
-                    const duration = document.createElement('div');
-                    duration.className = 'timeline-duration';
-                    if (phase.startTime && phase.endTime) {
-                        const secs = Math.round((phase.endTime - phase.startTime) / 1000);
-                        duration.textContent = `${secs}s`;
-                    } else {
-                        duration.textContent = '-';
-                    }
-
-                    row.appendChild(label);
-                    row.appendChild(barContainer);
-                    row.appendChild(duration);
-                    timeline.appendChild(row);
-                });
-            }
-
-            startTimeUpdate() {
-                setInterval(() => {
-                    const elapsed = Math.round((Date.now() - this.startTime) / 1000);
-                    const minutes = Math.floor(elapsed / 60);
-                    const seconds = elapsed % 60;
-                    document.getElementById('metricsExecutionTime').textContent =
-                        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-
-                    this.updateTimeline();
-                }, 1000);
-            }
-
-            setStatus(state, text) {
-                const dot = document.getElementById('statusDot');
-                const statusText = document.getElementById('statusText');
-
-                dot.className = `status-dot ${state}`;
-                statusText.textContent = text;
-
-                // Hide error banner on successful connection
-                if (state === 'connected') {
-                    document.getElementById('errorBanner').classList.remove('show');
-                }
-            }
-
-            showError(message) {
-                const banner = document.getElementById('errorBanner');
-                banner.textContent = '❌ ' + message;
-                banner.classList.add('show');
-            }
-
-            formatBytes(bytes) {
-                if (bytes === 0) return '0 B';
-                const k = 1024;
-                const sizes = ['B', 'KB', 'MB', 'GB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-            }
-
-            async loadExfilData() {
-                try {
-                    const response = await fetch('/api/exfil/all');
-                    const data = await response.json();
-
-                    const container = document.getElementById('exfil-content');
-                    if (!container) return;
-
-                    if (!data.exfil_files || data.exfil_files.length === 0) {
-                        container.innerHTML = '<p style="color: var(--text-secondary); padding: 1rem; text-align: center;">No exfil data collected yet</p>';
-                        return;
-                    }
-
-                    let html = `<div style="padding: 1rem;">`;
-                    html += `<h3 style="margin-bottom: 1rem; color: var(--accent-green);">Exfiltrated Data (${data.total} files)</h3>`;
-
-                    for (const file of data.exfil_files) {
-                        if (file.error) {
-                            html += `<div style="margin: 10px 0; padding: 10px; background: #2a1a1a; border-left: 3px solid var(--accent-red); border-radius: 4px;">
-                                <strong>${file.filename}</strong> - Error: ${file.error}
-                            </div>`;
-                            continue;
-                        }
-
-                        html += `<div style="margin: 15px 0; padding: 15px; background: var(--bg-secondary); border-left: 3px solid var(--accent-green); border-radius: 4px; border: 1px solid var(--border-color);">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                                <strong style="color: var(--accent-green);">${this.escapeHtml(file.filename)}</strong>
-                                <span style="color: var(--text-secondary); font-size: 0.9em;">${this.formatBytes(file.size)} | ${file.mtime}</span>
-                            </div>
-                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px; font-size: 0.9em;">
-                                <div><span style="color: var(--text-secondary);">Lines:</span> <span style="color: var(--accent-green);">${file.summary.total_lines}</span></div>
-                                <div><span style="color: var(--text-secondary);">Passwords:</span> <span style="color: var(--accent-yellow);">${file.summary.password_lines}</span></div>
-                                <div><span style="color: var(--text-secondary);">Credentials:</span> <span style="color: var(--accent-yellow);">${file.summary.credential_lines}</span></div>
-                                <div><span style="color: var(--text-secondary);">Paths:</span> <span style="color: var(--accent-blue);">${file.summary.path_lines}</span></div>
-                            </div>
-                            <details style="margin: 10px 0;">
-                                <summary style="cursor: pointer; color: var(--accent-green); padding: 5px; font-weight: 600;">Show Full Content</summary>
-                                <pre style="background: var(--bg-primary); padding: 10px; overflow-x: auto; font-size: 0.8em; max-height: 400px; margin: 10px 0; border: 1px solid var(--border-color); border-radius: 4px;">${this.escapeHtml(file.plaintext)}</pre>
-                            </details>
-                        </div>`;
-                    }
-                    html += `</div>`;
-                    container.innerHTML = html;
-                } catch (err) {
-                    console.error('Error loading exfil data:', err);
-                    const container = document.getElementById('exfil-content');
-                    if (container) container.innerHTML = `<p style="color: var(--accent-red); padding: 1rem;">Error loading exfil data</p>`;
-                }
-            }
-
-            escapeHtml(text) {
-                const map = {'&': '&', '<': '<', '>': '>', '"': '"', "'": '&#039;'};
-                return text.replace(/[&<>"']/g, m => map[m]);
-            }
-        }
-
-        // Initialize dashboard
-        let dashboard;
-        document.addEventListener('DOMContentLoaded', () => {
-            dashboard = new TelemetryDashboard();
-
-            // Allow reconnecting with new chain ID
-            document.getElementById('chainId').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    if (dashboard.ws) {
-                        dashboard.ws.close();
-                    }
-                    dashboard = new TelemetryDashboard();
-                }
-            });
-
-            // Load exfil data periodically
-            setInterval(() => dashboard.loadExfilData(), 5000);
-            dashboard.loadExfilData();
-        });
-    </script>
-
-    <div class="panel full-width" style="margin-top: 2rem;">
-                <div class="panel-header">Exfiltrated Data (Decrypted)</div>
-                <div id="exfil-content" style="max-height: 500px; overflow-y: auto;">
-                    <div style="color: var(--text-secondary); font-size: 0.85rem; padding: 1rem; text-align: center;">
-                        No exfil data collected yet
-                    </div>
-                </div>
-            </div>
+    <div class="panel">
+      <h2>Live Event Feed</h2>
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>EDR Techniques</h2>
+      <div class="detail-grid" id="edrDetail"></div>
+    </div>
+    <div class="panel">
+      <h2>Data Collection</h2>
+      <div class="detail-grid" id="dataDetail"></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Exfil Channels</h2>
+      <div class="detail-grid" id="exfilDetail"></div>
+    </div>
+    <div class="panel">
+      <h2>Anti-Forensics Cleanup</h2>
+      <div class="detail-grid" id="cleanupDetail"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:16px">
+    <h2 style="display:flex;justify-content:space-between;align-items:center">
+      Exfiltrated Data
+      <span style="font-size:11px;color:#00ff41;cursor:pointer" onclick="loadExfil()">↻ refresh</span>
+    </h2>
+    <div id="exfilData" style="font-size:12px;color:#666">No data yet</div>
+  </div>
+</div>
+
+<script>
+const PHASES = [
+  [-1,"LPE"],[0,"EDR Evasion"],[1,"C2 Bootstrap"],[2,"Model Download"],
+  [3,"Data Discovery"],[4,"Data Collection"],[5,"Encryption"],[6,"Exfiltration"],
+  [7,"BYOVD Drivers"],[8,"Process Injection"],[9,"Persistence"],
+  [10,"Forensic Collection"],[11,"Anti-Forensics"],[12,"Cleanup"],
+];
+
+const state = {
+  currentPhase: -2, totalEvents: 0,
+  edrTechniques: [], dataItems: [], exfilChannels: [],
+  driverAttempts: 0, driverSuccess: null,
+  cleanupItems: [], forensicItems: [],
+  phaseStatus: {}, phaseCounts: {},
+};
+
+const $id = id => document.getElementById(id);
+
+PHASES.forEach(([id, name]) => {
+  state.phaseStatus[id] = "pending";
+  state.phaseCounts[id] = 0;
+  const el = document.createElement("div");
+  el.className = "ph"; el.id = "ph-" + id;
+  el.innerHTML = `<span class="idx">${id < 0 ? "LPE" : id}</span><span class="name">${name}</span><span class="count" id="pc-${id}"></span><span class="st">pending</span>`;
+  $id("plist").appendChild(el);
+});
+
+function updatePhaseUI(id, status) {
+  const el = $id("ph-" + id);
+  if (!el) return;
+  el.className = "ph";
+  const st = el.querySelector(".st");
+  if (status === "active") { el.classList.add("active"); st.textContent = "active"; }
+  else if (status === "done") { el.classList.add("done"); st.textContent = "done"; }
+  else { st.textContent = "pending"; }
+}
+
+function addDetailItem(containerId, name, status) {
+  const container = $id(containerId);
+  let existing = container.querySelector(`[data-name="${name}"]`);
+  if (existing) {
+    existing.querySelector(".status").textContent = status;
+    existing.querySelector(".status").className = "status" + (status === "failure" ? " fail" : "");
+    return;
+  }
+  const div = document.createElement("div");
+  div.className = "detail-item"; div.dataset.name = name;
+  const displayName = name.replace(/_/g, " ");
+  div.innerHTML = `<span class="name">${displayName}</span><span class="status${status === "failure" ? " fail" : ""}">${status}</span>`;
+  container.appendChild(div);
+}
+
+function updateMetrics() {
+  const pName = PHASES.find(p => p[0] === state.currentPhase);
+  $id("mPhase").textContent = pName ? pName[1] : "--";
+  $id("mEdr").textContent = state.edrTechniques.length + "/15";
+  $id("mData").textContent = state.dataItems.length;
+  $id("mExfil").textContent = state.exfilChannels.length + "/5";
+  $id("mDrivers").textContent = (state.driverSuccess ? "1" : "0") + "/62";
+  $id("mDrivers").parentElement.querySelector(".val").style.color = state.driverSuccess ? "#00ff41" : (state.driverAttempts > 0 ? "#ffcc00" : "#ff3333");
+  $id("mCleanup").textContent = state.cleanupItems.length + "/18";
+  $id("mEvents").textContent = state.totalEvents;
+  $id("mForensic").textContent = state.forensicItems.length + "/11";
+
+  PHASES.forEach(([id]) => {
+    const countEl = $id("pc-" + id);
+    if (countEl && state.phaseCounts[id] > 0) countEl.textContent = state.phaseCounts[id];
+  });
+}
+
+function addLog(event) {
+  const div = document.createElement("div");
+  div.className = "entry";
+  const ts = event.received_at ? event.received_at.split("T")[1]?.slice(0, 8) || "" : "";
+  const pName = PHASES.find(p => p[0] === event.phase);
+  const pLabel = pName ? pName[1] : "P" + event.phase;
+  const detail = event.details_json ? (() => { try { const d = JSON.parse(event.details_json); return d.detail || ""; } catch { return ""; } })() : "";
+  div.innerHTML = `<span class="ts">${ts}</span><span class="ev">${event.event_type}</span> <span class="ph-tag">[${pLabel}]</span><span class="detail">${detail}</span>`;
+  const log = $id("log");
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function processEvent(event) {
+  state.totalEvents++;
+  const phase = event.phase;
+  const detail = event.details_json ? (() => { try { return JSON.parse(event.details_json).detail || ""; } catch { return ""; } })() : "";
+
+  if (phase != null) state.phaseCounts[phase] = (state.phaseCounts[phase] || 0) + 1;
+
+  if (event.event_type === "phase_start") {
+    if (phase > state.currentPhase) state.currentPhase = phase;
+    PHASES.forEach(([id]) => {
+      if (id < phase && state.phaseStatus[id] !== "done") {
+        state.phaseStatus[id] = "done";
+        updatePhaseUI(id, "done");
+      }
+    });
+    state.phaseStatus[phase] = "active";
+    updatePhaseUI(phase, "active");
+  }
+
+  if (event.event_type === "phase_complete") {
+    state.phaseStatus[phase] = "done";
+    updatePhaseUI(phase, "done");
+  }
+
+  if (event.event_type === "edr_technique") {
+    if (!state.edrTechniques.includes(detail)) state.edrTechniques.push(detail);
+    addDetailItem("edrDetail", detail, event.status || "success");
+  }
+
+  if (event.event_type === "data_item") {
+    if (!state.dataItems.includes(detail)) state.dataItems.push(detail);
+    addDetailItem("dataDetail", detail, event.status || "success");
+  }
+
+  if (event.event_type === "exfil_sent") {
+    if (!state.exfilChannels.includes(detail)) state.exfilChannels.push(detail);
+    addDetailItem("exfilDetail", detail, event.status || "success");
+  }
+
+  if (event.event_type === "driver_attempt") {
+    state.driverAttempts++;
+    addDetailItem("edrDetail", "drv:" + detail, event.status || "pending");
+  }
+
+  if (event.event_type === "driver_success") {
+    state.driverSuccess = detail;
+  }
+
+  if (event.event_type === "cleanup") {
+    if (!state.cleanupItems.includes(detail)) state.cleanupItems.push(detail);
+    addDetailItem("cleanupDetail", detail, event.status || "success");
+  }
+
+  if (event.event_type === "forensic_item") {
+    if (!state.forensicItems.includes(detail)) state.forensicItems.push(detail);
+    addDetailItem("dataDetail", "forensic:" + detail, event.status || "success");
+  }
+
+  if (event.event_type === "technique") {
+    addDetailItem("edrDetail", detail, event.status || "success");
+  }
+
+  addLog(event);
+  updateMetrics();
+}
+
+let ws = null, reconnectTimer = null;
+
+function setConn(on) {
+  $id("dot").className = on ? "dot on" : "dot";
+  $id("connText").textContent = on ? "Connected" : "Reconnecting...";
+}
+
+function connect() {
+  if (ws && ws.readyState < 2) return;
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  const host = location.hostname || "192.168.56.1";
+  const port = location.port || "8443";
+  ws = new WebSocket(`${proto}//${host}:${port}/ws/telemetry/research_chain_v4`);
+
+  ws.onopen = () => { setConn(true); if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; } };
+  ws.onclose = () => { setConn(false); reconnectTimer = setTimeout(connect, 2000); };
+  ws.onerror = () => { ws.close(); };
+  ws.onmessage = (msg) => {
+    let data;
+    try { data = JSON.parse(msg.data); } catch { return; }
+    if (data.type === "history" && Array.isArray(data.events)) {
+      data.events.forEach(e => processEvent(e));
+    } else if (data.event) {
+      processEvent(data.event);
+    }
+  };
+}
+
+connect();
+
+async function loadExfil() {
+  const host = location.hostname || "192.168.56.1";
+  const port = location.port || "8443";
+  const proto = location.protocol === "https:" ? "https:" : "http:";
+  try {
+    const res = await fetch(`${proto}//${host}:${port}/api/exfil/all`);
+    const data = await res.json();
+    const container = $id("exfilData");
+    if (!data.exfil_files || data.exfil_files.length === 0) {
+      container.innerHTML = '<span style="color:#666">No exfil data received yet</span>';
+      return;
+    }
+    container.innerHTML = data.exfil_files.map(f => {
+      const preview = f.plaintext ? f.plaintext.replace(/</g,"&lt;").replace(/>/g,"&gt;") : (f.error || "decode failed");
+      const summary = f.summary ? `${f.summary.total_lines} lines | ${f.summary.password_lines} passwords | ${f.summary.credential_lines} creds` : "";
+      return `<div style="margin-bottom:10px;padding:10px;background:#0e0e0e;border:1px solid #1e1e1e;border-radius:4px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="color:#00ff41">${f.filename}</span>
+          <span style="color:#555">${f.size}B · ${summary}</span>
+        </div>
+        <pre style="white-space:pre-wrap;word-break:break-all;color:#aaa;max-height:200px;overflow-y:auto;margin:0;font-size:11px">${preview}</pre>
+      </div>`;
+    }).join("");
+  } catch(e) {
+    $id("exfilData").innerHTML = `<span style="color:#ff3333">Failed to load: ${e.message}</span>`;
+  }
+}
+
+loadExfil();
+setInterval(loadExfil, 15000);
+</script>
 </body>
 </html>
-
-<!-- EXFIL DATA SECTION - Add this before the closing </body> tag -->
-<script>
-// Fetch and display decrypted exfil data
-async function loadExfilData() {
-    try {
-        const response = await fetch('/api/exfil/all');
-        const data = await response.json();
-        
-        const container = document.getElementById('exfil-content');
-        if (!container) return;
-        
-        if (!data.exfil_files || data.exfil_files.length === 0) {
-            container.innerHTML = '<p style="color: #888;">No exfil data collected yet</p>';
-            return;
-        }
-        
-        let html = `<div style="padding: 20px;">`;
-        html += `<h3>Exfiltrated Data (${data.total} files)</h3>`;
-        
-        for (const file of data.exfil_files) {
-            if (file.error) {
-                html += `<div style="margin: 10px 0; padding: 10px; background: #2a1a1a; border-left: 3px solid #ff4444;">
-                    <strong>${file.filename}</strong> - Error: ${file.error}
-                </div>`;
-                continue;
-            }
-            
-            html += `<div style="margin: 15px 0; padding: 15px; background: #1a1a2a; border-left: 3px solid #00ff00;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                    <strong style="color: #00ff88;">${file.filename}</strong>
-                    <span style="color: #888; font-size: 0.9em;">${file.size} bytes | ${file.mtime}</span>
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px; font-size: 0.9em;">
-                    <div><span style="color: #888;">Lines:</span> <span style="color: #00ff00;">${file.summary.total_lines}</span></div>
-                    <div><span style="color: #888;">Passwords:</span> <span style="color: #ffaa00;">${file.summary.password_lines}</span></div>
-                    <div><span style="color: #888;">Credentials:</span> <span style="color: #ffaa00;">${file.summary.credential_lines}</span></div>
-                    <div><span style="color: #888;">Paths:</span> <span style="color: #00ccff;">${file.summary.path_lines}</span></div>
-                </div>
-                <details style="margin: 10px 0;">
-                    <summary style="cursor: pointer; color: #00ff88; padding: 5px;">Show Full Content</summary>
-                    <pre style="background: #0a0a0a; padding: 10px; overflow-x: auto; font-size: 0.85em; max-height: 400px; margin: 10px 0; border: 1px solid #333;">${escapeHtml(file.plaintext)}</pre>
-                </details>
-            </div>`;
-        }
-        html += `</div>`;
-        container.innerHTML = html;
-    } catch (err) {
-        console.error('Error loading exfil data:', err);
-        const container = document.getElementById('exfil-content');
-        if (container) container.innerHTML = `<p style="color: #ff4444;">Error loading exfil data</p>`;
-    }
-}
-
-function escapeHtml(text) {
-    const map = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'};
-    return text.replace(/[&<>"']/g, m => map[m]);
-}
-
-// Load exfil data every 5 seconds
-setInterval(loadExfilData, 5000);
-loadExfilData(); // Initial load
-</script>

@@ -383,7 +383,8 @@ async def broadcast_telemetry_event(chain_id: str, event: dict):
         except Exception:
             dead.append(ws)
     for ws in dead:
-        conns.remove(ws)
+        if ws in conns:
+            conns.remove(ws)
 
 
 @app.websocket("/ws/telemetry/{chain_id}")
@@ -523,6 +524,52 @@ async def report_telemetry(request: TelemetryEventRequest):
         await broadcast_telemetry_event(request.chain_id, event_dict)
 
         return TelemetryEventResponse(**event_dict)
+    finally:
+        db.close()
+
+
+@app.get("/api/telemetry/simple")
+async def report_telemetry_simple(
+    chain: str = "research_chain_v4",
+    phase: int = 0,
+    type: str = "phase_start",
+    status: str = "active",
+    detail: str = "",
+):
+    """GET-based telemetry for the compiled binary (no JSON body needed)."""
+    ts = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    details = {"detail": detail} if detail else None
+    details_json = json.dumps(details) if details else None
+
+    db = SessionLocal()
+    try:
+        event = save_telemetry_event(
+            db,
+            chain_id=chain,
+            timestamp=ts,
+            event_type=type,
+            phase=phase,
+            status=status,
+            details_json=details_json,
+        )
+
+        if chain not in telemetry_cache:
+            telemetry_cache[chain] = deque(maxlen=100)
+
+        event_dict = {
+            "id": event.id,
+            "timestamp": event.timestamp,
+            "chain_id": event.chain_id,
+            "event_type": event.event_type,
+            "phase": event.phase,
+            "status": event.status,
+            "details_json": event.details_json,
+            "received_at": event.received_at.isoformat(),
+        }
+        telemetry_cache[chain].append(event_dict)
+        await broadcast_telemetry_event(chain, event_dict)
+
+        return {"ok": True, "id": event.id}
     finally:
         db.close()
 
@@ -962,28 +1009,29 @@ def _decode_exfil(data: bytes) -> str:
 
     import base64, json
 
+    import struct
+
     def _decrypt(raw: bytes) -> str:
-        raw = raw[4:]                       # strip 4-byte size header
-        raw = rc4(raw, b"key123")           # RC4 decrypt
-        raw = bytes(b ^ 0x42 for b in raw) # XOR decrypt
-        return raw.decode("utf-8", errors="replace")
+        if len(raw) < 5:
+            return "[chunk too small to decode]"
+        raw = raw[4:]
+        raw = rc4(raw, b"key123")
+        raw = bytes(b ^ 0x42 for b in raw)
+        result = raw.decode("utf-8", errors="replace")
+        printable = sum(1 for c in result if c in '\n\r\t' or (32 <= ord(c) <= 126)) / max(len(result), 1)
+        if printable < 0.8:
+            return "[continuation chunk — partial data, see primary exfil file]"
+        return result
 
     try:
         stripped = data.strip()
         if stripped.startswith(b"{"):
-            # JSON-wrapped: {"content": "<b64>"} — Discord double-encodes, so try double then single
             obj = json.loads(stripped)
             b64_str = obj.get("content", "")
-            try:
-                # Double base64 (Discord channel wraps already-b64 data in another b64)
-                inner_b64 = base64.b64decode(b64_str)
-                raw = base64.b64decode(inner_b64)
-                return _decrypt(raw)
-            except Exception:
-                raw = base64.b64decode(b64_str)
-                return _decrypt(raw)
+            inner = base64.b64decode(b64_str)
+            raw = base64.b64decode(inner)
+            return _decrypt(raw)
         else:
-            # Raw base64 (CDN/front channel)
             raw = base64.b64decode(stripped)
             return _decrypt(raw)
     except Exception as e:

