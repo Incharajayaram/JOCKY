@@ -129,6 +129,7 @@ ffi fs_list_files(path: string, recursive: bool) -> string;
 ffi fs_file_size(path: string) -> i64;
 ffi fs_read_file(path: string) -> i8*;
 ffi fs_write_file(path: string, data: i8*, size: i64) -> bool;
+ffi fs_read_text_files_in_dir(dir_path: string) -> string;
 
 // ---- Crypto ----
 ffi crypto_generate_key(size: i32) -> [i8];

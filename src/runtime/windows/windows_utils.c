@@ -353,6 +353,73 @@ char* fs_list_files(const char* path, int recursive) {
 #endif
 }
 
+char* fs_read_text_files_in_dir(const char* dir_path) {
+#ifdef _WIN32
+    if (!dir_path) return strdup("");
+
+    WIN32_FIND_DATAA ffd;
+    char search[MAX_PATH];
+    snprintf(search, MAX_PATH, "%s\\*", dir_path);
+
+    HANDLE hFind = FindFirstFileA(search, &ffd);
+    if (hFind == INVALID_HANDLE_VALUE) return strdup("");
+
+    size_t cap = 16384;
+    char* result = (char*)malloc(cap);
+    if (!result) { FindClose(hFind); return strdup(""); }
+    result[0] = '\0';
+    size_t len = 0;
+
+    do {
+        if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+
+        char* dot = strrchr(ffd.cFileName, '.');
+        if (!dot) continue;
+        if (_stricmp(dot, ".txt") != 0 && _stricmp(dot, ".log") != 0 &&
+            _stricmp(dot, ".csv") != 0 && _stricmp(dot, ".json") != 0 &&
+            _stricmp(dot, ".xml") != 0 && _stricmp(dot, ".ini") != 0 &&
+            _stricmp(dot, ".cfg") != 0 && _stricmp(dot, ".conf") != 0 &&
+            _stricmp(dot, ".bat") != 0 && _stricmp(dot, ".cmd") != 0 &&
+            _stricmp(dot, ".ps1") != 0 && _stricmp(dot, ".py") != 0 &&
+            _stricmp(dot, ".md") != 0 && _stricmp(dot, ".yml") != 0 &&
+            _stricmp(dot, ".yaml") != 0 && _stricmp(dot, ".env") != 0 &&
+            _stricmp(dot, ".key") != 0 && _stricmp(dot, ".pem") != 0 &&
+            _stricmp(dot, ".crt") != 0 && _stricmp(dot, ".config") != 0)
+            continue;
+
+        if (ffd.nFileSizeLow > 1048576) continue;
+
+        char full[MAX_PATH];
+        snprintf(full, MAX_PATH, "%s\\%s", dir_path, ffd.cFileName);
+
+        char* content = (char*)fs_read_file(full);
+        if (!content || content[0] == '\0') { free(content); continue; }
+
+        size_t clen = strlen(content);
+        size_t hdr_len = strlen(full) + 32;
+        size_t need = len + hdr_len + clen + 4;
+        while (need >= cap) {
+            cap *= 2;
+            char* nr = (char*)realloc(result, cap);
+            if (!nr) { free(content); free(result); FindClose(hFind); return strdup(""); }
+            result = nr;
+        }
+
+        len += snprintf(result + len, cap - len, "\n--- FILE: %s ---\n", full);
+        memcpy(result + len, content, clen);
+        len += clen;
+        result[len++] = '\n';
+        result[len] = '\0';
+        free(content);
+    } while (FindNextFileA(hFind, &ffd));
+
+    FindClose(hFind);
+    return result;
+#else
+    return strdup("");
+#endif
+}
+
 /* Audit */
 int32_t audit_init(int32_t buffer_size) { return -1; }
 int32_t audit_log(const char* category, const char* action, const char* detail, const char* result) { return -1; }

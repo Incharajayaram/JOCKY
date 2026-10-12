@@ -445,9 +445,6 @@ bool jocky_lsass_exfil(const char* exfil_url, const char* exfil_type);
  * Cleanup: Anti-Forensics  *(Windows unless noted)*
  * ============================================================================ */
 
-/* Delete the running executable using POSIX-semantics unlink (Win10+),
- * rename+delete-on-close (Win7+), or MoveFileEx reboot-delete as fallbacks.
- * Linux: unlinks /proc/self/exe immediately. */
 void jocky_self_delete(void);
 
 /* Clear every Windows event log channel via EvtClearLog (all channels
