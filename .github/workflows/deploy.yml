@@ -43,7 +43,7 @@ jobs:
             --concurrency 8 --timeout 600 \
             --min-instances 0 --max-instances 1 \
             --execution-environment gen2 \
-            --no-allow-unauthenticated \
+            --allow-unauthenticated \
             --quiet
 
       - name: Get backend URL
