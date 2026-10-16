@@ -1,17 +1,31 @@
 steps:
+  # Generate a short-lived access token using Cloud Build SA's ADC
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: get-token
+    entrypoint: bash
+    args:
+      - -c
+      - gcloud auth print-access-token > /workspace/gcs-token.txt
+
+  # Build backend — passes token as Docker secret so it never lands in image layers
   - name: gcr.io/cloud-builders/docker
     id: build-backend
+    entrypoint: bash
     env:
       - DOCKER_BUILDKIT=1
     args:
-      - build
-      - --platform=linux/amd64
-      - -f
-      - Dockerfile.backend
-      - -t
-      - $_IMG_BACKEND
-      - .
+      - -c
+      - |
+        docker build \
+          --platform linux/amd64 \
+          --secret id=gcs-token,src=/workspace/gcs-token.txt \
+          -f Dockerfile.backend \
+          -t $_IMG_BACKEND \
+          .
+    waitFor:
+      - get-token
 
+  # Build frontend (no secrets needed)
   - name: gcr.io/cloud-builders/docker
     id: build-frontend
     args:
@@ -22,6 +36,8 @@ steps:
       - -t
       - $_IMG_FRONTEND
       - .
+    waitFor:
+      - get-token
 
 images:
   - $_IMG_BACKEND

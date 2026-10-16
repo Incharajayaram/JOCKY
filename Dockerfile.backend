@@ -26,12 +26,20 @@ WORKDIR /workspace/jocky
 
 # Download toolchain from GCS.
 # Locally: pass --secret id=gcs-key,src=./gcs-key.json
-# Cloud Build: secret omitted — runs under Cloud Build SA which has GCS access via ADC
+# Cloud Build: pass --secret id=gcs-token,src=/workspace/gcs-token.txt (short-lived access token)
 RUN --mount=type=secret,id=gcs-key,required=false \
+    --mount=type=secret,id=gcs-token,required=false \
     if [ -f /run/secrets/gcs-key ]; then \
-        gcloud auth activate-service-account --key-file=/run/secrets/gcs-key; \
+        gcloud auth activate-service-account --key-file=/run/secrets/gcs-key && \
+        gcloud storage cp gs://jocky-toolchain/toolchain.zip /tmp/toolchain.zip; \
+    elif [ -f /run/secrets/gcs-token ]; then \
+        curl -fsSL \
+             -H "Authorization: Bearer $(cat /run/secrets/gcs-token)" \
+             "https://storage.googleapis.com/storage/v1/b/jocky-toolchain/o/toolchain.zip?alt=media" \
+             -o /tmp/toolchain.zip; \
+    else \
+        echo "No GCS credentials provided" && exit 1; \
     fi && \
-    gcloud storage cp gs://jocky-toolchain/toolchain.zip /tmp/toolchain.zip && \
     unzip -q /tmp/toolchain.zip -d /workspace/jocky && \
     rm /tmp/toolchain.zip
 
