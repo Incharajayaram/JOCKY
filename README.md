@@ -1,260 +1,157 @@
-# Kernel Evasion Research Pipeline
+# JOCKY
 
-**Authorized Research Project** - Red Hat + IIT Bombay Cyber Security Team
+A compiled language and toolchain for building payloads that report back to a C2 server, plus a forensic analysis pipeline for investigating Windows and Linux targets.
 
-A production-quality three-layer userland evasion system implementing modern Linux kernel evasion techniques for adversarial security research.
-
-## Overview
-
-Complete implementation of three integrated evasion layers:
-
-1. **Fileless Execution** - memfd_create + execveat for zero-disk-artifact binary execution
-2. **Process Hiding** - LD_PRELOAD readdir/readdir64 hooking for process invisibility
-3. **Metadata Blocking** - open/openat/read interception to block /proc file access
-
-## Quick Start
-
-### Build
-
-```bash
-# Build LD_PRELOAD libraries
-cd research/preload
-make clean && make
-
-# Build fileless execution tools
-cd ../payloads
-make clean && make
-```
-
-### Run
-
-```bash
-# Terminal 1: Execute fileless binary
-cd research/payloads
-./fileless_exec ./simple_payload
-
-# Terminal 2: Hide the process
-PID=$(pgrep -f simple_payload)
-HIDE_PIDS=$PID LD_PRELOAD=../preload/libprocessHider_v2.so ps aux
-# Result: Process is HIDDEN
-```
-
-## Project Structure
-
-```
-kernel-evasion/
-├── research/
-│   ├── preload/          # LD_PRELOAD process hiding libraries
-│   │   ├── processHider.c        # V1: Basic readdir hiding
-│   │   ├── processHider_v2.c     # V2: Enhanced metadata blocking
-│   │   ├── libprocessHider.so    # Compiled V1 library
-│   │   ├── libprocessHider_v2.so # Compiled V2 library
-│   │   └── Makefile
-│   ├── payloads/         # Fileless execution implementation
-│   │   ├── fileless_exec.c       # Memory execution wrapper
-│   │   ├── simple_payload.c      # Test victim program
-│   │   ├── fileless_exec         # Compiled binary
-│   │   ├── simple_payload        # Compiled test payload
-│   │   └── Makefile
-│   └── lkm/             # Abandoned kernel module (proved unsafe)
-├── docs/                # Architecture and design documentation
-├── CMakeLists.txt       # Build configuration
-└── README.md            # This file
-```
-
-## Components
-
-### Layer 1: Fileless Execution
-
-**File:** `research/payloads/fileless_exec.c` (113 lines)
-
-Executes binaries from memory with zero disk artifacts:
-- Read binary into RAM
-- Create anonymous memory file (memfd_create)
-- Write binary to memory file
-- Execute from memory (execveat syscall)
-- Full argument passing support
-
-**Status:** ✅ Production Ready
-
-### Layer 2: Process Hiding (V1)
-
-**File:** `research/preload/processHider.c` (115 lines)
-
-Basic LD_PRELOAD library for process invisibility:
-- Hook readdir/readdir64
-- Filter processes by PID
-- Hide from directory listing
-- Invisible to: ls /proc, ps (partial)
-
-**Status:** ✅ Working
-
-### Layer 3: Enhanced Metadata Blocking (V2)
-
-**File:** `research/preload/processHider_v2.c` (252 lines)
-
-Complete metadata blocking implementation:
-- Hooks: readdir, readdir64, open, openat, read, readlink
-- Blocks access to: /proc/[pid]/comm, /proc/[pid]/stat, /proc/[pid]/cmdline, /proc/[pid]/exe
-- Returns ENOENT (not found) errors
-- Fakes /proc/[pid]/exe symlink targets
-- Environment variable configuration: HIDE_PIDS
-
-**Status:** ✅ Production Ready
-
-## Test Results
-
-### Fileless Execution ✅
-- Binary loaded into memory: ✓
-- Zero disk artifacts: ✓
-- Process executes successfully: ✓
-- Arguments passed correctly: ✓
-- 60-second runtime verified: ✓
-- System stable: ✓
-
-### Process Visibility ✅
-- Hidden from readdir: ✓
-- Hidden from ls /proc: ✓
-- Hidden from ps aux: ✓
-- Process still alive internally: ✓
-
-### Metadata Access ✅
-- /proc/[pid]/comm blocked: ✓
-- /proc/[pid]/stat blocked: ✓
-- /proc/[pid]/cmdline blocked: ✓
-- /proc/[pid]/exe faked: ✓
-- Proper ENOENT errors: ✓
-
-### System Stability ✅
-- Zero kernel hangs: ✓
-- Zero system crashes: ✓
-- No memory leaks: ✓
-- Clean process termination: ✓
-
-## Requirements
-
-- **Linux:** 5.7+ (for memfd_create, execveat)
-- **Architecture:** x86_64
-- **Build Tools:** gcc/make
-- **Privileges:** No special privileges needed
-- **Kernel Changes:** None required (pure userland)
-
-## Usage Examples
-
-### Basic Fileless Execution
-```bash
-cd research/payloads
-./fileless_exec ./simple_payload arg1 arg2
-```
-
-### Hide Single Process
-```bash
-./fileless_exec ./simple_payload &
-HIDDEN=$!
-HIDE_PIDS=$HIDDEN LD_PRELOAD=../preload/libprocessHider_v2.so ps aux
-```
-
-### Hide Multiple Processes
-```bash
-HIDE_PIDS="1234 5678 9999" LD_PRELOAD=../preload/libprocessHider_v2.so ls /proc
-```
-
-### Complete Invisibility Test
-```bash
-# Start hidden process
-./fileless_exec ./simple_payload &
-PID=$!
-sleep 2
-
-# Verify hiding
-echo "Without LD_PRELOAD:"
-ls /proc | grep $PID || echo "  (not found)"
-ps aux | grep $PID | grep -v grep || echo "  (not found)"
-
-# Verify metadata blocking
-echo "With LD_PRELOAD_v2:"
-HIDE_PIDS=$PID LD_PRELOAD=../preload/libprocessHider_v2.so cat /proc/$PID/comm 2>&1
-HIDE_PIDS=$PID LD_PRELOAD=../preload/libprocessHider_v2.so cat /proc/$PID/stat 2>&1
-```
-
-## Design Decisions
-
-### Why Userland-Only
-- **Safety:** No kernel module crashes
-- **Stability:** Zero system-wide impact
-- **Deployability:** Simple LD_PRELOAD library
-- **Detectability:** Lower profile than kernel hooks
-- **Maintainability:** Pure C code, fully auditable
-
-### Why NOT eBPF
-- Test system has no monitoring tools (auditd, Falco, tetragon)
-- eBPF hooks are detectable (Datadog published detection)
-- bpf_probe_write_user documented crash risk
-- Adds secondary hooks (dmesg filtering) - expands attack surface
-- Userland approach covers 80%+ of use cases safely
-
-## Limitations
-
-### What This Hides
-✅ Process from directory listings  
-✅ Process metadata files (/proc/[pid]/*)  
-✅ Binary on disk (fileless execution)  
-✅ Process arguments and environment  
-
-### What This Does NOT Hide
-⚠️ Network connections (separate /proc/net/tcp hooks needed)  
-⚠️ Open file descriptors (would need lsof hooking)  
-⚠️ Direct /proc/[pid]/* reads by full path (open blocked, but file still exists in kernel)  
-⚠️ Kernel-level monitoring (auditd/Falco/tetragon logs see syscalls)  
-
-## Code Quality
-
-| Metric | Rating | Notes |
-|--------|--------|-------|
-| Lines of Code | 507 | Clean, focused |
-| Dependencies | 0 | Only libc, dlsym |
-| Memory Safety | ✅ | No buffer overflows |
-| Maintainability | ⭐⭐⭐⭐⭐ | Clear, auditable |
-| Portability | ✅ | x86_64 Linux 5.7+ |
-| Performance | ⭐⭐⭐⭐⭐ | Minimal overhead |
-| Stability | ⭐⭐⭐⭐⭐ | Zero crashes |
-
-## Documentation
-
-- **PROJECT_COMPLETION_REPORT.md** - Comprehensive technical analysis
-- **DELIVERY_SUMMARY.md** - Complete usage and deployment guide
-- **PHASE3_READY.md** - Phase 3 completion analysis
-- **PHASE2_SUCCESS.md** - Phase 2 results
-- **GIT_STATUS_AND_RESOLUTION.md** - Git repository status
-- **docs/ARCHITECTURE.md** - System architecture details
-
-## Authorization & Use
-
-**Authorized by:**
-- ✅ IIT Bombay Cyber Security Team
-- ✅ Red Hat Security Research
-
-**Intended for:**
-- ✅ Red team operations (authorized testing)
-- ✅ Defense system validation
-- ✅ Security research
-- ✅ Detection tool development
-
-**NOT for:**
-- ❌ Malicious purposes
-- ❌ Unauthorized system access
-- ❌ Evading law enforcement
-
-## Status
-
-**Project Status:** ✅ **COMPLETE & PRODUCTION READY**
-
-All three layers implemented, tested, and verified working. Zero system impact. Ready for deployment in authorized red team and defense research contexts.
+Live instance: https://jocky.pointblank.club/
 
 ---
 
-**Last Updated:** 2026-09-27  
-**Code Quality:** Production Grade  
-**Test Coverage:** Comprehensive  
-**System Stability:** Verified  
-**Authorization:** Confirmed  
+## What it does
+
+JOCKY has two main pipelines:
+
+**Attacker pipeline** — Write a payload in the JOCKY language, compile it, and it runs on the target. The payload collects data (system info, credentials, network state, files) and sends it back to the C2 server over HTTP. The server logs everything and exposes it through the web dashboard. Obfuscation passes run at compile time so the output binary is harder to detect.
+
+**Forensic pipeline** — Compile a forensic agent that runs on a target and collects artifacts: event logs, registry keys, prefetch files, MFT, network connections, running processes, memory regions. Output is JSON, STIX, Sigma rules, or HTML report. Useful for incident response and post-compromise analysis.
+
+---
+
+## Architecture
+
+```
+JOCKY source (.jky)
+        |
+    Compiler (Python + LLVM)
+        |
+    Obfuscation passes
+        |
+    Windows/Linux PE or ELF
+        |
+    Runs on target
+        |
+    HTTP POST to C2 server
+        |
+    Web dashboard (https://jocky.pointblank.club/)
+```
+
+The compiler targets `x86_64-w64-windows-gnu` for Windows and `x86_64-linux-gnu` for Linux. It links against a runtime library that handles network, crypto, evasion, and data collection.
+
+---
+
+## Local build
+
+### Requirements
+
+- Python 3.11+
+- Docker (for the web stack)
+- 10GB+ free disk
+- Linux x86_64
+
+### Setup
+
+```bash
+git clone https://github.com/Incharajayaram/JOCKY.git
+cd JOCKY
+pip install -e .
+```
+
+### Toolchain
+
+The compiler needs a pre-built clang toolchain with mingw sysroot and static libs (OpenSSL, curl, zlib). Download it:
+
+```bash
+./upload_toolchain.sh   # only if you're uploading to GCS
+# or pull from GCS if you have access:
+gcloud storage cp gs://jocky-toolchain/toolchain.zip /tmp/toolchain.zip
+unzip /tmp/toolchain.zip -d .
+```
+
+### Compile a payload
+
+```bash
+python scripts/compile_pipeline.py examples/research_chain_windows_production.jky \
+    --platform windows \
+    --preset aggressive
+```
+
+Output binary lands in `build/`.
+
+### Run the web stack locally
+
+```bash
+# Backend
+cd web/backend
+pip install -r requirements.txt
+uvicorn app:app --host 0.0.0.0 --port 8000
+
+# Frontend (separate terminal)
+cd web/frontend
+# serve with nginx or any static file server
+```
+
+---
+
+## Obfuscation passes
+
+Aggressive preset runs all of these at compile time:
+
+- `string_encrypt` — XOR encrypt string literals
+- `constant_obfuscate` — replace constants with computed expressions
+- `symbol_obfuscate` — rename functions and globals
+- `crypto_hash` — hash-based dispatch tables
+- `scf_obfuscate` — split control flow
+- `import_obfuscate` — dynamic import resolution
+- `strip_signature` — remove PE/ELF signatures
+- `virtualize` — lift hot functions to VM bytecode
+- `opaque_pred` — insert opaque predicates
+- `substitution` — arithmetic substitution
+- `boguscf` — bogus control flow
+- `flattening` — control flow flattening
+- `linear_mba` — mixed boolean arithmetic
+- `anti_debug` — timing and debugger detection
+- `indirect_call` — indirect call dispatch
+
+---
+
+## C2 telemetry
+
+The payload sends events to `/api/telemetry` on the C2 server. Events include:
+
+- `stage_start` / `stage_complete` — pipeline progress
+- `data_collected` — harvested data chunks
+- `exfil_success` / `exfil_fail` — upload results
+- `evasion_event` — EDR/AV detection attempts
+- `error` — runtime errors
+
+The dashboard at https://jocky.pointblank.club/ shows live event streams, exfiltrated data, forensic results, and driver scoring.
+
+---
+
+## Project structure
+
+```
+JOCKY/
+├── src/jocky/
+│   ├── language/       # Parser, type checker, codegen
+│   ├── passes/         # Obfuscation passes
+│   └── stdlib/         # Standard library
+├── src/runtime/
+│   ├── windows/        # Windows-specific APIs
+│   ├── linux/          # Linux-specific APIs
+│   ├── common/         # Shared (crypto, network, compression)
+│   ├── evasion/        # EDR evasion, AMSI bypass, unhooking
+│   ├── forensics/      # Forensic collection and analysis
+│   └── exfil/          # Exfiltration channels
+├── web/
+│   ├── backend/        # FastAPI C2 server
+│   └── frontend/       # Dashboard
+├── examples/           # Example .jky programs
+├── scripts/            # Compile pipeline and tooling
+└── tests/
+```
+
+---
+
+## License
+
+For authorized security research and red team use only.
